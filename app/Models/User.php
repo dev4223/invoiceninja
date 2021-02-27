@@ -80,6 +80,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'custom_value3',
         'custom_value4',
         'is_deleted',
+        'google_2fa_secret',
     ];
 
     /**
@@ -102,6 +103,12 @@ class User extends Authenticatable implements MustVerifyEmail
         'created_at'       => 'timestamp',
         'deleted_at'       => 'timestamp',
     ];
+
+
+    public function name()
+    {
+        return $this->first_name . ' ' . $this->last_name;
+    }
 
     public function getEntityType()
     {
@@ -330,6 +337,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function documents()
     {
         return $this->morphMany(Document::class, 'documentable');
+    }
+
+    public function isVerified()
+    {
+        return is_null($this->email_verified_at) ? false : true;
     }
 
     public function getEmailVerifiedAt()

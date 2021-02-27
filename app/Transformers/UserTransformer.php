@@ -58,6 +58,8 @@ class UserTransformer extends EntityTransformer
             'custom_value3' => $user->custom_value3 ?: '',
             'custom_value4' => $user->custom_value4 ?: '',
             'oauth_provider_id' => (string) $user->oauth_provider_id,
+            'last_confirmed_email_address' => (string) $user->last_confirmed_email_address ?: '',
+            'google_2fa_secret' => (bool) $user->google_2fa_secret,
         ];
     }
 
