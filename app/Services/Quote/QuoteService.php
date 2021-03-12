@@ -12,6 +12,7 @@
 namespace App\Services\Quote;
 
 use App\Events\Quote\QuoteWasApproved;
+use App\Jobs\Util\UnlinkFile;
 use App\Models\Invoice;
 use App\Models\Quote;
 use App\Repositories\QuoteRepository;
@@ -37,21 +38,6 @@ class QuoteService
 
         return $this;
     }
-
-    // public function markApproved()
-    // {
-    //     $mark_approved = new MarkApproved($this->quote->client);
-    //     $this->quote = $mark_approved->run($this->quote);
-
-    //     if ($this->quote->client->getSetting('auto_convert_quote') == true) {
-    //         $this->convert();
-    //     }
-
-    //     $this->markSent()
-    //          ->createInvitations();
-
-    //     return $this;
-    // }
 
     public function convert() :self
     {
@@ -126,6 +112,7 @@ class QuoteService
                  ->service()
                  ->markSent()
                  ->createInvitations()
+                 ->deletePdf()
                  ->save();
 
         }
@@ -186,6 +173,13 @@ class QuoteService
         if (!isset($this->quote->public_notes)) 
             $this->quote->public_notes = $this->quote->client->public_notes;
         
+        return $this;
+    }
+
+    public function deletePdf()
+    {
+        UnlinkFile::dispatchNow(config('filesystems.default'), $this->quote->client->quote_filepath() . $this->quote->number.'.pdf');
+
         return $this;
     }
 

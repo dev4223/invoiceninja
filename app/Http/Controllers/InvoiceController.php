@@ -30,6 +30,7 @@ use App\Jobs\Entity\EmailEntity;
 use App\Jobs\Invoice\StoreInvoice;
 use App\Jobs\Invoice\ZipInvoices;
 use App\Jobs\Util\UnlinkFile;
+use App\Models\Account;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\Quote;
@@ -395,6 +396,8 @@ class InvoiceController extends BaseController
         }
 
         $invoice = $this->invoice_repo->save($request->all(), $invoice);
+        
+        $invoice->service()->deletePdf();
 
         event(new InvoiceWasUpdated($invoice, $invoice->company, Ninja::eventVars()));
 
@@ -696,14 +699,14 @@ class InvoiceController extends BaseController
                 }
                 break;
             case 'cancel':
-                $invoice = $invoice->service()->handleCancellation()->save();
+                $invoice = $invoice->service()->handleCancellation()->deletePdf()->save();
 
                 if (! $bulk) {
                     $this->itemResponse($invoice);
                 }
                 break;
             case 'reverse':
-                $invoice = $invoice->service()->handleReversal()->save();
+                $invoice = $invoice->service()->handleReversal()->deletePdf()->save();
 
                 if (! $bulk) {
                     $this->itemResponse($invoice);
@@ -719,7 +722,7 @@ class InvoiceController extends BaseController
                 }
 
                 //touch reminder1,2,3_sent + last_sent here if the email is a reminder.
-                $invoice->service()->touchReminder($this->reminder_template)->save();
+                $invoice->service()->touchReminder($this->reminder_template)->deletePdf()->save();
 
                 $invoice->invitations->load('contact.client.country', 'invoice.client.country', 'invoice.company')->each(function ($invitation) use ($invoice) {
                     EmailEntity::dispatch($invitation, $invoice->company, $this->reminder_template);
@@ -906,7 +909,9 @@ class InvoiceController extends BaseController
      */
     public function upload(UploadInvoiceRequest $request, Invoice $invoice)
     {
-
+        if(!$this->checkFeature(Account::FEATURE_DOCUMENTS))
+            return $this->featureFailure();
+        
         if ($request->has('documents')) 
             $this->saveDocuments($request->file('documents'), $invoice);
 

@@ -23,20 +23,25 @@ class Setup {
     }
 
     handleDatabaseCheck() {
-        let data = {
-            db_host: document.querySelector('input[name="db_host"]').value,
-            db_port: document.querySelector('input[name="db_port"]').value,
-            db_database: document.querySelector('input[name="db_database"]')
-                .value,
-            db_username: document.querySelector('input[name="db_username"]')
-                .value,
-            db_password: document.querySelector('input[name="db_password"]')
-                .value,
-        };
+        let url = document.querySelector('meta[name=setup-db-check]').content,
+            data = {};
+
+        if (document.querySelector('input[name="db_host"]')) {
+            data = {
+                db_host: document.querySelector('input[name="db_host"]').value,
+                db_port: document.querySelector('input[name="db_port"]').value,
+                db_database: document.querySelector('input[name="db_database"]')
+                    .value,
+                db_username: document.querySelector('input[name="db_username"]')
+                    .value,
+                db_password: document.querySelector('input[name="db_password"]')
+                    .value,
+            };
+        }
 
         this.checkDbButton.disabled = true;
 
-        Axios.post('/setup/check_db', data)
+        Axios.post(url, data)
             .then((response) =>
                 this.handleSuccess(this.checkDbAlert, 'mail-wrapper')
             )
@@ -46,6 +51,8 @@ class Setup {
     }
 
     handleSmtpCheck() {
+        let url = document.querySelector('meta[name=setup-email-check]').content;
+
         let data = {
             mail_driver: document.querySelector('select[name="mail_driver"]')
                 .value,
@@ -71,7 +78,7 @@ class Setup {
             return (this.checkSmtpButton.disabled = false);
         }
 
-        Axios.post('/setup/check_mail', data)
+        Axios.post(url, data)
             .then((response) => {
                 this.handleSuccess(this.checkSmtpAlert, 'account-wrapper');
                 this.handleSuccess(this.checkSmtpAlert, 'submit-wrapper');
@@ -83,9 +90,10 @@ class Setup {
     }
 
     handleTestPdfCheck() {
+        let url = document.querySelector('meta[name=setup-pdf-check]').content;
         this.checkPdfButton.disabled = true;
 
-        Axios.post('/setup/check_pdf', {})
+        Axios.post(url, {})
             .then((response) => {
                 try {
                     let win = window.open(response.data.url, '_blank');

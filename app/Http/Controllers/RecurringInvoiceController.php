@@ -21,6 +21,7 @@ use App\Http\Requests\RecurringInvoice\ShowRecurringInvoiceRequest;
 use App\Http\Requests\RecurringInvoice\StoreRecurringInvoiceRequest;
 use App\Http\Requests\RecurringInvoice\UpdateRecurringInvoiceRequest;
 use App\Http\Requests\RecurringInvoice\UploadRecurringInvoiceRequest;
+use App\Models\Account;
 use App\Models\RecurringInvoice;
 use App\Repositories\RecurringInvoiceRepository;
 use App\Transformers\RecurringInvoiceTransformer;
@@ -373,6 +374,8 @@ class RecurringInvoiceController extends BaseController
 
         $recurring_invoice = $this->recurring_invoice_repo->save($request->all(), $recurring_invoice);
 
+        $recurring_invoice->service()->deletePdf()->save();
+
         return $this->itemResponse($recurring_invoice);
     }
 
@@ -438,7 +441,7 @@ class RecurringInvoiceController extends BaseController
     /**
      * @OA\Get(
      *      path="/api/v1/recurring_invoice/{invitation_key}/download",
-     *      operationId="downloadInvoice",
+     *      operationId="downloadRecurringInvoice",
      *      tags={"invoices"},
      *      summary="Download a specific invoice by invitation key",
      *      description="Downloads a specific invoice",
@@ -738,6 +741,9 @@ class RecurringInvoiceController extends BaseController
     public function upload(UploadRecurringInvoiceRequest $request, RecurringInvoice $recurring_invoice)
     {
 
+        if(!$this->checkFeature(Account::FEATURE_DOCUMENTS))
+            return $this->featureFailure();
+        
         if ($request->has('documents')) 
             $this->saveDocuments($request->file('documents'), $recurring_invoice);
 

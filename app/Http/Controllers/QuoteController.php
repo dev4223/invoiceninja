@@ -26,6 +26,7 @@ use App\Http\Requests\Quote\StoreQuoteRequest;
 use App\Http\Requests\Quote\UpdateQuoteRequest;
 use App\Http\Requests\Quote\UploadQuoteRequest;
 use App\Jobs\Invoice\ZipInvoices;
+use App\Models\Account;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\Quote;
@@ -386,6 +387,8 @@ class QuoteController extends BaseController
 
         $quote = $this->quote_repo->save($request->all(), $quote);
 
+        $quote->service()->deletePdf();
+        
         event(new QuoteWasUpdated($quote, $quote->company, Ninja::eventVars()));
 
         return $this->itemResponse($quote);
@@ -774,6 +777,9 @@ class QuoteController extends BaseController
      */
     public function upload(UploadQuoteRequest $request, Quote $quote)
     {
+
+        if(!$this->checkFeature(Account::FEATURE_DOCUMENTS))
+            return $this->featureFailure();
 
         if ($request->has('documents')) 
             $this->saveDocuments($request->file('documents'), $quote);

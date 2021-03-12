@@ -125,6 +125,15 @@ class SetupController extends Controller
             'DB_CONNECTION' => 'db-ninja-01',
         ];
 
+        if(config('ninja.preconfigured_install')){
+        	// Database connection was already configured. Don't let the user override it.
+        	unset($env_values['DB_HOST1']);
+			unset($env_values['DB_PORT1']);
+			unset($env_values['DB_DATABASE1']);
+			unset($env_values['DB_USERNAME1']);
+			unset($env_values['DB_PASSWORD1']);
+		}
+
         try {
 
             foreach ($env_values as $property => $value) {
@@ -155,6 +164,7 @@ class SetupController extends Controller
 
             return redirect('/');
         } catch (Exception $e) {
+            
             nlog($e->getMessage());
 
             return redirect()
@@ -212,7 +222,7 @@ class SetupController extends Controller
     public function checkPdf(Request $request)
     {
         try {
-            if (config('ninja.phantomjs_key')) {
+            if (config('ninja.phantomjs_pdf_generation')) {
                 return $this->testPhantom();
             }
 
@@ -240,7 +250,7 @@ class SetupController extends Controller
     private function testPhantom()
     {
         try {
-            $key = config('ninja.phantomjs_key');
+            $key = config('ninja.phantomjs_pdf_generation');
             $url = 'https://www.invoiceninja.org/';
 
             $phantom_url = "https://phantomjscloud.com/api/browser/v2/{$key}/?request=%7Burl:%22{$url}%22,renderType:%22pdf%22%7D";

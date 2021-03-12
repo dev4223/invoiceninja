@@ -26,6 +26,7 @@ use App\Http\Requests\Credit\UpdateCreditRequest;
 use App\Http\Requests\Credit\UploadCreditRequest;
 use App\Jobs\Entity\EmailEntity;
 use App\Jobs\Invoice\EmailCredit;
+use App\Models\Account;
 use App\Models\Client;
 use App\Models\Credit;
 use App\Models\Invoice;
@@ -375,6 +376,8 @@ class CreditController extends BaseController
 
         $credit = $this->credit_repository->save($request->all(), $credit);
 
+        $credit->service()->deletePdf();
+        
         event(new CreditWasUpdated($credit, $credit->company, Ninja::eventVars()));
 
         return $this->itemResponse($credit);
@@ -643,6 +646,9 @@ class CreditController extends BaseController
     public function upload(UploadCreditRequest $request, Credit $credit)
     {
 
+        if(!$this->checkFeature(Account::FEATURE_DOCUMENTS))
+            return $this->featureFailure();
+        
         if ($request->has('documents')) 
             $this->saveDocuments($request->file('documents'), $credit);
 

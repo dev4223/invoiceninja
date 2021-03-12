@@ -74,6 +74,10 @@ class UserRepository extends BaseRepository
         }
 
         $user->account_id = $account->id;
+
+        if(strlen($user->password) >=1)
+            $user->has_password = true;
+        
         $user->save();
 
         if (isset($data['company_user'])) {
@@ -103,6 +107,9 @@ class UserRepository extends BaseRepository
 
     public function destroy(array $data, User $user)
     {
+        if($user->isOwner())
+            return $user;
+
         if (array_key_exists('company_user', $data)) {
             $this->forced_includes = 'company_users';
 
@@ -141,9 +148,9 @@ class UserRepository extends BaseRepository
 
         event(new UserWasDeleted($user, auth()->user(), $company, Ninja::eventVars()));
 
-        $user->is_deleted = true;
-        $user->save();
-        $user->delete();
+        // $user->is_deleted = true;
+        // $user->save();
+        // $user->delete();
 
 
         return $user->fresh();

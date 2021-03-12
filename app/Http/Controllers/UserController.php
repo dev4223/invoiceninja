@@ -209,6 +209,8 @@ class UserController extends BaseController
 
         $ct = CreateCompanyToken::dispatchNow($company, $user, $user_agent);
 
+            nlog("in the store method of the usercontroller class");
+
         event(new UserWasCreated($user, auth()->user(), $company, Ninja::eventVars()));
 
         return $this->itemResponse($user->fresh());
@@ -466,8 +468,11 @@ class UserController extends BaseController
      */
     public function destroy(DestroyUserRequest $request, User $user)
     {
+        if($user->isOwner())
+            return response()->json(['message', 'Cannot detach owner.'],400);
+
         /* If the user passes the company user we archive the company user */
-        $user = $this->user_repo->destroy($request->all(), $user);
+        $user = $this->user_repo->delete($request->all(), $user);
 
         event(new UserWasDeleted($user, auth()->user(), auth()->user()->company, Ninja::eventVars()));
 
@@ -555,79 +560,6 @@ class UserController extends BaseController
     }
 
     /**
-     * Attach an existing user to a company.
-     *
-     * @OA\Post(
-     *      path="/api/v1/users/{user}/attach_to_company",
-     *      operationId="attachUser",
-     *      tags={"users"},
-     *      summary="Attach an existing user to a company",
-     *      description="Attach an existing user to a company",
-     *      @OA\Parameter(ref="#/components/parameters/X-Api-Secret"),
-     *      @OA\Parameter(ref="#/components/parameters/X-Api-Token"),
-     *      @OA\Parameter(ref="#/components/parameters/X-Requested-With"),
-     *      @OA\Parameter(ref="#/components/parameters/include"),
-     *      @OA\Parameter(
-     *          name="user",
-     *          in="path",
-     *          description="The user hashed_id",
-     *          example="FD767dfd7",
-     *          required=true,
-     *          @OA\Schema(
-     *              type="string",
-     *              format="string",
-     *          ),
-     *      ),
-     *      @OA\RequestBody(
-     *         description="The company user object",
-     *         required=true,
-     *         @OA\JsonContent(ref="#/components/schemas/CompanyUser"),
-     *     ),
-     *      @OA\Response(
-     *          response=200,
-     *          description="Returns the saved User object",
-     *          @OA\Header(header="X-MINIMUM-CLIENT-VERSION", ref="#/components/headers/X-MINIMUM-CLIENT-VERSION"),
-     *          @OA\Header(header="X-RateLimit-Remaining", ref="#/components/headers/X-RateLimit-Remaining"),
-     *          @OA\Header(header="X-RateLimit-Limit", ref="#/components/headers/X-RateLimit-Limit"),
-     *          @OA\JsonContent(ref="#/components/schemas/CompanyUser"),
-     *       ),
-     *       @OA\Response(
-     *          response=422,
-     *          description="Validation error",
-     *          @OA\JsonContent(ref="#/components/schemas/ValidationError"),
-     *
-     *       ),
-     *       @OA\Response(
-     *           response="default",
-     *           description="Unexpected Error",
-     *           @OA\JsonContent(ref="#/components/schemas/Error"),
-     *       ),
-     *     )
-     * @param AttachCompanyUserRequest $request
-     * @param User $user
-     * @return Response|mixed
-     */
-    public function attach(AttachCompanyUserRequest $request, User $user)
-    {
-        $company = auth()->user()->company();
-
-        $user->companies()->attach(
-            $company->id,
-            array_merge(
-                $request->all(),
-                [
-                    'account_id' => $company->account->id,
-                    'notifications' => CompanySettings::notificationDefaults(),
-            ]
-            )
-        );
-
-        $ct = CreateCompanyToken::dispatchNow($company, $user, 'User token created by'.auth()->user()->present()->name());
-
-        return $this->itemResponse($user->fresh());
-    }
-
-    /**
      * Detach an existing user to a company.
      *
      * @OA\Delete(
@@ -676,6 +608,9 @@ class UserController extends BaseController
      */
     public function detach(DetachCompanyUserRequest $request, User $user)
     {
+        if($user->isOwner())
+            return response()->json(['message', 'Cannot detach owner.'],400);
+
         $company_user = CompanyUser::whereUserId($user->id)
                                     ->whereCompanyId(auth()->user()->companyId())->first();
 
@@ -693,11 +628,68 @@ class UserController extends BaseController
     }
 
     /**
-     * Detach an existing user to a company.
+     * Invite an existing user to a company.
+     *
+     * @OA\Post(
+     *      path="/api/v1/users/{user}/invite",
+     *      operationId="inviteUser",
+     *      tags={"users"},
+     *      summary="Reconfirm an existing user to a company",
+     *      description="Reconfirm an existing user from a company",
+     *      @OA\Parameter(ref="#/components/parameters/X-Api-Secret"),
+     *      @OA\Parameter(ref="#/components/parameters/X-Api-Token"),
+     *      @OA\Parameter(ref="#/components/parameters/X-Requested-With"),
+     *      @OA\Parameter(ref="#/components/parameters/include"),
+     *      @OA\Parameter(
+     *          name="user",
+     *          in="path",
+     *          description="The user hashed_id",
+     *          example="FD767dfd7",
+     *          required=true,
+     *          @OA\Schema(
+     *              type="string",
+     *              format="string",
+     *          ),
+     *      ),
+     *      @OA\Response(
+     *          response=200,
+     *          description="Success response",
+     *          @OA\Header(header="X-MINIMUM-CLIENT-VERSION", ref="#/components/headers/X-MINIMUM-CLIENT-VERSION"),
+     *          @OA\Header(header="X-RateLimit-Remaining", ref="#/components/headers/X-RateLimit-Remaining"),
+     *          @OA\Header(header="X-RateLimit-Limit", ref="#/components/headers/X-RateLimit-Limit"),
+     *       ),
+     *       @OA\Response(
+     *          response=422,
+     *          description="Validation error",
+     *          @OA\JsonContent(ref="#/components/schemas/ValidationError"),
+     *
+     *       ),
+     *       @OA\Response(
+     *           response="default",
+     *           description="Unexpected Error",
+     *           @OA\JsonContent(ref="#/components/schemas/Error"),
+     *       ),
+     *     )
+     * @param ReconfirmUserRequest $request
+     * @param User $user
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function invite(ReconfirmUserRequest $request, User $user)
+    {
+
+        $user->service()->invite($user->company());
+
+        return response()->json(['message' => ctrans('texts.confirmation_resent')], 200);
+
+    }
+
+
+    /**
+     * Invite an existing user to a company.
      *
      * @OA\Post(
      *      path="/api/v1/users/{user}/reconfirm",
-     *      operationId="reconfirmUser",
+     *      operationId="inviteUserReconfirm",
      *      tags={"users"},
      *      summary="Reconfirm an existing user to a company",
      *      description="Reconfirm an existing user from a company",
@@ -741,20 +733,10 @@ class UserController extends BaseController
      */
     public function reconfirm(ReconfirmUserRequest $request, User $user)
     {
-        $user->confirmation_code = $this->createDbHash($user->company()->db);
-        $user->save();
 
-        $nmo = new NinjaMailerObject;
-        $nmo->mailable = new NinjaMailer((new VerifyUserObject($user, $user->company()))->build());
-        $nmo->company = $user->company();
-        $nmo->to_user = $user;
-        $nmo->settings = $user->company->settings;
-
-        NinjaMailerJob::dispatch($nmo);
+        $user->service()->invite($user->company());
 
         return response()->json(['message' => ctrans('texts.confirmation_resent')], 200);
 
     }
-
-
 }
