@@ -4,7 +4,7 @@
 @push('head')
     <meta name="pdf-url" content="{{ $invoice->pdf_file_path() }}">
     <meta name="show-invoice-terms" content="{{ $settings->show_accept_invoice_terms ? true : false }}">
-    <meta name="require-invoice-signature" content="{{ $settings->require_invoice_signature ? true : false }}">
+    <meta name="require-invoice-signature" content="{{ $client->company->account->hasFeature(\App\Models\Account::FEATURE_INVOICE_SETTINGS) && $settings->require_invoice_signature }}">
     <script src="{{ asset('js/vendor/pdf.js/pdf.min.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/signature_pad@2.3.2/dist/signature_pad.min.js"></script>
 @endpush
@@ -62,7 +62,7 @@
                     <div>
                         <h3 class="text-lg leading-6 font-medium text-gray-900">
                             {{ ctrans('texts.invoice_number_placeholder', ['invoice' => $invoice->number])}}
-                            - {{ ctrans('texts.paid') }}
+                            - {{ \App\Models\Invoice::stringStatus($invoice->status_id) }}
                         </h3>
                     </div>
                 </div>

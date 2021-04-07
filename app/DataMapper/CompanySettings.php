@@ -109,7 +109,7 @@ class CompanySettings extends BaseSettings
 
     public $shared_invoice_quote_counter = false; //@implemented
     public $shared_invoice_credit_counter = false; //@implemented
-    public $recurring_number_prefix = 'R'; //@implemented
+    public $recurring_number_prefix = ''; //@implemented
     public $reset_counter_frequency_id = '0'; //@implemented
     public $reset_counter_date = ''; //@implemented
     public $counter_padding = 4; //@implemented
@@ -138,6 +138,8 @@ class CompanySettings extends BaseSettings
     public $tax_rate3 = 0; //@TODO where do we use this?
     public $payment_type_id = '0'; //@TODO where do we use this?
     // public $invoice_fields = ''; //@TODO is this redundant, we store this in the custom_fields on the company?
+
+    public $valid_until = ''; //@implemented
 
     public $show_accept_invoice_terms = false; //@TODO ben to confirm
     public $show_accept_quote_terms = false;  //@TODO ben to confirm
@@ -430,6 +432,7 @@ class CompanySettings extends BaseSettings
         'show_accept_quote_terms'            => 'bool',
         'show_accept_invoice_terms'          => 'bool',
         'timezone_id'                        => 'string',
+        'valid_until'                        => 'string',
         'date_format_id'                     => 'string',
         'military_time'                      => 'bool',
         'language_id'                        => 'string',
@@ -574,7 +577,8 @@ class CompanySettings extends BaseSettings
     public static function notificationDefaults() :stdClass
     {
         $notification = new stdClass;
-        $notification->email = ['all_notifications'];
+        $notification->email = [];
+        // $notification->email = ['all_notifications'];
 
         return $notification;
     }
@@ -596,6 +600,7 @@ class CompanySettings extends BaseSettings
                 '$client.city_state_postal',
                 '$client.country',
                 '$contact.email',
+                '$client.phone',
             ],
             'company_details' => [
                 '$company.name',

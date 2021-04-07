@@ -34,7 +34,7 @@ trait UserNotifies
             array_push($required_permissions, 'all_user_notifications');
         }
 
-        if (count(array_intersect($required_permissions, $notifications->email)) >= 1 || count(array_intersect($required_permissions, ['all_user_notifications'])) >= 1 || count(array_intersect($required_permissions, 'all_notifications')) >= 1) {
+        if (count(array_intersect($required_permissions, $notifications->email)) >= 1 || count(array_intersect(['all_user_notifications'], $notifications->email)) >= 1 || count(array_intersect(['all_notifications'],$notifications->email)) >= 1) {
             array_push($notifiable_methods, 'mail');
         }
 
@@ -61,9 +61,10 @@ trait UserNotifies
             array_push($required_permissions, 'all_user_notifications');
         }
 
-        if (count(array_intersect($required_permissions, $notifications->email)) >= 1 || count(array_intersect($required_permissions, ['all_user_notifications'])) >= 1 || count(array_intersect($required_permissions, ['all_notifications'])) >= 1) {
+        if (count(array_intersect($required_permissions, $notifications->email)) >= 1 || count(array_intersect(['all_user_notifications'], $notifications->email)) >= 1 || count(array_intersect(['all_notifications'],$notifications->email)) >= 1) {
             array_push($notifiable_methods, 'mail');
         }
+
 
         return $notifiable_methods;
     }
