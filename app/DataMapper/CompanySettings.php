@@ -236,6 +236,7 @@ class CompanySettings extends BaseSettings
     public $id_number = ''; //@implemented
 
     public $page_size = 'A4';  //Letter, Legal, Tabloid, Ledger, A0, A1, A2, A3, A4, A5, A6
+    public $page_layout = 'portrait';
     public $font_size = 7; //@implemented
     public $primary_font = 'Roboto';
     public $secondary_font = 'Roboto';
@@ -327,6 +328,7 @@ class CompanySettings extends BaseSettings
         'signature_on_pdf'                   => 'bool',
         'quote_footer'                       => 'string',
         'page_size'                          => 'string',
+        'page_layout'                        => 'string',
         'font_size'                          => 'int',
         'primary_font'                       => 'string',
         'secondary_font'                     => 'string',
@@ -593,14 +595,14 @@ class CompanySettings extends BaseSettings
         $variables = [
             'client_details' => [
                 '$client.name',
-                '$client.id_number',
+                '$client.number',
                 '$client.vat_number',
                 '$client.address1',
                 '$client.address2',
                 '$client.city_state_postal',
                 '$client.country',
-                '$contact.email',
                 '$client.phone',
+                '$contact.email',
             ],
             'company_details' => [
                 '$company.name',
@@ -666,7 +668,7 @@ class CompanySettings extends BaseSettings
                 '$total_taxes',
                 '$line_taxes',
                 '$paid_to_date',
-                '$outstanding',
+                '$total',
             ],
         ];
 

@@ -1,9 +1,5 @@
 <div>
-    <p class="mb-4 uppercase leading-4 tracking-wide inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary text-white">
-        Subscriptions
-    </p>
-
-    <div class="flex items-center justify-between mt-4">
+    <div class="flex items-center justify-between">
         <div class="flex items-center">
             <span class="mr-2 text-sm hidden md:block">{{ ctrans('texts.per_page') }}</span>
             <select wire:model="per_page" class="form-select py-1 text-sm">
@@ -21,12 +17,22 @@
                 <tr>
                     <th class="px-6 py-3 text-xs font-medium leading-4 tracking-wider text-left text-white uppercase border-b border-gray-200 bg-primary">
                         <p role="button" wire:click="sortBy('number')" class="cursor-pointer">
+                            {{ ctrans('texts.subscription') }}
+                        </p>
+                    </th>
+                    <th class="px-6 py-3 text-xs font-medium leading-4 tracking-wider text-left text-white uppercase border-b border-gray-200 bg-primary">
+                        <p role="button" wire:click="sortBy('number')" class="cursor-pointer">
+                            {{ ctrans('texts.frequency') }}
+                        </p>
+                    </th>
+                    <th class="px-6 py-3 text-xs font-medium leading-4 tracking-wider text-left text-white uppercase border-b border-gray-200 bg-primary">
+                        <p role="button" wire:click="sortBy('number')" class="cursor-pointer">
                             {{ ctrans('texts.invoice') }}
                         </p>
                     </th>
                     <th class="px-6 py-3 border-b border-gray-200 bg-primary text-left text-xs leading-4 font-medium text-white uppercase tracking-wider">
                         <p role="button" wire:click="sortBy('amount')" class="cursor-pointer">
-                            {{ ctrans('texts.total') }}
+                            {{ ctrans('texts.amount') }}
                         </p>
                     </th>
                     <th class="px-6 py-3 border-b border-gray-200 bg-primary text-left text-xs leading-4 font-medium text-white uppercase tracking-wider">
@@ -39,6 +45,12 @@
                 <tbody>
                 @forelse($recurring_invoices as $recurring_invoice)
                     <tr class="bg-white group hover:bg-gray-100">
+                        <td class="px-6 py-4 whitespace-no-wrap text-sm leading-5 text-gray-500">
+                            {{ $recurring_invoice->subscription->name }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-no-wrap text-sm leading-5 text-gray-500">
+                            {{ \App\Models\RecurringInvoice::frequencyForKey($recurring_invoice->frequency_id) }}
+                        </td>
                         <td class="px-6 py-4 whitespace-no-wrap text-sm leading-5 text-gray-500">
                             <a href="{{ route('client.recurring_invoice.show', $recurring_invoice->hashed_id) }}"
                                class="button-link text-primary">

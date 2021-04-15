@@ -70,10 +70,10 @@ class Credit extends BaseModel
         'custom_surcharge2',
         'custom_surcharge3',
         'custom_surcharge4',
-        'custom_surcharge_tax1',
-        'custom_surcharge_tax2',
-        'custom_surcharge_tax3',
-        'custom_surcharge_tax4',
+        // 'custom_surcharge_tax1',
+        // 'custom_surcharge_tax2',
+        // 'custom_surcharge_tax3',
+        // 'custom_surcharge_tax4',
         'design_id',
         'assigned_user_id',
         'exchange_rate',
@@ -255,10 +255,10 @@ class Credit extends BaseModel
         }
 
         if (! $invitation) {
-            event(new CreditWasUpdated($this, $this->company, Ninja::eventVars()));
+            event(new CreditWasUpdated($this, $this->company, Ninja::eventVars(auth()->user()->id)));
             CreateEntityPdf::dispatchNow($this->invitations->first());
         } else {
-            event(new CreditWasUpdated($this, $this->company, Ninja::eventVars()));
+            event(new CreditWasUpdated($this, $this->company, Ninja::eventVars(auth()->user()->id)));
             CreateEntityPdf::dispatchNow($invitation);
         }
 

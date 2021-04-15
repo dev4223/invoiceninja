@@ -109,6 +109,10 @@ class BillingPortalPurchase extends Component
         'passwordless_login_sent' => false,
         'started_payment' => false,
         'discount_applied' => false,
+        'show_loading_bar' => false,
+        'not_eligible' => null,
+        'not_eligible_message' => null,
+        'payment_required' => true,
     ];
 
     /**
@@ -266,10 +270,13 @@ class BillingPortalPurchase extends Component
 
             return $this;
         }
+        
+        if((int)$this->subscription->price == 0)
+            $this->steps['payment_required'] = false;
+        else
+            $this->steps['fetched_payment_methods'] = true;
 
-        $this->steps['fetched_payment_methods'] = true;
-
-        $this->methods = $contact->client->service()->getPaymentMethods(1000);
+        $this->methods = $contact->client->service()->getPaymentMethods($this->price);
 
         $this->heading_text = ctrans('texts.payment_methods');
 
@@ -299,6 +306,7 @@ class BillingPortalPurchase extends Component
     public function handleBeforePaymentEvents()
     {
         $this->steps['started_payment'] = true;
+        $this->steps['show_loading_bar'] = true;
 
         $data = [
             'client_id' => $this->contact->client->id,
@@ -320,11 +328,22 @@ class BillingPortalPurchase extends Component
             ->fillDefaults()
             ->save();
 
+        $is_eligible = $this->subscription->service()->isEligible($this->contact);
+
+        if (is_array($is_eligible)) {
+            $this->steps['not_eligible'] = true;
+            $this->steps['not_eligible_message'] = $is_eligible['exception'];
+            $this->steps['show_loading_bar'] = false;
+
+            return;
+        }
+
         Cache::put($this->hash, [
                 'subscription_id' => $this->subscription->id,
                 'email' => $this->email ?? $this->contact->email,
                 'client_id' => $this->contact->client->id,
                 'invoice_id' => $this->invoice->id,
+                'context' => 'purchase',
                 now()->addMinutes(60)]
         );
 
@@ -342,6 +361,30 @@ class BillingPortalPurchase extends Component
             'email' => $this->email ?? $this->contact->email,
             'quantity' => $this->quantity,
             'contact_id' => $this->contact->id,
+            'client_id' => $this->contact->client->id,
+        ]);
+    }
+
+    public function handlePaymentNotRequired()
+    {
+
+       $is_eligible = $this->subscription->service()->isEligible($this->contact);
+
+        if ($is_eligible['status_code'] != 200) {
+            $this->steps['not_eligible'] = true;
+            $this->steps['not_eligible_message'] = $is_eligible['exception']['message'];
+            $this->steps['show_loading_bar'] = false;
+
+            return;
+        }
+
+
+        return $this->subscription->service()->handleNoPaymentRequired([
+            'email' => $this->email ?? $this->contact->email,
+            'quantity' => $this->quantity,
+            'contact_id' => $this->contact->id,
+            'client_id' => $this->contact->client->id,
+            'coupon' => '',
         ]);
     }
 
