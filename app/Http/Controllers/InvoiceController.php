@@ -218,7 +218,7 @@ class InvoiceController extends BaseController
                            ->triggeredActions($request)
                            ->save();
 
-        event(new InvoiceWasCreated($invoice, $invoice->company, Ninja::eventVars()));
+        event(new InvoiceWasCreated($invoice, $invoice->company, Ninja::eventVars(auth()->user()->id)));
         
         return $this->itemResponse($invoice);
     }
@@ -392,14 +392,14 @@ class InvoiceController extends BaseController
         }
 
         if ($invoice->isLocked()) {
-            return response()->json(['message' => ctrans('texts.locked_invoice')]);
+            return response()->json(['message' => ctrans('texts.locked_invoice')], 403);
         }
 
         $invoice = $this->invoice_repo->save($request->all(), $invoice);
         
         $invoice->service()->deletePdf();
 
-        event(new InvoiceWasUpdated($invoice, $invoice->company, Ninja::eventVars()));
+        event(new InvoiceWasUpdated($invoice, $invoice->company, Ninja::eventVars(auth()->user()->id)));
 
         return $this->itemResponse($invoice);
     }

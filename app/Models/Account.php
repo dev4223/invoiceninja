@@ -14,6 +14,7 @@ namespace App\Models;
 use App\Models\Presenters\AccountPresenter;
 use App\Utils\Ninja;
 use App\Utils\Traits\MakesHash;
+use Carbon\Carbon;
 use DateTime;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Laracasts\Presenter\PresentableTrait;
@@ -53,6 +54,8 @@ class Account extends BaseModel
         'deleted_at',
         'promo_expires',
         'discount_expires',
+        'trial_started',
+        'plan_expires'
     ];
 
     const PLAN_FREE = 'free';
@@ -238,14 +241,15 @@ class Account extends BaseModel
         }
 
         $trial_active = false;
-        if ($trial_plan && $include_trial) {
-            $trial_started = DateTime::createFromFormat('Y-m-d', $this->trial_started);
-            $trial_expires = clone $trial_started;
-            $trial_expires->modify('+2 weeks');
 
-            if ($trial_expires >= date_create()) {
+        if ($trial_plan && $include_trial) {
+            $trial_started = $this->trial_started;
+            $trial_expires = $this->trial_started->addSeconds($this->trial_duration);
+
+            if($trial_expires->greaterThan(now())){
                 $trial_active = true;
-            }
+             }
+
         }
 
         $plan_active = false;
@@ -254,8 +258,8 @@ class Account extends BaseModel
                 $plan_active = true;
                 $plan_expires = false;
             } else {
-                $plan_expires = DateTime::createFromFormat('Y-m-d', $this->plan_expires);
-                if ($plan_expires >= date_create()) {
+                $plan_expires = Carbon::parse($this->plan_expires);
+                if ($plan_expires->greaterThan(now())) {
                     $plan_active = true;
                 }
             }
@@ -264,6 +268,7 @@ class Account extends BaseModel
         if (! $include_inactive && ! $plan_active && ! $trial_active) {
             return null;
         }
+
 
         // Should we show plan details or trial details?
         if (($plan && ! $trial_plan) || ! $include_trial) {

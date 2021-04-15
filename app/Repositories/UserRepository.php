@@ -123,7 +123,7 @@ class UserRepository extends BaseRepository
             $cu->forceDelete();
         }
 
-        event(new UserWasDeleted($user, $company, Ninja::eventVars()));
+        event(new UserWasDeleted($user, $company, Ninja::eventVars(auth()->user()->id)));
 
         $user->delete();
 
@@ -146,11 +146,11 @@ class UserRepository extends BaseRepository
             $cu->delete();
         }
 
-        event(new UserWasDeleted($user, auth()->user(), $company, Ninja::eventVars()));
+        event(new UserWasDeleted($user, auth()->user(), $company, Ninja::eventVars(auth()->user()->id)));
 
-        // $user->is_deleted = true;
-        // $user->save();
-        // $user->delete();
+         $user->is_deleted = true;
+         $user->save();
+         $user->delete();
 
 
         return $user->fresh();
@@ -164,7 +164,7 @@ class UserRepository extends BaseRepository
 
         $user->delete();
 
-        event(new UserWasArchived($user, auth()->user(), auth()->user()->company, Ninja::eventVars()));
+        event(new UserWasArchived($user, auth()->user(), auth()->user()->company, Ninja::eventVars(auth()->user()->id)));
 
     }
 
@@ -177,9 +177,19 @@ class UserRepository extends BaseRepository
             return;
         }
 
+        $user->is_deleted = false;
+        $user->save();
         $user->restore();
+        // $user->company_user->restore();
 
-        event(new UserWasRestored($user, auth()->user(), auth()->user()->company, Ninja::eventVars()));
+        $cu = CompanyUser::withTrashed()
+                         ->where('user_id', $user->id)
+                         ->where('company_id', auth()->user()->company()->id)
+                         ->first();
+
+        $cu->restore();
+
+        event(new UserWasRestored($user, auth()->user(), auth()->user()->company, Ninja::eventVars(auth()->user()->id)));
 
     }
 }

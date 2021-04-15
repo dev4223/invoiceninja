@@ -77,8 +77,13 @@ class EmailPayment implements ShouldQueue
 
             $email_builder = (new PaymentEmailEngine($this->payment, $this->contact))->build();
 
+            $invitation = null;
+
+            if($this->payment->invoices()->exists())
+                $invitation = $this->payment->invoices()->first()->invitations()->first();
+
             $nmo = new NinjaMailerObject;
-            $nmo->mailable = new TemplateEmail($email_builder, $this->contact);
+            $nmo->mailable = new TemplateEmail($email_builder, $this->contact, $invitation);
             $nmo->to_user = $this->contact;
             $nmo->settings = $this->settings;
             $nmo->company = $this->company;
@@ -86,7 +91,7 @@ class EmailPayment implements ShouldQueue
 
             NinjaMailerJob::dispatch($nmo);
 
-            event(new PaymentWasEmailed($this->payment, $this->payment->company, Ninja::eventVars()));
+            event(new PaymentWasEmailed($this->payment, $this->payment->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
         }
     }
 }

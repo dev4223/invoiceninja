@@ -34,6 +34,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\App;
 
 /*Multi Mailer implemented*/
 
@@ -104,6 +105,9 @@ class EmailEntity implements ShouldQueue
         /* Set DB */
         MultiDB::setDB($this->company->db);
 
+        App::setLocale($this->invitation->contact->preferredLocale());
+
+
         $nmo = new NinjaMailerObject;
         $nmo->mailable = new TemplateEmail($this->email_entity_builder,$this->invitation->contact, $this->invitation);
         $nmo->company = $this->company;
@@ -138,7 +142,7 @@ class EmailEntity implements ShouldQueue
     {
         switch ($this->entity_string) {
             case 'invoice':
-                event(new InvoiceWasEmailedAndFailed($this->invitation, $this->company, $message, $this->reminder_template, Ninja::eventVars()));
+                event(new InvoiceWasEmailedAndFailed($this->invitation, $this->company, $message, $this->reminder_template, Ninja::eventVars(auth()->user()->id)));
                 break;
 
             default:

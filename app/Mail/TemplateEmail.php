@@ -14,6 +14,7 @@ namespace App\Mail;
 use App\Models\Client;
 use App\Models\ClientContact;
 use App\Models\User;
+use App\Utils\HtmlEngine;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
@@ -48,10 +49,22 @@ class TemplateEmail extends Mailable
     {
         $template_name = 'email.template.'.$this->build_email->getTemplate();
 
+        if($this->build_email->getTemplate() == 'custom') {
+            $this->build_email->setBody(str_replace('$body', $this->build_email->getBody(), $this->client->getSetting('email_style_custom')));
+        }
+
         $settings = $this->client->getMergedSettings();
 
         $company = $this->client->company;
 
+        if($this->invitation)
+        {
+            $html_variables = (new HtmlEngine($this->invitation))->makeValues();
+            $signature = str_replace(array_keys($html_variables), array_values($html_variables), $settings->email_signature);
+        }
+        else
+            $signature = $settings->email_signature;
+        
         $this->from(config('mail.from.address'), $this->company->present()->name());
         
         if (strlen($settings->bcc_email) > 1) 
@@ -71,7 +84,7 @@ class TemplateEmail extends Mailable
                 'view_link' => $this->build_email->getViewLink(),
                 'view_text' => $this->build_email->getViewText(),
                 'title' => '',
-                'signature' => $settings->email_signature,
+                'signature' => $signature,
                 'settings' => $settings,
                 'company' => $company,
                 'whitelabel' => $this->client->user->account->isPaid() ? true : false,

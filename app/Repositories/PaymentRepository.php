@@ -114,6 +114,7 @@ class PaymentRepository extends BaseRepository {
 
         /*Iterate through invoices and apply payments*/
         if (array_key_exists('invoices', $data) && is_array($data['invoices']) && count($data['invoices']) > 0) {
+
             $invoice_totals = array_sum(array_column($data['invoices'], 'amount'));
 
             $invoices = Invoice::whereIn('id', array_column($data['invoices'], 'invoice_id'))->get();
@@ -125,7 +126,10 @@ class PaymentRepository extends BaseRepository {
                 $invoice = Invoice::whereId($paid_invoice['invoice_id'])->first();
 
                 if ($invoice) {
-                    $invoice = $invoice->service()->markSent()->applyPayment($payment, $paid_invoice['amount'])->save();
+                    $invoice = $invoice->service()
+                                       ->markSent()
+                                       ->applyPayment($payment, $paid_invoice['amount'])
+                                       ->save();
                 }
             }
         } else {
@@ -151,7 +155,7 @@ class PaymentRepository extends BaseRepository {
         }
 
 		if ( ! $is_existing_payment && ! $this->import_mode ) {
-			event( new PaymentWasCreated( $payment, $payment->company, Ninja::eventVars() ) );
+			event( new PaymentWasCreated( $payment, $payment->company, Ninja::eventVars(auth()->user()->id) ) );
 		}
 
         nlog("payment amount = {$payment->amount}");
@@ -182,7 +186,6 @@ class PaymentRepository extends BaseRepository {
         $company_currency = $client->company->settings->currency_id;
 
         if ($company_currency != $client_currency) {
-            $currency = $client->currency();
 
             $exchange_rate = new CurrencyApi();
 
@@ -202,7 +205,7 @@ class PaymentRepository extends BaseRepository {
 
         $payment = $payment->service()->deletePayment();
 
-        event(new PaymentWasDeleted($payment, $payment->company, Ninja::eventVars()));
+        event(new PaymentWasDeleted($payment, $payment->company, Ninja::eventVars(auth()->user()->id)));
 
         return $payment;
         //return parent::delete($payment);

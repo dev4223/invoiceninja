@@ -84,10 +84,10 @@ class Invoice extends BaseModel
         'custom_surcharge2',
         'custom_surcharge3',
         'custom_surcharge4',
-        'custom_surcharge_tax1',
-        'custom_surcharge_tax2',
-        'custom_surcharge_tax3',
-        'custom_surcharge_tax4',
+    // 'custom_surcharge_tax1',
+    // 'custom_surcharge_tax2',
+    // 'custom_surcharge_tax3',
+    // 'custom_surcharge_tax4',
         'design_id',
         'assigned_user_id',
         'exchange_rate',
@@ -103,10 +103,6 @@ class Invoice extends BaseModel
         'updated_at' => 'timestamp',
         'created_at' => 'timestamp',
         'deleted_at' => 'timestamp',
-        'custom_surcharge_tax1' => 'bool',
-        'custom_surcharge_tax2' => 'bool',
-        'custom_surcharge_tax3' => 'bool',
-        'custom_surcharge_tax4' => 'bool',
     ];
 
     protected $with = [];
@@ -166,6 +162,11 @@ class Invoice extends BaseModel
         return $this->belongsTo(User::class)->withTrashed();
     }
 
+    public function recurring_invoice()
+    {
+        return $this->belongsTo(RecurringInvoice::class)->withTrashed();
+    }
+
     public function assigned_user()
     {
         return $this->belongsTo(User::class, 'assigned_user_id', 'id')->withTrashed();
@@ -179,6 +180,11 @@ class Invoice extends BaseModel
     public function client()
     {
         return $this->belongsTo(Client::class)->withTrashed();
+    }
+
+    public function subscription()
+    {
+        return $this->belongsTo(Subscription::class)->withTrashed();
     }
 
     public function documents()
@@ -391,7 +397,7 @@ class Invoice extends BaseModel
         $storage_path = Storage::$type($this->client->invoice_filepath().$this->numberFormatter().'.pdf');
 
         if (! Storage::exists($this->client->invoice_filepath().$this->numberFormatter().'.pdf')) {
-            event(new InvoiceWasUpdated($this, $this->company, Ninja::eventVars()));
+            event(new InvoiceWasUpdated($this, $this->company, Ninja::eventVars(auth()->user()->id)));
             CreateEntityPdf::dispatchNow($invitation);
         }
 

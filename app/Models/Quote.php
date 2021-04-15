@@ -71,10 +71,10 @@ class Quote extends BaseModel
         'custom_surcharge2',
         'custom_surcharge3',
         'custom_surcharge4',
-        'custom_surcharge_tax1',
-        'custom_surcharge_tax2',
-        'custom_surcharge_tax3',
-        'custom_surcharge_tax4',
+        // 'custom_surcharge_tax1',
+        // 'custom_surcharge_tax2',
+        // 'custom_surcharge_tax3',
+        // 'custom_surcharge_tax4',
         'design_id',
         'assigned_user_id',
         'exchange_rate',
@@ -213,7 +213,7 @@ class Quote extends BaseModel
         nlog($storage_path);
 
         if (! Storage::exists($this->client->quote_filepath().$this->numberFormatter().'.pdf')) {
-            event(new QuoteWasUpdated($this, $this->company, Ninja::eventVars()));
+            event(new QuoteWasUpdated($this, $this->company, Ninja::eventVars(auth()->user()->id)));
             CreateEntityPdf::dispatchNow($invitation);
         }
 

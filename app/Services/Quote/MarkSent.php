@@ -14,6 +14,7 @@ namespace App\Services\Quote;
 use App\Events\Quote\QuoteWasMarkedSent;
 use App\Models\Quote;
 use App\Utils\Ninja;
+use Carbon\Carbon;
 
 class MarkSent
 {
@@ -37,7 +38,14 @@ class MarkSent
 
         $this->quote->markInvitationsSent();
 
-        event(new QuoteWasMarkedSent($this->quote, $this->quote->company, Ninja::eventVars()));
+        if ($this->quote->due_date != '' || $this->quote->client->getSetting('valid_until') == '') {
+            
+        }
+        else{
+            $this->quote->due_date = Carbon::parse($this->quote->date)->addDays($this->quote->client->getSetting('valid_until'));
+        }
+
+        event(new QuoteWasMarkedSent($this->quote, $this->quote->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
 
         $this->quote
              ->service()
