@@ -65,6 +65,7 @@ class CompanyGateway extends BaseModel
         '3758e7f7c6f4cecf0f4f348b9a00f456' => 304,
         '3b6621f970ab18887c4f6dca78d3f8bb' => 305,
         '54faab2ab6e3223dbe848b1686490baa' => 306,
+        'd14dd26a47cecc30fdd65700bfb67b34' => 301,
     ];
 
     protected $touches = [];
@@ -225,7 +226,7 @@ class CompanyGateway extends BaseModel
     {
         $config = $this->getConfig();
 
-        if ($this->gateway->provider == 'Stripe' && strpos($config->publishableKey, 'test')) {
+        if ($this->gateway->provider == 'Stripe' && property_exists($config, 'publishableKey') && strpos($config->publishableKey, 'test')) {
             return true;
         }
 
@@ -269,14 +270,36 @@ class CompanyGateway extends BaseModel
      */
     public function calcGatewayFeeLabel($amount, Client $client, $gateway_type_id = GatewayType::CREDIT_CARD) :string
     {
-        $label = '';
+        $label = ' ';
 
         $fee = $this->calcGatewayFee($amount, $gateway_type_id);
 
-        if ($fee > 0) {
-            $fee = Number::formatMoney(round($fee, 2), $client);
-            $label = ' - '.$fee.' '.ctrans('texts.fee');
+        // if ($fee > 0) {
+        //     $fee =  Number::formatMoney(round($fee, 2), $client);
+        //     $label = ' - '.$fee.' '.ctrans('texts.fee');
+        // }
+
+        if($fee > 0) {
+
+            $fees_and_limits = $this->fees_and_limits->{$gateway_type_id};
+
+            if(strlen($fees_and_limits->fee_percent) >=1)
+                $label .= $fees_and_limits->fee_percent . '%';
+
+            if(strlen($fees_and_limits->fee_amount) >=1){
+
+                if(strlen($label) > 1) {
+
+                    $label .= ' + ' . Number::formatMoney($fees_and_limits->fee_amount, $client);
+
+                }else {
+                    $label .= Number::formatMoney($fees_and_limits->fee_amount, $client);
+                }
+            }
+
+
         }
+
 
         return $label;
     }
@@ -286,14 +309,14 @@ class CompanyGateway extends BaseModel
         $fees_and_limits = $this->getFeesAndLimits($gateway_type_id);
 
         if (! $fees_and_limits) {
-            return 0;
+            return false;
         }
 
         $fee = 0;
 
         if ($fees_and_limits->fee_amount) {
             $fee += $fees_and_limits->fee_amount;
-            // info("fee after adding fee amount = {$fee}");
+            nlog("fee after adding fee amount = {$fee}");
         }
 
         if ($fees_and_limits->fee_percent) {
@@ -302,7 +325,7 @@ class CompanyGateway extends BaseModel
             } else {
                 $fee += round(($amount * $fees_and_limits->fee_percent / 100), 2);
             }
-            // info("fee after adding fee percent = {$fee}");
+            nlog("fee after adding fee percent = {$fee}");
         }
 
         /* Cap fee if we have to here. */
@@ -311,6 +334,7 @@ class CompanyGateway extends BaseModel
         }
 
         $pre_tax_fee = $fee;
+            nlog("fee after adding fee percent = {$fee}");
 
         /**/
         if ($include_taxes) {
@@ -329,6 +353,7 @@ class CompanyGateway extends BaseModel
                 // info("fee after adding fee tax 3 = {$fee}");
             }
         }
+            nlog("fee after adding fee percent = {$fee}");
 
         return $fee;
     }

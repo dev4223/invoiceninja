@@ -18,7 +18,7 @@ Route::group(['middleware' => ['api_secret_check']], function () {
     Route::post('api/v1/oauth_login', 'Auth\LoginController@oauthApiLogin');
 });
 
-Route::group(['middleware' => ['api_secret_check', 'email_db']], function () {
+Route::group(['middleware' => ['api_secret_check','email_db']], function () {
     Route::post('api/v1/login', 'Auth\LoginController@apiLogin')->name('login.submit');
     Route::post('api/v1/reset_password', 'Auth\ForgotPasswordController@sendResetLinkEmail');
 });
@@ -37,6 +37,8 @@ Route::group(['middleware' => ['api_db', 'token_auth', 'locale'], 'prefix' => 'a
     Route::put('clients/{client}/upload', 'ClientController@upload')->name('clients.upload');
     Route::post('clients/bulk', 'ClientController@bulk')->name('clients.bulk');
 
+    Route::resource('client_gateway_tokens', 'ClientGatewayTokenController'); 
+    
     Route::post('connected_account', 'ConnectedAccountController@index');
     Route::post('connected_account/gmail', 'ConnectedAccountController@handleGmailOauth');
 
@@ -73,6 +75,8 @@ Route::group(['middleware' => ['api_db', 'token_auth', 'locale'], 'prefix' => 'a
     Route::put('expenses/{expense}/upload', 'ExpenseController@upload');
     Route::post('expenses/bulk', 'ExpenseController@bulk')->name('expenses.bulk');
 
+    Route::post('export', 'ExportController@index')->name('export.index');
+
     Route::resource('expense_categories', 'ExpenseCategoryController'); // name = (expense_categories. index / create / show / update / destroy / edit
     Route::post('expense_categories/bulk', 'ExpenseCategoryController@bulk')->name('expense_categories.bulk');
 
@@ -88,6 +92,8 @@ Route::group(['middleware' => ['api_db', 'token_auth', 'locale'], 'prefix' => 'a
     Route::put('invoices/{invoice}/upload', 'InvoiceController@upload')->name('invoices.upload');
     Route::get('invoice/{invitation_key}/download', 'InvoiceController@downloadPdf')->name('invoices.downloadPdf');
     Route::post('invoices/bulk', 'InvoiceController@bulk')->name('invoices.bulk');
+    
+    Route::post('logout', 'LogoutController@index')->name('logout');
 
     Route::post('migrate', 'MigrationController@index')->name('migrate.start');
 
@@ -140,6 +146,7 @@ Route::group(['middleware' => ['api_db', 'token_auth', 'locale'], 'prefix' => 'a
     Route::resource('tasks', 'TaskController'); // name = (tasks. index / create / show / update / destroy / edit
     Route::post('tasks/bulk', 'TaskController@bulk')->name('tasks.bulk');
     Route::put('tasks/{task}/upload', 'TaskController@upload');
+    Route::post('tasks/sort', 'TaskController@sort');
 
     Route::resource('task_statuses', 'TaskStatusController'); // name = (task_statuses. index / create / show / update / destroy / edit
     Route::post('task_statuses/bulk', 'TaskStatusController@bulk')->name('task_statuses.bulk');
@@ -176,17 +183,20 @@ Route::group(['middleware' => ['api_db', 'token_auth', 'locale'], 'prefix' => 'a
     // Route::post('hooks', 'SubscriptionController@subscribe')->name('hooks.subscribe');
     // Route::delete('hooks/{subscription_id}', 'SubscriptionController@unsubscribe')->name('hooks.unsubscribe');
 
+    Route::post('stripe/update_payment_methods', 'StripeController@update')->middleware('password_protected')->name('stripe.update');
+    Route::post('stripe/import_customers', 'StripeController@import')->middleware('password_protected')->name('stripe.import');
+
     Route::resource('subscriptions', 'SubscriptionController');
     Route::post('subscriptions/bulk', 'SubscriptionController@bulk')->name('subscriptions.bulk');
 
-    Route::resource('cliente_subscriptions', 'ClientSubscriptionController');
 });
 
 Route::match(['get', 'post'], 'payment_webhook/{company_key}/{company_gateway_id}', 'PaymentWebhookController')
-    ->middleware(['guest', 'api_db'])
+    ->middleware(['guest'])
     ->name('payment_webhook');
 
 Route::post('api/v1/postmark_webhook', 'PostMarkController@webhook');
 Route::get('token_hash_router', 'OneTimeTokenController@router');
 Route::get('webcron', 'WebCronController@index');
+
 Route::fallback('BaseController@notFound');

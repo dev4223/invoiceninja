@@ -11,6 +11,7 @@
 
 namespace App\Providers;
 
+use App\Events\Account\AccountCreated;
 use App\Events\Client\ClientWasArchived;
 use App\Events\Client\ClientWasCreated;
 use App\Events\Client\ClientWasDeleted;
@@ -67,6 +68,11 @@ use App\Events\Quote\QuoteWasEmailed;
 use App\Events\Quote\QuoteWasRestored;
 use App\Events\Quote\QuoteWasUpdated;
 use App\Events\Quote\QuoteWasViewed;
+use App\Events\RecurringInvoice\RecurringInvoiceWasArchived;
+use App\Events\RecurringInvoice\RecurringInvoiceWasCreated;
+use App\Events\RecurringInvoice\RecurringInvoiceWasDeleted;
+use App\Events\RecurringInvoice\RecurringInvoiceWasRestored;
+use App\Events\RecurringInvoice\RecurringInvoiceWasUpdated;
 use App\Events\Subscription\SubscriptionWasArchived;
 use App\Events\Subscription\SubscriptionWasCreated;
 use App\Events\Subscription\SubscriptionWasDeleted;
@@ -126,6 +132,7 @@ use App\Listeners\Activity\VendorDeletedActivity;
 use App\Listeners\Activity\VendorRestoredActivity;
 use App\Listeners\Activity\VendorUpdatedActivity;
 use App\Listeners\Contact\UpdateContactLastLogin;
+use App\Listeners\Credit\CreditCreatedNotification;
 use App\Listeners\Credit\CreditEmailedNotification;
 use App\Listeners\Credit\CreditRestoredActivity;
 use App\Listeners\Credit\CreditViewedActivity;
@@ -135,6 +142,7 @@ use App\Listeners\Invoice\CreateInvoiceHtmlBackup;
 use App\Listeners\Invoice\CreateInvoicePdf;
 use App\Listeners\Invoice\InvoiceArchivedActivity;
 use App\Listeners\Invoice\InvoiceCancelledActivity;
+use App\Listeners\Invoice\InvoiceCreatedNotification;
 use App\Listeners\Invoice\InvoiceDeletedActivity;
 use App\Listeners\Invoice\InvoiceEmailActivity;
 use App\Listeners\Invoice\InvoiceEmailFailedActivity;
@@ -154,12 +162,18 @@ use App\Listeners\Payment\PaymentNotification;
 use App\Listeners\Payment\PaymentRestoredActivity;
 use App\Listeners\Quote\QuoteApprovedActivity;
 use App\Listeners\Quote\QuoteArchivedActivity;
+use App\Listeners\Quote\QuoteCreatedNotification;
 use App\Listeners\Quote\QuoteDeletedActivity;
 use App\Listeners\Quote\QuoteEmailActivity;
 use App\Listeners\Quote\QuoteEmailedNotification;
 use App\Listeners\Quote\QuoteRestoredActivity;
 use App\Listeners\Quote\QuoteViewedActivity;
 use App\Listeners\Quote\ReachWorkflowSettings;
+use App\Listeners\RecurringInvoice\CreateRecurringInvoiceActivity;
+use App\Listeners\RecurringInvoice\RecurringInvoiceArchivedActivity;
+use App\Listeners\RecurringInvoice\RecurringInvoiceDeletedActivity;
+use App\Listeners\RecurringInvoice\RecurringInvoiceRestoredActivity;
+use App\Listeners\RecurringInvoice\UpdateRecurringInvoiceActivity;
 use App\Listeners\SendVerificationNotification;
 use App\Listeners\User\ArchivedUserActivity;
 use App\Listeners\User\CreatedUserActivity;
@@ -179,6 +193,8 @@ class EventServiceProvider extends ServiceProvider
      * @var array
      */
     protected $listen = [
+        AccountCreated::class =>[
+        ],
         MessageSending::class =>[
         ],
         MessageSent::class => [
@@ -257,6 +273,7 @@ class EventServiceProvider extends ServiceProvider
         ],
         CreditWasCreated::class => [
             CreatedCreditActivity::class,
+            CreditCreatedNotification::class,
         ],
         CreditWasDeleted::class => [
             DeleteCreditActivity::class,
@@ -315,6 +332,7 @@ class EventServiceProvider extends ServiceProvider
         ],
         InvoiceWasCreated::class => [
             CreateInvoiceActivity::class,
+            InvoiceCreatedNotification::class,
         //    CreateInvoicePdf::class,
         ],
         InvoiceWasPaid::class => [
@@ -370,6 +388,7 @@ class EventServiceProvider extends ServiceProvider
         ],
         QuoteWasCreated::class => [
             CreatedQuoteActivity::class,
+            QuoteCreatedNotification::class,
         ],
         QuoteWasUpdated::class => [
             QuoteUpdatedActivity::class,
@@ -390,6 +409,21 @@ class EventServiceProvider extends ServiceProvider
         ],
         QuoteWasRestored::class => [
             QuoteRestoredActivity::class,
+        ],
+        RecurringInvoiceWasUpdated::class => [
+            UpdateRecurringInvoiceActivity::class,
+        ],
+        RecurringInvoiceWasCreated::class => [
+            CreateRecurringInvoiceActivity::class,
+        ],
+        RecurringInvoiceWasDeleted::class => [
+            RecurringInvoiceDeletedActivity::class,
+        ],
+        RecurringInvoiceWasArchived::class => [
+            RecurringInvoiceArchivedActivity::class,
+        ],
+        RecurringInvoiceWasRestored::class => [
+            RecurringInvoiceRestoredActivity::class,
         ],
         TaskWasCreated::class => [
             CreatedTaskActivity::class,

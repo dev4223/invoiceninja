@@ -14,7 +14,10 @@ namespace App\Mail\Engine;
 use App\DataMapper\EmailTemplateDefaults;
 use App\Models\Account;
 use App\Utils\HtmlEngine;
+use App\Utils\Ninja;
 use App\Utils\Number;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Lang;
 
 class InvoiceEmailEngine extends BaseEmailEngine
 {
@@ -42,6 +45,10 @@ class InvoiceEmailEngine extends BaseEmailEngine
 
     public function build()
     {
+
+        App::forgetInstance('translator');
+        Lang::replace(Ninja::transformTranslations($this->client->getMergedSettings()));
+
         if (is_array($this->template_data) &&  array_key_exists('body', $this->template_data) && strlen($this->template_data['body']) > 0) {
             $body_template = $this->template_data['body'];
         } elseif (strlen($this->client->getSetting('email_template_'.$this->reminder_template)) > 0) {
@@ -99,7 +106,12 @@ class InvoiceEmailEngine extends BaseEmailEngine
             ->setInvitation($this->invitation);
 
         if ($this->client->getSetting('pdf_email_attachment') !== false && $this->invoice->company->account->hasFeature(Account::FEATURE_PDF_ATTACHMENT)) {
-            $this->setAttachments([$this->invoice->pdf_file_path()]);
+
+            if(Ninja::isHosted())
+                $this->setAttachments([$this->invoice->pdf_file_path(null, 'url', true)]);
+            else
+                $this->setAttachments([$this->invoice->pdf_file_path()]);
+
             // $this->setAttachments(['path' => $this->invoice->pdf_file_path(), 'name' => basename($this->invoice->pdf_file_path())]);
 
         }
@@ -109,9 +121,14 @@ class InvoiceEmailEngine extends BaseEmailEngine
 
             // Storage::url
             foreach($this->invoice->documents as $document){
-                // $this->setAttachments(['path'=>$document->filePath(),'name'=>$document->name]);
                 $this->setAttachments([['path' => $document->filePath(), 'name' => $document->name, 'mime' => $document->type]]);
             }
+
+            foreach($this->invoice->company->documents as $document){
+                $this->setAttachments([['path' => $document->filePath(), 'name' => $document->name, 'mime' => $document->type]]);
+            }
+
+
 
         }
 

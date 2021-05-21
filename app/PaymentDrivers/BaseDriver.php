@@ -271,7 +271,7 @@ class BaseDriver extends AbstractPaymentDriver
 
         $invoices->each(function ($invoice) use ($fee_total) {
             if (collect($invoice->line_items)->contains('type_id', '3')) {
-                $invoice->service()->toggleFeesPaid()->save();
+                $invoice->service()->toggleFeesPaid()->deletePdf()->save();
                 $invoice->client->service()->updateBalance($fee_total)->save();
                 $invoice->ledger()->updateInvoiceBalance($fee_total, "Gateway fee adjustment for invoice {$invoice->number}");
             }
@@ -370,7 +370,13 @@ class BaseDriver extends AbstractPaymentDriver
 
         $invoices = Invoice::whereIn('id', $this->transformKeys(array_column($this->payment_hash->invoices(), 'invoice_id')))->get();
 
-        $invoices->first()->invitations->each(function ($invitation) {
+        $invoices->each(function ($invoice){
+
+            $invoice->service()->deletePdf();
+
+        });
+
+        $invoices->first()->invitations->each(function ($invitation) use ($nmo){
 
             if ($invitation->contact->send_email && $invitation->contact->email) {
 
@@ -388,6 +394,7 @@ class BaseDriver extends AbstractPaymentDriver
             SystemLog::EVENT_GATEWAY_ERROR,
             $gateway::SYSTEM_LOG_TYPE,
             $gateway->client,
+            $gateway->client->company,
         );
 
         throw new PaymentFailed($error, $e->getCode());
@@ -521,6 +528,7 @@ class BaseDriver extends AbstractPaymentDriver
             SystemLog::EVENT_GATEWAY_SUCCESS,
             $gateway_const,
             $this->client,
+            $this->client->company,
         );
     }
 }

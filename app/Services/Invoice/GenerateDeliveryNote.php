@@ -49,7 +49,9 @@ class GenerateDeliveryNote
 
         $this->contact = $contact;
 
-        $this->disk = $disk ?? config('filesystems.default');
+        $this->disk = 'public';
+
+        // $this->disk = $disk ?? config('filesystems.default');
     }
 
     public function run()
@@ -60,7 +62,7 @@ class GenerateDeliveryNote
 
         $file_path = sprintf('%s%s_delivery_note.pdf', $this->invoice->client->invoice_filepath(), $this->invoice->number);
 
-        if (config('ninja.phantomjs_pdf_generation')) {
+        if (config('ninja.phantomjs_pdf_generation') || config('ninja.pdf_generator') == 'phantom') {
             return (new Phantom)->generate($this->invoice->invitations->first());
         }
 
@@ -92,7 +94,7 @@ class GenerateDeliveryNote
 
         // Storage::makeDirectory($this->invoice->client->invoice_filepath(), 0775);
 
-            if(config('ninja.invoiceninja_hosted_pdf_generation')){
+            if(config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja'){
                 $pdf = (new NinjaPdf())->build($maker->getCompiledHTML(true));
             }
             else {
@@ -105,6 +107,7 @@ class GenerateDeliveryNote
 
         Storage::disk($this->disk)->put($file_path, $pdf);
 
-        return $file_path;
+        return Storage::disk($this->disk)->path($file_path);
+
     }
 }

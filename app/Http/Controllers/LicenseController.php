@@ -81,6 +81,7 @@ class LicenseController extends BaseController
      */
     public function index()
     {
+        $this->checkLicense();
 
         /* Catch claim license requests */
         if (config('ninja.environment') == 'selfhost' && request()->has('license_key')) {
@@ -105,6 +106,12 @@ class LicenseController extends BaseController
                         'message' => trans('texts.invalid_white_label_license'),
                         'errors' => new stdClass,
                     ];
+
+                    $account->plan_term = Account::PLAN_TERM_YEARLY;
+                    $account->plan_paid = null;
+                    $account->plan_expires = null;
+                    $account->plan = Account::PLAN_FREE;
+                    $account->save();
 
                     return response()->json($error, 400);
                 } else {
@@ -139,5 +146,16 @@ class LicenseController extends BaseController
         ];
 
         return response()->json($error, 400);
+    }
+
+    private function checkLicense()
+    {
+        $account = auth()->user()->company()->account;
+
+        if($account->plan == 'white_label' && $account->plan_expires->lt(now())){
+            $account->plan = null;
+            $account->plan_expires = null;
+            $account->save();
+        }
     }
 }

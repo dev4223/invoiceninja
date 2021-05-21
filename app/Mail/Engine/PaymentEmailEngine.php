@@ -12,6 +12,7 @@
 namespace App\Mail\Engine;
 
 use App\DataMapper\EmailTemplateDefaults;
+use App\Models\Account;
 use App\Utils\Helpers;
 use App\Utils\Number;
 use App\Utils\Traits\MakesDates;
@@ -33,7 +34,7 @@ class PaymentEmailEngine extends BaseEmailEngine
     public $contact;
 
     private $helpers;
-    
+
     public function __construct($payment, $contact, $template_data = null)
     {
         $this->payment = $payment;
@@ -71,6 +72,16 @@ class PaymentEmailEngine extends BaseEmailEngine
             ->setFooter('')
             ->setViewLink('')
             ->setViewText('');
+
+        if ($this->client->getSetting('pdf_email_attachment') !== false && $this->company->account->hasFeature(Account::FEATURE_PDF_ATTACHMENT)) {
+
+            $this->payment->invoices->each(function ($invoice){
+                
+                $this->setAttachments([$invoice->pdf_file_path()]);
+
+            });
+
+        }
 
         return $this;
     }
@@ -169,7 +180,7 @@ class PaymentEmailEngine extends BaseEmailEngine
         $data['$company3'] = ['value' => $this->helpers->formatCustomFieldValue($this->company->custom_fields, 'company3', $this->settings->custom_value3, $this->client) ?: '&nbsp;', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'company3')];
         $data['$company4'] = ['value' => $this->helpers->formatCustomFieldValue($this->company->custom_fields, 'company4', $this->settings->custom_value4, $this->client) ?: '&nbsp;', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'company4')];
 
-        $data['$view_link'] = ['value' => '<a href="'.$this->payment->getLink().'">'.ctrans('texts.view_payment').'</a>', 'label' => ctrans('texts.view_payment')];
+        $data['$view_link'] = ['value' => '<a class="button" href="'.$this->payment->getLink().'">'.ctrans('texts.view_payment').'</a>', 'label' => ctrans('texts.view_payment')];
         $data['$view_url'] = ['value' => $this->payment->getLink(), 'label' => ctrans('texts.view_payment')];
 
         $data['$invoices'] = ['value' => $this->formatInvoices(), 'label' => ctrans('texts.invoices')];

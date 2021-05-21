@@ -14,7 +14,9 @@ namespace App\Mail;
 use App\Models\Client;
 use App\Models\ClientContact;
 use App\Models\User;
+use App\Services\PdfMaker\Designs\Utilities\DesignHelpers;
 use App\Utils\HtmlEngine;
+use App\Utils\TemplateEngine;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
@@ -55,6 +57,16 @@ class TemplateEmail extends Mailable
 
         $settings = $this->client->getMergedSettings();
 
+        if ($this->build_email->getTemplate() !== 'custom') {
+            $this->build_email->setBody(
+                DesignHelpers::parseMarkdownToHtml($this->build_email->getBody())
+            );
+
+            $this->build_email->setBody(
+                TemplateEngine::wrapElementsIntoTables('<div id="content-wrapper"></div>', $this->build_email->getBody(), $settings)
+            );
+        }
+
         $company = $this->client->company;
 
         if($this->invitation)
@@ -64,10 +76,10 @@ class TemplateEmail extends Mailable
         }
         else
             $signature = $settings->email_signature;
-        
+
         $this->from(config('mail.from.address'), $this->company->present()->name());
-        
-        if (strlen($settings->bcc_email) > 1) 
+
+        if (strlen($settings->bcc_email) > 1)
             $this->bcc($settings->bcc_email, $settings->bcc_email);
 
         $this->subject($this->build_email->getSubject())
@@ -95,7 +107,7 @@ class TemplateEmail extends Mailable
             });
 
         //conditionally attach files
-        if ($settings->pdf_email_attachment !== false && ! empty($this->build_email->getAttachments())) {
+        // if ($settings->pdf_email_attachment !== false && ! empty($this->build_email->getAttachments())) {
 
             //hosted | plan check here
             foreach ($this->build_email->getAttachments() as $file) {
@@ -106,7 +118,7 @@ class TemplateEmail extends Mailable
                     $this->attach($file['path'], ['as' => $file['name'], 'mime' => $file['mime']]);
 
             }
-        }
+        // }
 
         return $this;
     }

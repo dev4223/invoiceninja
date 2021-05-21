@@ -50,12 +50,14 @@ class InvoiceController extends Controller
     {
         set_time_limit(0);
 
+        $invoice->service()->removeUnpaidGatewayFees()->save();
+
         $data = [
             'invoice' => $invoice,
         ];
 
         if ($request->query('mode') === 'fullscreen') {
-            return response()->file($invoice->pdf_file_path(null, 'path'));
+            return render('invoices.show-fullscreen', $data);
         }
 
         return $this->render('invoices.show', $data);
@@ -125,6 +127,8 @@ class InvoiceController extends Controller
 
         $payment_methods = auth()->user()->client->service()->getPaymentMethods($total);
 
+        //if there is only one payment method -> lets return straight to the payment page
+
         $data = [
             'settings' => auth()->user()->client->getMergedSettings(),
             'invoices' => $invoices,
@@ -133,8 +137,6 @@ class InvoiceController extends Controller
             'hashed_ids' => $invoices->pluck('hashed_id'),
             'total' =>  $total,
         ];
-
-// nlog($data);
 
         return $this->render('invoices.payment', $data);
     }
@@ -162,10 +164,10 @@ class InvoiceController extends Controller
 
         //if only 1 pdf, output to buffer for download
         if ($invoices->count() == 1) {
-            return response()->streamDownload(function () use ($invoices) {
-                echo file_get_contents($invoices->first()->pdf_file_path());
-            }, basename($invoices->first()->pdf_file_path()));
-            //return response()->download(TempFile::path($invoices->first()->pdf_file_path()), basename($invoices->first()->pdf_file_path()));
+
+           $file = $invoices->first()->pdf_file_path();
+           return response()->download($file, basename($file), ['Cache-Control:' => 'no-cache'])->deleteFileAfterSend(true);;
+
         }
 
         // enable output of HTTP headers

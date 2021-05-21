@@ -23,6 +23,7 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\PaymentHash;
 use App\Models\SystemLog;
+use App\Services\Subscription\SubscriptionService;
 use App\Utils\Number;
 use App\Utils\Traits\MakesDates;
 use App\Utils\Traits\MakesHash;
@@ -95,6 +96,10 @@ class PaymentController extends Controller
 
         $payable_invoices = collect($request->payable_invoices);
         $invoices = Invoice::whereIn('id', $this->transformKeys($payable_invoices->pluck('invoice_id')->toArray()))->get();
+
+        $invoices->each(function($invoice){
+            $invoice->service()->removeUnpaidGatewayFees()->save();
+        });
 
         /* pop non payable invoice from the $payable_invoices array */
 
@@ -238,14 +243,14 @@ class PaymentController extends Controller
                 ->get();
         }
 
-        $hash_data = ['invoices' => $payable_invoices->toArray(), 'credits' => $credit_totals];
+        $hash_data = ['invoices' => $payable_invoices->toArray(), 'credits' => $credit_totals, 'amount_with_fee' => max(0, (($invoice_totals + $fee_totals) - $credit_totals))];
 
         if ($request->query('hash')) {
             $hash_data['billing_context'] = Cache::get($request->query('hash'));
         }
 
         $payment_hash = new PaymentHash;
-        $payment_hash->hash = Str::random(128);
+        $payment_hash->hash = Str::random(32);
         $payment_hash->data = $hash_data;
         $payment_hash->fee_total = $fee_totals;
         $payment_hash->fee_invoice_id = $first_invoice->id;
@@ -285,7 +290,8 @@ class PaymentController extends Controller
                 SystemLog::CATEGORY_GATEWAY_RESPONSE,
                 SystemLog::EVENT_GATEWAY_ERROR,
                 SystemLog::TYPE_FAILURE,
-                auth('contact')->user()->client
+                auth('contact')->user()->client,
+                auth('contact')->user()->client->company
             );
 
             throw new PaymentFailed($e->getMessage());
@@ -298,24 +304,12 @@ class PaymentController extends Controller
 
         $payment_hash = PaymentHash::whereRaw('BINARY `hash`= ?', [$request->payment_hash])->first();
 
-        try {
             return $gateway
                 ->driver(auth()->user()->client)
                 ->setPaymentMethod($request->input('payment_method_id'))
                 ->setPaymentHash($payment_hash)
                 ->checkRequirements()
                 ->processPaymentResponse($request);
-        } catch (\Exception $e) {
-            SystemLogger::dispatch(
-                $e->getMessage(),
-                SystemLog::CATEGORY_GATEWAY_RESPONSE,
-                SystemLog::EVENT_GATEWAY_FAILURE,
-                SystemLog::TYPE_FAILURE,
-                auth('contact')->user()->client
-            );
-
-            throw new PaymentFailed($e->getMessage());
-        }
     }
 
     /**
@@ -341,6 +335,12 @@ class PaymentController extends Controller
         }
 
         $payment = $payment->service()->applyCredits($payment_hash)->save();
+
+        if (property_exists($payment_hash->data, 'billing_context')) {
+            $billing_subscription = \App\Models\Subscription::find($payment_hash->data->billing_context->subscription_id);
+
+            return (new SubscriptionService($billing_subscription))->completePurchase($payment_hash);
+        }
 
         return redirect()->route('client.payments.show', ['payment' => $this->encodePrimaryKey($payment->id)]);
     }

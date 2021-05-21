@@ -15,6 +15,18 @@ use App\Libraries\MultiDB;
 
 class SubdomainController extends BaseController
 {
+    private $protected = [
+        'www',
+        'app',
+        'ninja',
+        'sentry',
+        'staging',
+        'pdf',
+        'demo',
+        'docs',
+        'client_domain',
+        'custom_domain',
+    ];
 
     public function __construct()
     {
@@ -28,9 +40,8 @@ class SubdomainController extends BaseController
      */
     public function index()
     {
-        $subdomain_exists = MultiDB::findAndSetDbByDomain(request()->input('subdomain'));
 
-        if($subdomain_exists)
+        if(in_array(request()->input('subdomain'), $this->protected) || MultiDB::findAndSetDbByDomain(['subdomain' => request()->input('subdomain')]))
             return response()->json(['message' => 'Domain not available'] , 401);
 
         return response()->json(['message' => 'Domain available'], 200);

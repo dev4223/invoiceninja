@@ -58,7 +58,7 @@ trait Utilities
     private function processSuccessfulPayment(Payment $_payment)
     {
         if ($this->getParent()->payment_hash->data->store_card) {
-            $this->storePaymentMethod($_payment);
+            $this->storeLocalPaymentMethod($_payment);
         }
 
         $data = [
@@ -76,7 +76,8 @@ trait Utilities
             SystemLog::CATEGORY_GATEWAY_RESPONSE,
             SystemLog::EVENT_GATEWAY_SUCCESS,
             SystemLog::TYPE_CHECKOUT,
-            $this->getParent()->client
+            $this->getParent()->client,
+            $this->getParent()->client->company
         );
 
         return redirect()->route('client.payments.show', ['payment' => $this->getParent()->encodePrimaryKey($payment->id)]);
@@ -101,7 +102,8 @@ trait Utilities
             SystemLog::CATEGORY_GATEWAY_RESPONSE,
             SystemLog::EVENT_GATEWAY_FAILURE,
             SystemLog::TYPE_CHECKOUT,
-            $this->getParent()->client
+            $this->getParent()->client,
+            $this->getParent()->client->company,
         );
 
         if ($throw_exception) {
@@ -118,7 +120,7 @@ trait Utilities
         }
     }
 
-    private function storePaymentMethod(Payment $response)
+    private function storeLocalPaymentMethod(Payment $response)
     {
         try {
             $payment_meta = new stdClass;
