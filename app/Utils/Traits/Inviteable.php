@@ -11,6 +11,7 @@
 
 namespace App\Utils\Traits;
 
+use App\Utils\Ninja;
 use Illuminate\Support\Str;
 
 /**
@@ -46,7 +47,10 @@ trait Inviteable
     {
         $entity_type = Str::snake(class_basename($this->entityType()));
 
-        $domain = isset($this->company->portal_domain) ?: $this->company->domain();
+        if(Ninja::isHosted())
+            $domain = isset($this->company->portal_domain) ? $this->company->portal_domain : $this->company->domain();
+        else
+            $domain = config('ninja.app_url');
 
         switch ($this->company->portal_mode) {
             case 'subdomain':
@@ -64,6 +68,33 @@ trait Inviteable
                 return '';
                 break;
         }
+    }
+
+    public function getPortalLink() :string
+    {
+
+        if(Ninja::isHosted())
+            $domain = isset($this->company->portal_domain) ? $this->company->portal_domain : $this->company->domain();
+        else
+            $domain = config('ninja.app_url');
+
+        switch ($this->company->portal_mode) {
+            case 'subdomain':
+                return $domain.'/client/';
+                break;
+            case 'iframe':
+                return $domain.'/client/';
+                //return $domain . $entity_type .'/'. $this->contact->client->client_hash .'/'. $this->key;
+                break;
+            case 'domain':
+                return $domain.'/client/';
+                break;
+
+            default:
+                return '';
+                break;
+        }
+
     }
 
     public function getAdminLink() :string

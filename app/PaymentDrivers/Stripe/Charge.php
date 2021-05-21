@@ -62,23 +62,24 @@ class Charge
 
         $this->stripe->init();
 
-        $local_stripe = new StripeClient(
-            $this->stripe->company_gateway->getConfigField('apiKey')
-        );
 
         $response = null;
 
         try {
-            $response = $local_stripe->paymentIntents->create([
+
+            $data = [
               'amount' => $this->stripe->convertToStripeAmount($amount, $this->stripe->client->currency()->precision),
               'currency' => $this->stripe->client->getCurrencyCode(),
               'payment_method' => $cgt->token,
               'customer' => $cgt->gateway_customer_reference,
               'confirm' => true,
               'description' => $description,
-            ]);
+            ];
 
-            SystemLogger::dispatch($response, SystemLog::CATEGORY_GATEWAY_RESPONSE, SystemLog::EVENT_GATEWAY_SUCCESS, SystemLog::TYPE_STRIPE, $this->stripe->client);
+            $response = $this->stripe->createPaymentIntent($data, $this->stripe->stripe_connect_auth);
+            // $response = $local_stripe->paymentIntents->create($data);
+
+            SystemLogger::dispatch($response, SystemLog::CATEGORY_GATEWAY_RESPONSE, SystemLog::EVENT_GATEWAY_SUCCESS, SystemLog::TYPE_STRIPE, $this->stripe->client, $this->stripe->client->company);
         } catch (\Exception $e) {
 
             $data =[
@@ -118,7 +119,7 @@ class Charge
 
             $this->stripe->processInternallyFailedPayment($this->stripe, $e);
 
-            SystemLogger::dispatch($data, SystemLog::CATEGORY_GATEWAY_RESPONSE, SystemLog::EVENT_GATEWAY_FAILURE, SystemLog::TYPE_STRIPE, $this->stripe->client);
+            SystemLogger::dispatch($data, SystemLog::CATEGORY_GATEWAY_RESPONSE, SystemLog::EVENT_GATEWAY_FAILURE, SystemLog::TYPE_STRIPE, $this->stripe->client, $this->stripe->client->company);
         }  
 
         if (! $response) {

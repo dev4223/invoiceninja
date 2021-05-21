@@ -432,10 +432,6 @@ class Design extends BaseDesign
             ? $this->context['variables']
             : ['values' => ['$entity.public_notes' => $this->entity->public_notes, '$entity.terms' => $this->entity->terms, '$entity_footer' => $this->entity->footer], 'labels' => []];
 
-        if ($this->type == 'delivery_note') {
-            return [];
-        }
-
         $variables = $this->context['pdf_variables']['total_columns'];
 
         $elements = [
@@ -444,7 +440,6 @@ class Design extends BaseDesign
                 ['element' => 'p', 'content' => '', 'properties' => ['style' => 'text-align: left; display: flex; flex-direction: column;'], 'elements' => [
                     ['element' => 'span', 'content' => '$entity.terms_label: ', 'properties' => ['hidden' => $this->entityVariableCheck('$entity.terms'), 'data-ref' => 'total_table-terms-label', 'style' => 'font-weight: bold; text-align: left; margin-top: 1rem;']],
                     ['element' => 'span', 'content' => strtr($_variables['values']['$entity.terms'], $_variables), 'properties' => ['data-ref' => 'total_table-terms', 'style' => 'text-align: left;']],
-                    ['element' => 'span', 'content' => strtr($_variables['values']['$entity_footer'], $_variables), 'properties' => ['data-ref' => 'total_table-footer', 'style' => 'text-align: left; margin-top: 1rem;']],
                 ]],
                 ['element' => 'img', 'properties' => ['hidden' => $this->client->getSetting('signature_on_pdf'), 'style' => 'max-width: 50%; height: auto;', 'src' => '$contact.signature']],
                 ['element' => 'div', 'properties' => ['style' => 'margin-top: 1.5rem; display: flex; align-items: flex-start;'], 'elements' => [
@@ -453,6 +448,10 @@ class Design extends BaseDesign
             ]],
             ['element' => 'div', 'properties' => ['class' => 'totals-table-right-side'], 'elements' => []],
         ];
+
+        if ($this->type == 'delivery_note') {
+            return $elements;
+        }
 
         foreach (['discount'] as $property) {
             $variable = sprintf('%s%s', '$', $property);

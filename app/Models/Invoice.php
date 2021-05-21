@@ -204,7 +204,7 @@ class Invoice extends BaseModel
 
     public function activities()
     {
-        return $this->hasMany(Activity::class);
+        return $this->hasMany(Activity::class)->orderBy('id', 'DESC')->take(300);
     }
 
     public function history()
@@ -245,13 +245,16 @@ class Invoice extends BaseModel
 
     public function getStatusAttribute()
     {
-        if ($this->status_id == self::STATUS_SENT && $this->due_date > Carbon::now()) {
+        $due_date = $this->due_date ? Carbon::parse($this->due_date) : false;
+        $partial_due_date = $this->partial_due_Date ? Carbon::parse($this->partial_due_date) : false;
+
+        if ($this->status_id == self::STATUS_SENT && $due_date && $due_date->gt(now())) {
             return self::STATUS_UNPAID;
-        } elseif ($this->status_id == self::STATUS_PARTIAL && $this->partial_due_date > Carbon::now()) {
-            return self::STATUS_UNPAID;
-        } elseif ($this->status_id == self::STATUS_SENT && $this->due_date < Carbon::now()) {
+        } elseif ($this->status_id == self::STATUS_PARTIAL && $partial_due_date && $partial_due_date->gt(now())) {
+            return self::STATUS_PARTIAL;
+        } elseif ($this->status_id == self::STATUS_SENT && $due_date && $due_date->lt(now())) {
             return self::STATUS_OVERDUE;
-        } elseif ($this->status_id == self::STATUS_PARTIAL && $this->partial_due_date < Carbon::now()) {
+        } elseif ($this->status_id == self::STATUS_PARTIAL && $partial_due_date && $partial_due_date->lt(now())) {
             return self::STATUS_OVERDUE;
         } else {
             return $this->status_id;
@@ -260,6 +263,7 @@ class Invoice extends BaseModel
 
     public function isPayable(): bool
     {
+
         if ($this->status_id == self::STATUS_DRAFT && $this->is_deleted == false) {
             return true;
         } elseif ($this->status_id == self::STATUS_SENT && $this->is_deleted == false) {
@@ -388,25 +392,39 @@ class Invoice extends BaseModel
         return $invoice_calc->build();
     }
 
-    public function pdf_file_path($invitation = null, string $type = 'url')
+    public function pdf_file_path($invitation = null, string $type = 'path', bool $portal = false)
     {
         if (! $invitation) {
-            $invitation = $this->invitations->first();
+
+            if($this->invitations()->exists())
+                $invitation = $this->invitations()->first();
+            else{
+                $this->service()->createInvitations();
+                $invitation = $this->invitations()->first();
+            }
+
         }
 
-        $storage_path = Storage::$type($this->client->invoice_filepath().$this->numberFormatter().'.pdf');
+        if(!$invitation)
+            throw new \Exception('Hard fail, could not create an invitation - is there a valid contact?');
 
-        if (! Storage::exists($this->client->invoice_filepath().$this->numberFormatter().'.pdf')) {
-            event(new InvoiceWasUpdated($this, $this->company, Ninja::eventVars(auth()->user()->id)));
-            CreateEntityPdf::dispatchNow($invitation);
+        $file_path = $this->client->invoice_filepath().$this->numberFormatter().'.pdf';
+
+        if(Ninja::isHosted() && $portal && Storage::disk(config('filesystems.default'))->exists($file_path)){
+            return Storage::disk(config('filesystems.default'))->{$type}($file_path);
         }
+        elseif(Ninja::isHosted() && $portal){
+            $file_path = CreateEntityPdf::dispatchNow($invitation,config('filesystems.default'));
+            return Storage::disk(config('filesystems.default'))->{$type}($file_path);
+        }
+        
+        if(Storage::disk('public')->exists($file_path))
+            return Storage::disk('public')->{$type}($file_path);
 
-        return $storage_path;
+        $file_path = CreateEntityPdf::dispatchNow($invitation);
+            return Storage::disk('public')->{$type}($file_path);
     }
 
-    /**
-     * Updates Invites to SENT.
-     */
     public function markInvitationsSent()
     {
         $this->invitations->each(function ($invitation) {

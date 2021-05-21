@@ -12,6 +12,7 @@
 namespace App\Jobs\Mail;
 
 use App\DataMapper\Analytics\EmailFailure;
+use App\DataMapper\Analytics\EmailSuccess;
 use App\Events\Invoice\InvoiceWasEmailedAndFailed;
 use App\Events\Payment\PaymentWasEmailedAndFailed;
 use App\Jobs\Mail\NinjaMailerObject;
@@ -20,6 +21,7 @@ use App\Libraries\Google\Google;
 use App\Libraries\MultiDB;
 use App\Mail\TemplateEmail;
 use App\Models\ClientContact;
+use App\Models\Company;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\SystemLog;
@@ -53,7 +55,11 @@ class NinjaMailerJob implements ShouldQueue
 
     public $nmo;
 
-    public function __construct(NinjaMailerObject $nmo)
+    public $override;
+
+    public $company;
+
+    public function __construct(NinjaMailerObject $nmo, bool $override = false)
     {
 
         $this->nmo = $nmo;
@@ -63,38 +69,59 @@ class NinjaMailerJob implements ShouldQueue
     public function handle()
     {
         /*If we are migrating data we don't want to fire any emails*/
-        if ($this->nmo->company->is_disabled) 
+        if ($this->nmo->company->is_disabled && !$this->override) 
             return true;
         
         /*Set the correct database*/
         MultiDB::setDb($this->nmo->company->db);
+
+        /* Serializing models from other jobs wipes the primary key */
+        $this->company = Company::where('company_key', $this->nmo->company->company_key)->first();
 
         /* Set the email driver */
         $this->setMailDriver();
 
         if (strlen($this->nmo->settings->reply_to_email) > 1) {
             
-            $reply_to_name = strlen($this->nmo->settings->reply_to_name) > 1 ? $this->nmo->settings->reply_to_name : $this->nmo->company->present()->name();
+            if(property_exists($this->nmo->settings, 'reply_to_name'))
+                $reply_to_name = strlen($this->nmo->settings->reply_to_name) > 3 ? $this->nmo->settings->reply_to_name : $this->nmo->settings->reply_to_email;
+            else
+                $reply_to_name = $this->nmo->settings->reply_to_email;
+
             $this->nmo->mailable->replyTo($this->nmo->settings->reply_to_email, $reply_to_name);
 
         }
+        else {
+            $this->nmo->mailable->replyTo($this->company->owner()->email, $this->company->owner()->present()->name());
+        }
 
-        if (strlen($this->nmo->settings->bcc_email) > 1) 
-            $this->nmo->mailable->bcc($this->nmo->settings->bcc_email, $this->nmo->settings->bcc_email);
+
+        if (strlen($this->nmo->settings->bcc_email) > 1) {
+            nlog('bcc list available');
+            nlog($this->nmo->settings->bcc_email);
+            $this->nmo->mailable->bcc(explode(",", $this->nmo->settings->bcc_email), 'Blind Copy');
+        }
         
 
         //send email
         try {
             nlog("trying to send");
+            
             Mail::to($this->nmo->to_user->email)
                 ->send($this->nmo->mailable);
+
+            LightLogs::create(new EmailSuccess($this->nmo->company->company_key))
+                     ->batch();
+
         } catch (\Exception $e) {
 
             nlog("error failed with {$e->getMessage()}");
-            // nlog($e);
 
             if($this->nmo->entity)
                 $this->entityEmailFailed($e->getMessage());
+
+            if(Ninja::isHosted())
+                app('sentry')->captureException($e);
         }
     }
 
@@ -156,7 +183,15 @@ class NinjaMailerJob implements ShouldQueue
         nlog("Sending via {$user->name()}");
 
         $google = (new Google())->init();
-        $google->getClient()->setAccessToken(json_encode($user->oauth_user_token));
+
+        try{
+            $google->getClient()->setAccessToken(json_encode($user->oauth_user_token));
+        }
+        catch(\Exception $e) {
+            $this->logMailError('Gmail Token Invalid', $this->company->clients()->first());
+            $this->nmo->settings->email_sending_method = 'default';
+            return $this->setMailDriver();
+        }
 
         if ($google->getClient()->isAccessTokenExpired()) {
             $google->refreshToken($user);
@@ -189,7 +224,8 @@ class NinjaMailerJob implements ShouldQueue
             SystemLog::CATEGORY_MAIL,
             SystemLog::EVENT_MAIL_SEND,
             SystemLog::TYPE_FAILURE,
-            $recipient_object
+            $recipient_object,
+            $this->nmo->company
         );
     }
 
@@ -198,9 +234,9 @@ class NinjaMailerJob implements ShouldQueue
         nlog('mailer job failed');
         nlog($exception->getMessage());
         
-        $job_failure = new EmailFailure();
-        $job_failure->string_metric5 = get_parent_class($this);
-        $job_failure->string_metric6 = $exception->getMessage();
+        $job_failure = new EmailFailure($this->nmo->company->company_key);
+        $job_failure->string_metric5 = 'failed_email';
+        $job_failure->string_metric6 = substr($exception->getMessage(), 0, 150);
 
         LightLogs::create($job_failure)
                  ->batch();

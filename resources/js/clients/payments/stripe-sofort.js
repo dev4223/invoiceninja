@@ -9,13 +9,17 @@
  */
 
 class ProcessSOFORT {
-    constructor(key) {
+    constructor(key, stripeConnect) {
         this.key = key;
         this.errors = document.getElementById('errors');
+        this.stripeConnect = stripeConnect;
     }
 
     setupStripe = () => {
         this.stripe = Stripe(this.key);
+
+        if(this.stripeConnect)
+            this.stripe.stripeAccount = stripeConnect;
 
         return this;
     };
@@ -60,6 +64,9 @@ class ProcessSOFORT {
 
 const publishableKey = document.querySelector(
     'meta[name="stripe-publishable-key"]'
-).content;
+)?.content ?? '';
 
-new ProcessSOFORT(publishableKey).setupStripe().handle();
+const stripeConnect = 
+    document.querySelector('meta[name="stripe-account-id"]')?.content ?? ''; 
+
+new ProcessSOFORT(publishableKey, stripeConnect).setupStripe().handle();

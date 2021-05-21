@@ -15,7 +15,6 @@ use App\Models\Account;
 use App\Models\Activity;
 use App\Models\Subscription;
 use App\Models\Client;
-use App\Models\ClientSubscription;
 use App\Models\Company;
 use App\Models\CompanyGateway;
 use App\Models\CompanyLedger;
@@ -158,6 +157,8 @@ class CompanyTransformer extends EntityTransformer
             'oauth_password_required' => (bool)$company->oauth_password_required,
             'session_timeout' => (int)$company->session_timeout,
             'default_password_timeout' => (int) $company->default_password_timeout,
+            'invoice_task_datelog' => (bool) $company->invoice_task_datelog,
+            'show_task_end_date' => (bool) $company->show_task_end_date,
         ];
     }
 

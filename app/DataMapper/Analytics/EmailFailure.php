@@ -11,7 +11,9 @@
 
 namespace App\DataMapper\Analytics;
 
-class EmailFailure
+use Turbo124\Beacon\ExampleMetric\GenericMixedMetric;
+
+class EmailFailure extends GenericMixedMetric
 {
     /**
      * The type of Sample.
@@ -45,7 +47,7 @@ class EmailFailure
      *
      * @var string
      */
-    public $string_metric5 = '';
+    public $string_metric5 = 'stub';
 
     /**
      * The exception string
@@ -53,5 +55,23 @@ class EmailFailure
      *
      * @var string
      */
-    public $string_metric6 = '';
+    public $string_metric6 = 'stub';
+
+    /**
+     * The counter
+     * set to 1.
+     *
+     * @var string
+     */
+    public $int_metric1 = 1;
+
+    /**
+     * Company Key
+     * @var string
+     */
+    public $string_metric7 = '';
+
+    public function __construct($string_metric7) {
+        $this->string_metric7 = $string_metric7;
+    }
 }

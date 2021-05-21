@@ -13,7 +13,10 @@ namespace App\Mail\Engine;
 
 use App\Models\Account;
 use App\Utils\HtmlEngine;
+use App\Utils\Ninja;
 use App\Utils\Number;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Lang;
 
 class QuoteEmailEngine extends BaseEmailEngine
 {
@@ -41,6 +44,9 @@ class QuoteEmailEngine extends BaseEmailEngine
 
     public function build()
     {
+        App::forgetInstance('translator');
+        Lang::replace(Ninja::transformTranslations($this->client->getMergedSettings()));
+        
         if (is_array($this->template_data) &&  array_key_exists('body', $this->template_data) && strlen($this->template_data['body']) > 0) {
             $body_template = $this->template_data['body'];
         } else {
@@ -91,8 +97,11 @@ class QuoteEmailEngine extends BaseEmailEngine
 
 
         if ($this->client->getSetting('pdf_email_attachment') !== false && $this->quote->company->account->hasFeature(Account::FEATURE_PDF_ATTACHMENT)) {
-            $this->setAttachments([$this->quote->pdf_file_path()]);
-            //$this->setAttachments(['path' => $this->quote->pdf_file_path(), 'name' => basename($this->quote->pdf_file_path())]);
+
+            if(Ninja::isHosted())
+                $this->setAttachments([$this->quote->pdf_file_path(null, 'url', true)]);
+            else
+                $this->setAttachments([$this->quote->pdf_file_path()]);
 
         }
 
@@ -101,7 +110,10 @@ class QuoteEmailEngine extends BaseEmailEngine
 
             // Storage::url
             foreach($this->quote->documents as $document){
-                // $this->setAttachments(['path'=>$document->filePath(),'name'=>$document->name]);
+                $this->setAttachments([['path' => $document->filePath(), 'name' => $document->name, 'mime' => $document->type]]);
+            }
+
+            foreach($this->quote->company->documents as $document){
                 $this->setAttachments([['path' => $document->filePath(), 'name' => $document->name, 'mime' => $document->type]]);
             }
 

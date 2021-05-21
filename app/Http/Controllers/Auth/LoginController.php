@@ -13,16 +13,23 @@ namespace App\Http\Controllers\Auth;
 
 use App\DataMapper\Analytics\LoginFailure;
 use App\DataMapper\Analytics\LoginSuccess;
+use App\Events\User\UserLoggedIn;
 use App\Http\Controllers\BaseController;
 use App\Http\Controllers\Controller;
 use App\Jobs\Account\CreateAccount;
+use App\Jobs\Company\CreateCompanyToken;
+use App\Jobs\Util\SystemLogger;
 use App\Libraries\MultiDB;
 use App\Libraries\OAuth\OAuth;
 use App\Libraries\OAuth\Providers\Google;
+use App\Models\Client;
+use App\Models\Company;
 use App\Models\CompanyToken;
 use App\Models\CompanyUser;
+use App\Models\SystemLog;
 use App\Models\User;
 use App\Transformers\CompanyUserTransformer;
+use App\Utils\Ninja;
 use App\Utils\Traits\UserSessionAttributes;
 use Google_Client;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
@@ -169,6 +176,8 @@ class LoginController extends BaseController
 
             $user = $this->guard()->user();
 
+            event(new UserLoggedIn($user, $user->account->default_company, Ninja::eventVars($user->id)));
+
             //if user has 2fa enabled - lets check this now:
 
             if($user->google_2fa_secret && $request->has('one_time_password'))
@@ -193,19 +202,48 @@ class LoginController extends BaseController
             }
 
             $user->setCompany($user->account->default_company);
-            $timeout = auth()->user()->company()->default_password_timeout / 60000;
-            Cache::put(auth()->user()->hashed_id.'_logged_in', Str::random(64), $timeout);
+
+            $timeout = $user->company()->default_password_timeout;
+
+            if($timeout == 0)
+                $timeout = 30*60*1000*1000;
+            else
+                $timeout = $timeout/1000;
+
+            Cache::put($user->hashed_id.'_'.$user->account_id.'_logged_in', Str::random(64), $timeout);
 
             $cu = CompanyUser::query()
                   ->where('user_id', auth()->user()->id);
 
-            return $this->listResponse($cu);
+            if(!$cu->exists())
+                return response()->json(['message' => 'User not linked to any companies'], 403);
+
+            $cu->first()->account->companies->each(function ($company) use($cu, $request){
+
+                if($company->tokens()->where('is_system', true)->count() == 0)
+                {
+                    CreateCompanyToken::dispatchNow($company, $cu->first()->user, $request->server('HTTP_USER_AGENT'));
+                }
+
+            });
+
+            return $this->timeConstrainedResponse($cu);
+            // return $this->listResponse($cu);
 
         } else {
 
             LightLogs::create(new LoginFailure())
                 ->increment()
                 ->batch();
+
+            SystemLogger::dispatch(
+                json_encode(['ip' => request()->getClientIp()]),
+                SystemLog::CATEGORY_SECURITY,
+                SystemLog::EVENT_USER,
+                SystemLog::TYPE_LOGIN_FAILURE,
+                null,
+                Company::first(),
+            );
 
             $this->incrementLoginAttempts($request);
 
@@ -262,9 +300,20 @@ class LoginController extends BaseController
 
         $cu = CompanyUser::query()
                           ->where('user_id', $company_token->user_id);
-        //->where('company_id', $company_token->company_id);
 
-        //$ct = CompanyUser::whereUserId(auth()->user()->id);
+
+        $cu->first()->account->companies->each(function ($company) use($cu, $request){
+
+            if($company->tokens()->where('is_system', true)->count() == 0)
+            {
+                CreateCompanyToken::dispatchNow($company, $cu->first()->user, $request->server('HTTP_USER_AGENT'));
+            }
+        });
+
+
+        if($request->has('current_company') && $request->input('current_company') == 'true')
+          $cu->where("company_id", $company_token->company_id);
+
         return $this->refreshResponse($cu);
     }
 
@@ -311,13 +360,28 @@ class LoginController extends BaseController
 
                 Auth::login($existing_user, true);
                 $existing_user->setCompany($existing_user->account->default_company);
-                $timeout = $existing_user->company()->default_password_timeout / 60000;
-                Cache::put($existing_user->hashed_id.'_logged_in', Str::random(64), $timeout);
+
+                $timeout = $existing_user->company()->default_password_timeout;
+
+                if($timeout == 0)
+                    $timeout = 30*60*1000*1000;
+                else
+                    $timeout = $timeout/1000;
+
+                Cache::put($existing_user->hashed_id.'_'.$existing_user->account_id.'_logged_in', Str::random(64), $timeout);
 
                 $cu = CompanyUser::query()
                                   ->where('user_id', auth()->user()->id);
 
-                return $this->listResponse($cu);
+                $cu->first()->account->companies->each(function ($company) use($cu){
+
+                    if($company->tokens()->where('is_system', true)->count() == 0)
+                    {
+                        CreateCompanyToken::dispatchNow($company, $cu->first()->user, request()->server('HTTP_USER_AGENT'));
+                    }
+                });
+
+                return $this->timeConstrainedResponse($cu);
                 
             }
         }
@@ -345,12 +409,27 @@ class LoginController extends BaseController
 
             auth()->user()->email_verified_at = now();
             auth()->user()->save();
-            $timeout = auth()->user()->company()->default_password_timeout / 60000;
-            Cache::put(auth()->user()->hashed_id.'_logged_in', Str::random(64), $timeout);
 
-            $ct = CompanyUser::whereUserId(auth()->user()->id);
+            $timeout = auth()->user()->company()->default_password_timeout;
 
-            return $this->listResponse($ct);
+                if($timeout == 0)
+                    $timeout = 30*60*1000*1000;
+                else
+                    $timeout = $timeout/1000;
+
+            Cache::put(auth()->user()->hashed_id.'_'.auth()->user()->account_id.'_logged_in', Str::random(64), $timeout);
+
+            $cu = CompanyUser::whereUserId(auth()->user()->id);
+
+            $cu->first()->account->companies->each(function ($company) use($cu){
+
+                if($company->tokens()->where('is_system', true)->count() == 0)
+                {
+                    CreateCompanyToken::dispatchNow($company, $cu->first()->user, request()->server('HTTP_USER_AGENT'));
+                }
+            });
+
+            return $this->timeConstrainedResponse($cu);
         }
 
         return response()

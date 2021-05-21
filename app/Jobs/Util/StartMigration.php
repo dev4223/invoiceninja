@@ -26,6 +26,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use ZipArchive;
 
 class StartMigration implements ShouldQueue
@@ -90,6 +91,21 @@ class StartMigration implements ShouldQueue
         $archive = $zip->open(public_path("storage/{$this->filepath}"));
         $filename = pathinfo($this->filepath, PATHINFO_FILENAME);
 
+            // if($this->company->id == $this->company->account->default_company_id)
+            // {
+            //     $new_default_company = $this->company->account->companies->first();
+
+            //     if ($new_default_company) {
+            //         $this->company->account->default_company_id = $new_default_company->id;
+            //         $this->company->account->save();
+            //     }
+            // }
+
+        $update_product_flag = $this->company->update_products;
+
+        $this->company->update_products = false;
+        $this->company->save();
+
         try {
             if (! $archive) {
                 throw new ProcessingMigrationArchiveFailed('Processing migration archive failed. Migration file is possibly corrupted.');
@@ -110,9 +126,20 @@ class StartMigration implements ShouldQueue
 
             Import::dispatchNow($file, $this->company, $this->user);
 
-        } catch (NonExistingMigrationFile | ProcessingMigrationArchiveFailed | ResourceNotAvailableForMigration | MigrationValidatorFailed | ResourceDependencyMissing $e) {
+            Storage::deleteDirectory(public_path("storage/migrations/{$filename}"));
 
-            Mail::to($this->user)->send(new MigrationFailed($e, $e->getMessage()));
+            // $this->company->account->default_company_id = $this->company->id;
+            // $this->company->account->save();
+
+            $this->company->update_products = $update_product_flag;
+            $this->company->save();
+
+        } catch (NonExistingMigrationFile | ProcessingMigrationArchiveFailed | ResourceNotAvailableForMigration | MigrationValidatorFailed | ResourceDependencyMissing | \Exception $e) {
+
+            $this->company->update_products = $update_product_flag;
+            $this->company->save();
+
+            Mail::to($this->user->email, $this->user->name())->send(new MigrationFailed($e, $e->getMessage()));
 
             if (app()->environment() !== 'production') {
                 info($e->getMessage());

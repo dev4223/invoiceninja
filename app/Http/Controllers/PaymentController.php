@@ -208,6 +208,9 @@ class PaymentController extends BaseController
     {
         $payment = $this->payment_repo->save($request->all(), PaymentFactory::create(auth()->user()->company()->id, auth()->user()->id));
 
+        if($request->has('email_receipt') && $request->input('email_receipt') == 'true' && !$payment->client->getSetting('client_manual_payment_notification'))
+            $payment->service()->sendEmail();
+
         return $this->itemResponse($payment);
     }
 
@@ -382,7 +385,7 @@ class PaymentController extends BaseController
 
         $payment = $this->payment_repo->save($request->all(), $payment);
 
-        event(new PaymentWasUpdated($payment, $payment->company, Ninja::eventVars(auth()->user()->id)));
+        event(new PaymentWasUpdated($payment, $payment->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
         return $this->itemResponse($payment);
     }
 
@@ -592,7 +595,7 @@ class PaymentController extends BaseController
              $this->payment_repo->restore($payment);
                 
                 if (! $bulk) {
-                    return $this->listResponse($payment);
+                    return $this->itemResponse($payment);
                 }
 
                 break;
@@ -600,7 +603,7 @@ class PaymentController extends BaseController
              $this->payment_repo->archive($payment);
                 
                 if (! $bulk) {
-                    return $this->listResponse($payment);
+                    return $this->itemResponse($payment);
                 }
                 // code...
                 break;
@@ -608,14 +611,26 @@ class PaymentController extends BaseController
              $this->payment_repo->delete($payment);
                 
                 if (! $bulk) {
-                    return $this->listResponse($payment);
+                    return $this->itemResponse($payment);
                 }
                 // code...
                 break;
             case 'email':
                 //dispatch email to queue
-                break;
+                $payment->service()->sendEmail();
 
+                if (! $bulk) {
+                    return $this->itemResponse($payment);
+                }
+                break;
+            case 'email_receipt':
+                $this->payment->service()->sendEmail();
+
+                if (! $bulk) {
+                    return $this->itemResponse($payment);
+                }
+                break;
+            
             default:
                 // code...
                 break;
@@ -670,6 +685,8 @@ class PaymentController extends BaseController
     public function refund(RefundPaymentRequest $request)
     {
         $payment = $request->payment();
+
+// nlog($request->all());
 
         $payment = $payment->refund($request->all());
 

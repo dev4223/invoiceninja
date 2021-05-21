@@ -11,6 +11,8 @@
 
 namespace App\Http\Controllers;
 
+use App\DataMapper\Analytics\EmailBounce;
+use App\DataMapper\Analytics\EmailSpam;
 use App\Jobs\Util\SystemLogger;
 use App\Libraries\MultiDB;
 use App\Models\CreditInvitation;
@@ -19,6 +21,7 @@ use App\Models\QuoteInvitation;
 use App\Models\RecurringInvoiceInvitation;
 use App\Models\SystemLog;
 use Illuminate\Http\Request;
+use Turbo124\Beacon\Facades\LightLogs;
 
 /**
  * Class PostMarkController.
@@ -71,8 +74,7 @@ class PostMarkController extends BaseController
 
         if($request->header('X-API-SECURITY') && $request->header('X-API-SECURITY') == config('postmark.secret'))
         {
-
-            nlog($request->all());
+            // nlog($request->all());
 
             MultiDB::findAndSetDbByCompanyKey($request->input('Tag'));
             
@@ -123,7 +125,13 @@ class PostMarkController extends BaseController
         $this->invitation->email_status = 'delivered';
         $this->invitation->save();
 
-        SystemLogger::dispatch($request->all(), SystemLog::CATEGORY_MAIL, SystemLog::EVENT_MAIL_DELIVERY, SystemLog::TYPE_WEBHOOK_RESPONSE, $this->invitation->contact->client);
+        SystemLogger::dispatch($request->all(), 
+            SystemLog::CATEGORY_MAIL, 
+            SystemLog::EVENT_MAIL_DELIVERY, 
+            SystemLog::TYPE_WEBHOOK_RESPONSE, 
+            $this->invitation->contact->client,
+            $this->invitation->company
+        );
     }
 
 // {
@@ -157,7 +165,15 @@ class PostMarkController extends BaseController
         $this->invitation->email_status = 'bounced';
         $this->invitation->save();
 
-        SystemLogger::dispatch($request->all(), SystemLog::CATEGORY_MAIL, SystemLog::EVENT_MAIL_BOUNCED, SystemLog::TYPE_WEBHOOK_RESPONSE, $this->invitation->contact->client);
+        $bounce = new EmailBounce(
+            $request->input('Tag'),
+            $request->input('From'),
+            $request->input('MessageID')
+        );
+
+        LightLogs::create($bounce)->batch();
+
+        SystemLogger::dispatch($request->all(), SystemLog::CATEGORY_MAIL, SystemLog::EVENT_MAIL_BOUNCED, SystemLog::TYPE_WEBHOOK_RESPONSE, $this->invitation->contact->client, $this->invitation->company);
     }
 
 // {
@@ -191,7 +207,15 @@ class PostMarkController extends BaseController
         $this->invitation->email_status = 'spam';
         $this->invitation->save();
 
-        SystemLogger::dispatch($request->all(), SystemLog::CATEGORY_MAIL, SystemLog::EVENT_MAIL_SPAM_COMPLAINT, SystemLog::TYPE_WEBHOOK_RESPONSE, $this->invitation->contact->client);
+        $spam = new EmailSpam(
+            $request->input('Tag'),
+            $request->input('From'),
+            $request->input('MessageID')
+        );
+
+        LightLogs::create($bounce)->batch();
+
+        SystemLogger::dispatch($request->all(), SystemLog::CATEGORY_MAIL, SystemLog::EVENT_MAIL_SPAM_COMPLAINT, SystemLog::TYPE_WEBHOOK_RESPONSE, $this->invitation->contact->client, $this->invitation->company);
     }
 
     private function discoverInvitation($message_id)

@@ -25,12 +25,8 @@
     .header-wrapper {
         margin-top: 2rem;
         display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-columns: 1fr 0.5fr 2fr;
         padding: 2rem 3rem;
-    }
-
-    .header-wrapper .company-logo {
-        height: 5rem;
     }
 
     .header-wrapper .entity-details-wrapper {
@@ -48,6 +44,10 @@
     .header-wrapper #entity-details > tr,
     .header-wrapper #entity-details th {
         font-weight: normal;
+    }
+
+    .company-logo {
+        zoom: 50%; /** Adapt the zoom size, if you think it's necessary. **/
     }
 
     .contacts-wrapper {
@@ -94,7 +94,9 @@
     #product-table,
     #delivery-note-table,
     #task-table {
-        padding: 3rem;
+        padding-left: 3rem;
+        padding-right: 3rem;
+        margin-top: 3rem;
         /* margin-bottom: 200px; */
         min-width: 100%;
         table-layout: fixed;
@@ -167,6 +169,7 @@
     }
 
     #table-totals {
+        margin-top: 1rem;
         display: grid;
         grid-template-columns: 2fr 1fr;
         gap: 80px;
@@ -220,17 +223,14 @@
         padding: 10px;
     }
 
-    #footer {
-        position: fixed;
-        bottom: 0;
-        min-width: 100%;
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
-        margin-left: -10px;
+    [data-ref="total_table-footer"] {
+        text-align: left;
+        padding-left: 3rem;
+        padding-right: 3rem;
     }
 
-    #footer > * {
-        padding: 5px;
+    #footer {
+        margin-top: 1rem;
     }
 </style>
 
@@ -280,21 +280,23 @@
 
     <table id="task-table" cellspacing="0"></table>
 
-    <div id="table-totals" cellspacing="0"></div>
-
     <table id="delivery-note-table" cellspacing="0"></table>
+
+    <div id="table-totals" cellspacing="0"></div>
 </div>
 
 <div id="footer">
+    <p data-ref="total_table-footer">$entity_footer</p>
 
-
-    <div style="background-color: #00968B"><!-- 1 --></div>
-    <div style="background-color: #1D756E"><!-- 2 --></div>
-    <div style="background-color: #FCB600"><!-- 3 --></div>
-    <div style="background-color: #BA932F"><!-- 4 --></div>
-    <div style="background-color: #A72A4E"><!-- 5 --></div>
-    <div style="background-color: #E20041"><!-- 6 --></div>
-    <div style="background-color: #F8B300"><!-- 7 --></div>
-    <div style="background-color: #009B8F"><!-- 8 --></div>
+    <script>
+        // Clear up space a bit, if [product-table, tasks-table, delivery-note-table] isn't present.
+        document.addEventListener('DOMContentLoaded', () => {
+            ['product-table', 'task-table', 'delivery-note-table'].forEach((tableIdentifier) => {
+                document.getElementById(tableIdentifier).childElementCount === 0
+                    ? document.getElementById(tableIdentifier).style.display = 'none'
+                    : '';
+            });
+        });
+    </script>
 </div>
 

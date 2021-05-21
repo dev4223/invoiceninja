@@ -24,9 +24,9 @@ Route::get('tmp_pdf/{hash}', 'ClientPortal\TempRouteController@index')->name('tm
 Route::get('client/key_login/{contact_key}', 'ClientPortal\ContactHashLoginController@login')->name('client.contact_login')->middleware(['contact_key_login']);
 Route::get('client/magic_link/{magic_link}', 'ClientPortal\ContactHashLoginController@magicLink')->name('client.contact_magic_link')->middleware(['contact_key_login']);
 Route::get('documents/{document_hash}', 'ClientPortal\DocumentController@publicDownload')->name('documents.public_download');
+Route::get('error', 'ClientPortal\ContactHashLoginController@errorPage')->name('client.error');
 
-//todo implement domain DB
-Route::group(['middleware' => ['auth:contact', 'locale', 'check_client_existence'], 'prefix' => 'client', 'as' => 'client.'], function () {
+Route::group(['middleware' => ['auth:contact', 'locale', 'check_client_existence','domain_db'], 'prefix' => 'client', 'as' => 'client.'], function () {
     Route::get('dashboard', 'ClientPortal\DashboardController@index')->name('dashboard'); // name = (dashboard. index / create / show / update / destroy / edit
 
     Route::get('invoices', 'ClientPortal\InvoiceController@index')->name('invoices.index')->middleware('portal_enabled');
@@ -54,7 +54,7 @@ Route::group(['middleware' => ['auth:contact', 'locale', 'check_client_existence
     Route::get('payment_methods/{payment_method}/verification', 'ClientPortal\PaymentMethodController@verify')->name('payment_methods.verification');
     Route::post('payment_methods/{payment_method}/verification', 'ClientPortal\PaymentMethodController@processVerification');
 
-    Route::resource('payment_methods', 'ClientPortal\PaymentMethodController')->except(['edit', 'update']); // name = (payment_methods. index / create / show / update / destroy / edit
+    Route::resource('payment_methods', 'ClientPortal\PaymentMethodController')->except(['edit', 'update']);
 
     Route::match(['GET', 'POST'], 'quotes/approve', 'ClientPortal\QuoteController@bulk')->name('quotes.bulk');
     Route::get('quotes', 'ClientPortal\QuoteController@index')->name('quotes.index')->middleware('portal_enabled');
@@ -74,14 +74,15 @@ Route::group(['middleware' => ['auth:contact', 'locale', 'check_client_existence
 
     Route::get('subscriptions/{recurring_invoice}/plan_switch/{target}', 'ClientPortal\SubscriptionPlanSwitchController@index')->name('subscription.plan_switch');
 
-    Route::resource('subscriptions', 'ClientPortal\SubscriptionController')->only(['index']);
+    Route::resource('subscriptions', 'ClientPortal\SubscriptionController')->middleware('portal_enabled')->only(['index']);
+
+    Route::resource('tasks', 'ClientPortal\TaskController')->only(['index']);
 
     Route::post('upload', 'ClientPortal\UploadController')->name('upload.store');
-
     Route::get('logout', 'Auth\ContactLoginController@logout')->name('logout');
 });
 
-Route::get('client/subscription/{subscription}/purchase/', 'ClientPortal\SubscriptionPurchaseController@index')->name('client.subscription.purchase');
+Route::get('client/subscriptions/{subscription}/purchase', 'ClientPortal\SubscriptionPurchaseController@index')->name('client.subscription.purchase')->middleware('domain_db');
 
 Route::group(['middleware' => ['invite_db'], 'prefix' => 'client', 'as' => 'client.'], function () {
     /*Invitation catches*/

@@ -1,6 +1,34 @@
 # Release notes
 
 ## [Unreleased (daily channel)](https://github.com/invoiceninja/invoiceninja/tree/v5-develop)
+- Add Cache-control: no-cache to prevent overaggressive caching of assets
+- Improved labelling in the settings (client portal)
+- Client portal: Multiple accounts access improvements (#5703)
+- Client portal: "Credits" updates (#5734)
+- Client portal: Make sidebar white color, in order to make logo displaying more simple. (#5753)
+
+## [v5.1.56-release](https://github.com/invoiceninja/invoiceninja/releases/tag/v5.1.56-release)
+## Fixed:
+- Fix User created/updated/deleted Actvity display format
+- Fix for Stripe autobill / token regression
+
+## Added:
+- Invoice / Quote / Credit created notifications
+- Logout route - deletes all auth tokens
+
+## [v5.1.54-release](https://github.com/invoiceninja/invoiceninja/releases/tag/v5.1.54-release)
+## Fixed:
+- Fixes for e-mails, encoding & parsing invalid HTML
+
+## [v5.1.50-release](https://github.com/invoiceninja/invoiceninja/releases/tag/v5.1.50-release)
+## Fixed:
+- Refactor of e-mail templates
+- Client portal: Invoices & recurring invoices are now sorted by date (by default)
+
+## Added:
+- Public notes of entities will now show in #footer section of designs (previously totals table).
+
+## [v5.1.47-release](https://github.com/invoiceninja/invoiceninja/releases/tag/v5.1.47-release)
 
 ### Added:
 - Subscriptions are now going to show the frequency in the table (#5412)
