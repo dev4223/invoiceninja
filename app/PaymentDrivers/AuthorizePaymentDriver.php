@@ -7,7 +7,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\PaymentDrivers;
@@ -54,11 +54,11 @@ class AuthorizePaymentDriver extends BaseDriver
     /**
      * Returns the gateway types.
      */
-    public function gatewayTypes() :array
+    public function gatewayTypes(): array
     {
-        $types = [
-            GatewayType::CREDIT_CARD,
-        ];
+        $types = [];
+
+            $types[] = GatewayType::CREDIT_CARD;
 
         return $types;
     }

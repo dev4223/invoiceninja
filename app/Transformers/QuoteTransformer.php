@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Transformers;
@@ -108,7 +108,7 @@ class QuoteTransformer extends EntityTransformer
             'po_number' => $quote->po_number ?: '',
             'date' => $quote->date ?: '',
             'last_sent_date' => $quote->last_sent_date ?: '',
-            'next_send_date' => $quote->date ?: '',
+            'next_send_date' => $quote->next_send_date ?: '',
             'reminder1_sent' => $quote->reminder1_sent ?: '',
             'reminder2_sent' => $quote->reminder2_sent ?: '',
             'reminder3_sent' => $quote->reminder3_sent ?: '',

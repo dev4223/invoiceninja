@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Mail\Engine;
@@ -14,8 +14,10 @@ namespace App\Mail\Engine;
 use App\DataMapper\EmailTemplateDefaults;
 use App\Models\Account;
 use App\Utils\Helpers;
+use App\Utils\Ninja;
 use App\Utils\Number;
 use App\Utils\Traits\MakesDates;
+use Illuminate\Support\Facades\App;
 
 class PaymentEmailEngine extends BaseEmailEngine
 {
@@ -48,6 +50,11 @@ class PaymentEmailEngine extends BaseEmailEngine
 
     public function build()
     {
+        App::forgetInstance('translator');
+        $t = app('translator');
+        App::setLocale($this->contact->preferredLocale());
+        $t->replace(Ninja::transformTranslations($this->client->getMergedSettings()));
+
         if (is_array($this->template_data) &&  array_key_exists('body', $this->template_data) && strlen($this->template_data['body']) > 0) {
             $body_template = $this->template_data['body'];
         } elseif (strlen($this->client->getSetting('email_template_payment')) > 0) {
@@ -77,7 +84,10 @@ class PaymentEmailEngine extends BaseEmailEngine
 
             $this->payment->invoices->each(function ($invoice){
                 
-                $this->setAttachments([$invoice->pdf_file_path()]);
+                if(Ninja::isHosted())
+                    $this->setAttachments([$invoice->pdf_file_path($invoice->invitations->first(), 'url', true)]);
+                else
+                    $this->setAttachments([$invoice->pdf_file_path($invoice->invitations->first())]);
 
             });
 

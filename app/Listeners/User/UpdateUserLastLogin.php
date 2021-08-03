@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Listeners\User;
@@ -57,9 +57,9 @@ class UpdateUserLastLogin implements ShouldQueue
         if($user->ip != $ip)
         {
             $nmo = new NinjaMailerObject;
-            $nmo->mailable = new UserLoggedIn($user, $user->account->companies()->first(), $ip);
-            $nmo->company = $user->account->companies()->first();
-            $nmo->settings = $user->account->companies()->first()->settings;
+            $nmo->mailable = new UserLoggedIn($user, $user->account->companies->first(), $ip);
+            $nmo->company = $user->account->companies->first();
+            $nmo->settings = $user->account->companies->first()->settings;
             $nmo->to_user = $user;
             NinjaMailerJob::dispatch($nmo);
         

@@ -1,11 +1,31 @@
 # Release notes
 
 ## [Unreleased (daily channel)](https://github.com/invoiceninja/invoiceninja/tree/v5-develop)
+## Added:
+- Client portal: Show message when trying to approve non-approvable quotes
+- Client portal: Remove "Approve" button from single quote page if quote is non-approvable
+- Client portal: Hide "Pay now" buttons if no gateways are configured
+- Client portal: "Download" and "Open in new tab" buttons on documents show page
+- Client portal: Make "Invoice Ninja" link clickable in footer
+
+## Fixed:
+- Client portal: Showing message instead of blank page when trying to download zero quotes
+- Client portal: Fixed bug with payment gateways after checking for required fields
+
+## [v5.2.0-release](https://github.com/invoiceninja/invoiceninja/releases/tag/v5.2.0-release)
+## Added:
+- Timezone Offset: Schedule emails based on timezone and time offsets.
+- Force client country to system country if none is set.
+- GMail Oauth via web
+
+## Fixed:
 - Add Cache-control: no-cache to prevent overaggressive caching of assets
 - Improved labelling in the settings (client portal)
 - Client portal: Multiple accounts access improvements (#5703)
 - Client portal: "Credits" updates (#5734)
 - Client portal: Make sidebar white color, in order to make logo displaying more simple. (#5753)
+- Inject small delay into emails to allow all resources to be produced (ie PDFs) prior to sending
+- Fixes for endless reminders not firing
 
 ## [v5.1.56-release](https://github.com/invoiceninja/invoiceninja/releases/tag/v5.1.56-release)
 ## Fixed:

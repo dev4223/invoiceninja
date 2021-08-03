@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Invoice;
@@ -104,6 +104,8 @@ class ApplyPayment extends AbstractService
              ->ledger()
              ->updatePaymentBalance($amount_paid);
 
+        nlog("updating client balance by amount {$amount_paid}");
+        
         $this->invoice
              ->client
              ->service()

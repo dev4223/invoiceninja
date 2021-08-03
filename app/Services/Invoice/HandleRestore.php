@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Invoice;
@@ -46,6 +46,15 @@ class HandleRestore extends AbstractService
                                      ->where('paymentable_type', '=', 'invoices')
                                      ->sum(\DB::raw('amount'));
 
+nlog("first pre restore amount = {$pre_restore_amount}");
+
+            $pre_restore_amount -=  $payment->paymentables()
+                                     ->where('paymentable_type', '=', 'invoices')
+                                     ->sum(\DB::raw('refunded'));
+
+nlog("second pre restore amount = {$pre_restore_amount}");
+
+
             //restore the paymentables
             $payment->paymentables()
                     ->where('paymentable_type', '=', 'invoices')
@@ -57,7 +66,15 @@ class HandleRestore extends AbstractService
                                      ->where('paymentable_type', '=', 'invoices')
                                      ->sum(\DB::raw('amount'));
 
-            info($payment->amount . " == " . $payment_amount);
+nlog("first payment_amount = {$payment_amount}");
+
+            $payment_amount -= $payment->paymentables()
+                                     ->where('paymentable_type', '=', 'invoices')
+                                     ->sum(\DB::raw('refunded'));
+
+nlog("second payment_amount = {$payment_amount}");
+
+            nlog($payment->amount . " == " . $payment_amount);
 
             if ($payment->amount == $payment_amount) {
                 $payment->is_deleted = false;

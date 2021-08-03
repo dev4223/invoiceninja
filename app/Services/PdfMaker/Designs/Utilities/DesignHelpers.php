@@ -7,7 +7,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\PdfMaker\Designs\Utilities;
@@ -321,10 +321,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
     public static function parseMarkdownToHtml(string $markdown): ?string
     {
+        // Use setting to determinate if parsing should be done.
+        // 'parse_markdown_on_pdfs'
+
         $converter = new CommonMarkConverter([
             'allow_unsafe_links' => false,
         ]);
 
         return $converter->convertToHtml($markdown);
+    }
+
+    public function processMarkdownOnLineItems(array &$items)
+    {
+        foreach ($items as $key => $item) {
+            foreach ($item as $variable => $value) {
+                $item[$variable] = DesignHelpers::parseMarkdownToHtml($value ?? '');
+            }
+
+            $items[$key] = $item;
+        }
     }
 }

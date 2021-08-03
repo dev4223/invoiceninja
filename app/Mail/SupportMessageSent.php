@@ -13,13 +13,13 @@ class SupportMessageSent extends Mailable
 {
  //   use Queueable, SerializesModels;
 
-    public $message;
+    public $support_message;
 
     public $send_logs;
 
-    public function __construct($message, $send_logs)
+    public function __construct($support_message, $send_logs)
     {
-        $this->message = $message;
+        $this->support_message = $support_message;
         $this->send_logs = $send_logs;
     }
 
@@ -52,19 +52,28 @@ class SupportMessageSent extends Mailable
 
         $account = auth()->user()->account;
 
-        $plan = $account->plan ?: 'Self Hosted';
+        $priority = '';
+        $plan = $account->plan ?: '';
+
+        if(strlen($plan) >1)
+            $priority = '[PRIORITY] ';
 
         $company = auth()->user()->company();
         $user = auth()->user();
 
-        $subject = "Customer MSG {$user->present()->name} - [{$plan} - DB:{$company->db}]";
+        if(Ninja::isHosted())
+            $subject = "{$priority}Hosted-{$company->db} :: Customer Support - {$plan} ".date('M jS, g:ia');
+        else
+            $subject = "{$priority}Self Hosted :: Customer Support - [{$plan}] ".date('M jS, g:ia');
 
-        return $this->from(config('mail.from.address'), config('mail.from.name')) //todo this needs to be fixed to handle the hosted version
-            ->subject($subject)
-            ->markdown('email.support.message', [
-                'message' => $this->message,
-                'system_info' => $system_info,
-                'laravel_log' => $log_lines,
-            ]);
+        return $this->from(config('mail.from.address'), $user->present()->name()) 
+                ->replyTo($user->email, $user->present()->name())
+                ->subject($subject)
+                ->view('email.support.message', [
+                    'support_message' => $this->support_message,
+                    'system_info' => $system_info,
+                    'laravel_log' => $log_lines,
+                    'logo' => $company->present()->logo(),
+                ]);
     }
 }

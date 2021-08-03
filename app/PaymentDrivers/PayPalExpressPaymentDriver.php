@@ -7,7 +7,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\PaymentDrivers;
@@ -98,7 +98,7 @@ class PayPalExpressPaymentDriver extends BaseDriver
 
         $message = [
             'server_response' => $response->getMessage(),
-            'data' => $this->checkout->payment_hash->data,
+            'data' => $this->payment_hash->data,
         ];
 
         SystemLogger::dispatch(
@@ -118,7 +118,7 @@ class PayPalExpressPaymentDriver extends BaseDriver
         $this->initializeOmnipayGateway();
 
         $response = $this->omnipay_gateway
-            ->completePurchase(['amount' => $this->payment_hash->data->amount])
+            ->completePurchase(['amount' => $this->payment_hash->data->amount, 'currency' => $this->client->getCurrencyCode()])
             ->send();
 
         if ($response->isCancelled()) {
@@ -197,36 +197,23 @@ class PayPalExpressPaymentDriver extends BaseDriver
 
     public function generatePaymentItems(array $data)
     {
-        $total = 0;
 
-        $items = collect($this->payment_hash->data->invoices)->map(function ($i) use (&$total) {
-            $invoice = Invoice::findOrFail($this->decodePrimaryKey($i->invoice_id));
+        $_invoice = collect($this->payment_hash->data->invoices)->first();
+        $invoice = Invoice::withTrashed()->find($this->decodePrimaryKey($_invoice->invoice_id));
 
-            return collect($invoice->line_items)->map(function ($lineItem) use (&$total) {
-                if (floatval($lineItem->quantity) != intval($lineItem->quantity)) {
-                    return null;
-                }
+        $line_item = collect($invoice->line_items)->first();
 
-                $total += $lineItem->cost * $lineItem->quantity;
+        $items = [];
 
-                return new Item([
-                    'name' => $lineItem->product_key,
-                    'description' => substr($lineItem->notes, 0, 100),
-                    'price' => $lineItem->cost,
-                    'quantity' => $lineItem->quantity,
-                ]);
-            });
-        });
-
-        if ($total != $data['total']['amount_with_fee']) {
-            $items[0][] = new Item([
-                'name' => trans('texts.taxes_and_fees'),
-                'description' => '',
-                'price' => $data['total']['amount_with_fee'] - $total,
+        $items[] = new Item([
+                'name' => " ",
+                'description' => ctrans('texts.invoice_number') . "# " . $invoice->number,
+                'price' => $data['total']['amount_with_fee'],
                 'quantity' => 1,
             ]);
-        }
 
-        return $items[0]->toArray();
+        return $items;
+
     }
+
 }

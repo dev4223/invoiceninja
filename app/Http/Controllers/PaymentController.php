@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers;
@@ -207,9 +207,6 @@ class PaymentController extends BaseController
     public function store(StorePaymentRequest $request)
     {
         $payment = $this->payment_repo->save($request->all(), PaymentFactory::create(auth()->user()->company()->id, auth()->user()->id));
-
-        if($request->has('email_receipt') && $request->input('email_receipt') == 'true' && !$payment->client->getSetting('client_manual_payment_notification'))
-            $payment->service()->sendEmail();
 
         return $this->itemResponse($payment);
     }

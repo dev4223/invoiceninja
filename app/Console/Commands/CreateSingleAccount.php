@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Console\Commands;
@@ -14,9 +14,11 @@ namespace App\Console\Commands;
 use App\DataMapper\CompanySettings;
 use App\DataMapper\FeesAndLimits;
 use App\Events\Invoice\InvoiceWasCreated;
+use App\Events\RecurringInvoice\RecurringInvoiceWasCreated;
 use App\Factory\GroupSettingFactory;
 use App\Factory\InvoiceFactory;
 use App\Factory\InvoiceItemFactory;
+use App\Factory\RecurringInvoiceFactory;
 use App\Factory\SubscriptionFactory;
 use App\Helpers\Invoice\InvoiceSum;
 use App\Jobs\Company\CreateCompanyTaskStatuses;
@@ -34,6 +36,7 @@ use App\Models\Project;
 use App\Models\Quote;
 use App\Models\RecurringInvoice;
 use App\Models\Task;
+use App\Models\TaxRate;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\VendorContact;
@@ -47,6 +50,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use stdClass;
 
 class CreateSingleAccount extends Command
 {
@@ -109,6 +113,14 @@ class CreateSingleAccount extends Command
             'portal_domain' => 'http://ninja.test:8000',
         ]);
 
+        $settings = $company->settings;
+        $settings->invoice_terms = 'Default company invoice terms';
+        $settings->quote_terms = 'Default company quote terms';
+        $settings->invoice_footer = 'Default invoice footer';
+
+        $company->settings = $settings;
+        $company->save();
+
         $account->default_company_id = $company->id;
         $account->save();
 
@@ -145,6 +157,29 @@ class CreateSingleAccount extends Command
                 'user_id' => $user->id,
                 'company_id' => $company->id,
             ]);
+
+
+        TaxRate::factory()->create([
+            'user_id' => $user->id,
+            'company_id' => $company->id,
+            'name' => 'GST',
+            'rate' => 10
+        ]);
+
+        TaxRate::factory()->create([
+            'user_id' => $user->id,
+            'company_id' => $company->id,
+            'name' => 'VAT',
+            'rate' => 17.5
+        ]);
+
+        TaxRate::factory()->create([
+            'user_id' => $user->id,
+            'company_id' => $company->id,
+            'name' => 'CA Sales Tax',
+            'rate' => 5
+        ]);
+
 
         $this->info('Creating '.$this->count.' clients');
 
@@ -193,16 +228,19 @@ class CreateSingleAccount extends Command
 
             $client = $company->clients->random();
 
-            $this->info('creating task for client #'.$client->id);
+            $this->info('creating task for client #' . $client->id);
             $this->createTask($client);
 
             $client = $company->clients->random();
 
-            $this->info('creating project for client #'.$client->id);
+            $this->info('creating project for client #' . $client->id);
             $this->createProject($client);
 
-            $this->info('creating credit for client #'.$client->id);
+            $this->info('creating credit for client #' . $client->id);
             $this->createCredit($client);
+
+            $this->info('creating recurring invoice for client # ' . $client->id);
+            $this->createRecurringInvoice($client);
         }
 
         $this->createGateways($company, $user);
@@ -217,34 +255,34 @@ class CreateSingleAccount extends Command
         $gs->save();
 
         $p1 = Product::factory()->create([
-                'user_id' => $user->id,
-                'company_id' => $company->id,
-                'product_key' => 'pro_plan',
-                'notes' => 'The Pro Plan',
-                'cost' => 10,
-                'price' => 10,
-                'quantity' => 1,
-            ]);        
+            'user_id' => $user->id,
+            'company_id' => $company->id,
+            'product_key' => 'pro_plan',
+            'notes' => 'The Pro Plan',
+            'cost' => 10,
+            'price' => 10,
+            'quantity' => 1,
+        ]);
 
         $p2 = Product::factory()->create([
-                'user_id' => $user->id,
-                'company_id' => $company->id,
-                'product_key' => 'enterprise_plan',
-                'notes' => 'The Enterprise Plan',
-                'cost' => 14,
-                'price' => 14,
-                'quantity' => 1,
-            ]); 
+            'user_id' => $user->id,
+            'company_id' => $company->id,
+            'product_key' => 'enterprise_plan',
+            'notes' => 'The Enterprise Plan',
+            'cost' => 14,
+            'price' => 14,
+            'quantity' => 1,
+        ]);
 
         $p3 = Product::factory()->create([
-                'user_id' => $user->id,
-                'company_id' => $company->id,
-                'product_key' => 'free_plan',
-                'notes' => 'The Free Plan',
-                'cost' => 0,
-                'price' => 0,
-                'quantity' => 1,
-            ]); 
+            'user_id' => $user->id,
+            'company_id' => $company->id,
+            'product_key' => 'free_plan',
+            'notes' => 'The Free Plan',
+            'cost' => 0,
+            'price' => 0,
+            'quantity' => 1,
+        ]);
 
         $webhook_config = [
             'post_purchase_url' => 'http://ninja.test:8000/api/admin/plan',
@@ -402,6 +440,10 @@ class CreateSingleAccount extends Command
         $invoice_calc->build();
 
         $invoice = $invoice_calc->getInvoice();
+
+        if ($this->gateway === 'braintree') {
+            $invoice->amount = 100; // Braintree sandbox only allows payments under 2,000 to complete successfully.
+        }
 
         $invoice->save();
         $invoice->service()->createInvitations()->markSent();
@@ -587,7 +629,7 @@ class CreateSingleAccount extends Command
 
             $gateway_types = $cg->driver(new Client)->gatewayTypes();
 
-            $fees_and_limits = new \stdClass;
+            $fees_and_limits = new stdClass;
             $fees_and_limits->{$gateway_types[0]} = new FeesAndLimits;
 
             $cg->fees_and_limits = $fees_and_limits;
@@ -610,7 +652,7 @@ class CreateSingleAccount extends Command
 
             $gateway_types = $cg->driver(new Client)->gatewayTypes();
 
-            $fees_and_limits = new \stdClass;
+            $fees_and_limits = new stdClass;
             $fees_and_limits->{$gateway_types[0]} = new FeesAndLimits;
 
             $cg->fees_and_limits = $fees_and_limits;
@@ -631,7 +673,7 @@ class CreateSingleAccount extends Command
 
             $gateway_types = $cg->driver(new Client)->gatewayTypes();
 
-            $fees_and_limits = new \stdClass;
+            $fees_and_limits = new stdClass;
             $fees_and_limits->{$gateway_types[0]} = new FeesAndLimits;
 
             $cg->fees_and_limits = $fees_and_limits;
@@ -652,11 +694,96 @@ class CreateSingleAccount extends Command
 
             $gateway_types = $cg->driver(new Client)->gatewayTypes();
 
-            $fees_and_limits = new \stdClass;
+            $fees_and_limits = new stdClass;
             $fees_and_limits->{$gateway_types[0]} = new FeesAndLimits;
 
             $cg->fees_and_limits = $fees_and_limits;
             $cg->save();
         }
+
+        if (config('ninja.testvars.wepay') && ($this->gateway == 'all' || $this->gateway == 'wepay')) {
+            $cg = new CompanyGateway;
+            $cg->company_id = $company->id;
+            $cg->user_id = $user->id;
+            $cg->gateway_key = '8fdeed552015b3c7b44ed6c8ebd9e992';
+            $cg->require_cvv = true;
+            $cg->require_billing_address = true;
+            $cg->require_shipping_address = true;
+            $cg->update_details = true;
+            $cg->config = encrypt(config('ninja.testvars.wepay'));
+            $cg->save();
+
+            $gateway_types = $cg->driver(new Client)->gatewayTypes();
+
+            $fees_and_limits = new stdClass;
+            $fees_and_limits->{$gateway_types[0]} = new FeesAndLimits;
+
+            $cg->fees_and_limits = $fees_and_limits;
+            $cg->save();
+        }
+
+        if (config('ninja.testvars.braintree') && ($this->gateway == 'all' || $this->gateway == 'braintree')) {
+            $cg = new CompanyGateway;
+            $cg->company_id = $company->id;
+            $cg->user_id = $user->id;
+            $cg->gateway_key = 'f7ec488676d310683fb51802d076d713';
+            $cg->require_cvv = true;
+            $cg->require_billing_address = true;
+            $cg->require_shipping_address = true;
+            $cg->update_details = true;
+            $cg->config = encrypt(config('ninja.testvars.braintree'));
+            $cg->save();
+
+            $gateway_types = $cg->driver(new Client)->gatewayTypes();
+
+            $fees_and_limits = new stdClass;
+            $fees_and_limits->{$gateway_types[0]} = new FeesAndLimits;
+
+            $cg->fees_and_limits = $fees_and_limits;
+            $cg->save();
+        }
+    }
+
+    private function createRecurringInvoice($client)
+    {
+        $faker = Factory::create();
+
+        $invoice = RecurringInvoiceFactory::create($client->company->id, $client->user->id); //stub the company and user_id
+        $invoice->client_id = $client->id;
+        $dateable = Carbon::now()->subDays(rand(0, 90));
+        $invoice->date = $dateable;
+
+        $invoice->line_items = $this->buildLineItems(rand(1, 10));
+        $invoice->uses_inclusive_taxes = false;
+
+        if (rand(0, 1)) {
+            $invoice->tax_name1 = 'GST';
+            $invoice->tax_rate1 = 10.00;
+        }
+
+        if (rand(0, 1)) {
+            $invoice->tax_name2 = 'VAT';
+            $invoice->tax_rate2 = 17.50;
+        }
+
+        if (rand(0, 1)) {
+            $invoice->tax_name3 = 'CA Sales Tax';
+            $invoice->tax_rate3 = 5;
+        }
+
+        $invoice->custom_value1 = $faker->date;
+        $invoice->custom_value2 = rand(0, 1) ? 'yes' : 'no';
+
+        $invoice->status_id = RecurringInvoice::STATUS_ACTIVE;
+        $invoice->save();
+
+        $invoice_calc = new InvoiceSum($invoice);
+        $invoice_calc->build();
+
+        $invoice = $invoice_calc->getInvoice();
+
+        $invoice->save();
+
+        event(new RecurringInvoiceWasCreated($invoice, $invoice->company, Ninja::eventVars()));
     }
 }

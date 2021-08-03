@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. payment Ninja LLC (https://paymentninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Payment;
@@ -118,6 +118,7 @@ class PaymentService
                                     ->client
                                     ->service()
                                     ->getCredits();
+
 
             foreach ($credits as $credit) {
                 //starting invoice balance

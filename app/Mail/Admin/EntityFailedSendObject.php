@@ -6,14 +6,16 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Mail\Admin;
 
 use App\Utils\HtmlEngine;
+use App\Utils\Ninja;
 use App\Utils\Number;
 use stdClass;
+        use Illuminate\Support\Facades\App;
 
 class EntityFailedSendObject
 {
@@ -50,6 +52,15 @@ class EntityFailedSendObject
 
     public function build()
     {
+
+        App::forgetInstance('translator');
+        /* Init a new copy of the translator*/
+        $t = app('translator');
+        /* Set the locale*/
+        App::setLocale($this->company->getLocale());
+        /* Set customized translations _NOW_ */
+        $t->replace(Ninja::transformTranslations($this->company->settings));
+
         $this->setTemplate();
 
         $mail_obj = new stdClass;

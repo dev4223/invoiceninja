@@ -7,7 +7,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers;
@@ -21,8 +21,6 @@ class PaymentWebhookController extends Controller
     public function __invoke(PaymentWebhookRequest $request, string $company_key, string $company_gateway_id)
     {
 
-    	// MultiDB::findAndSetDbByCompanyKey($company_key);
-
         $payment = $request->getPayment();
         
         if(!$payment)
@@ -32,7 +30,6 @@ class PaymentWebhookController extends Controller
 
         if(!$client)
 	        return response()->json(['message' => 'Client record not found.'], 400);
-
 
         return $request->getCompanyGateway()
             ->driver($client)

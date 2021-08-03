@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Jobs\Entity;
@@ -109,9 +109,8 @@ class EmailEntity implements ShouldQueue
 
         App::setLocale($this->invitation->contact->preferredLocale());
 
-
         $nmo = new NinjaMailerObject;
-        $nmo->mailable = new TemplateEmail($this->email_entity_builder,$this->invitation->contact, $this->invitation);
+        $nmo->mailable = new TemplateEmail($this->email_entity_builder, $this->invitation->contact, $this->invitation);
         $nmo->company = $this->company;
         $nmo->settings = $this->settings;
         $nmo->to_user = $this->invitation->contact;

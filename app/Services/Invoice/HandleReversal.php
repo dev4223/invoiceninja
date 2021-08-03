@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Invoice;
@@ -71,7 +71,8 @@ class HandleReversal extends AbstractService
             $credit = CreditFactory::create($this->invoice->company_id, $this->invoice->user_id);
             $credit->client_id = $this->invoice->client_id;
             $credit->invoice_id = $this->invoice->id;
-
+            $credit->date = now();
+            
             $item = InvoiceItemFactory::create();
             $item->quantity = 1;
             $item->cost = (float) $total_paid;
@@ -89,7 +90,7 @@ class HandleReversal extends AbstractService
         }
 
         /*If there is a payment linked, then the credit needs to be linked back to that payment in case of refund*/
-        if ($paymentables->count() > 0) {
+        if ($paymentables->count() > 0 && $credit) {
             $payment = $paymentables->first()->payment;
             $payment->credits()->save($credit);
 

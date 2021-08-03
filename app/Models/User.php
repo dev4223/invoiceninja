@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
@@ -31,6 +31,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Laracasts\Presenter\PresentableTrait;
+use Illuminate\Support\Facades\Cache;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -81,7 +82,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'custom_value3',
         'custom_value4',
         'is_deleted',
-        'google_2fa_secret',
+        // 'google_2fa_secret',
     ];
 
     /**
@@ -159,9 +160,9 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function setCompany($company)
     {
-        // config(['ninja.company_id' => $company->id]);
-
         $this->company = $company;
+
+        return $this;
     }
 
     /**
@@ -170,16 +171,17 @@ class User extends Authenticatable implements MustVerifyEmail
     public function getCompany()
     {
 
-        if (request()->header('X-API-TOKEN')) {
-            $company_token = CompanyToken::with(['company'])->whereRaw('BINARY `token`= ?', [request()->header('X-API-TOKEN')])->first();
-
-            return $company_token->company;
-        }
-        elseif ($this->company){
+        if ($this->company){
 
             return $this->company;
         
         }
+        elseif (request()->header('X-API-TOKEN')) {
+            $company_token = CompanyToken::with(['company'])->whereRaw('BINARY `token`= ?', [request()->header('X-API-TOKEN')])->first();
+
+            return $company_token->company;
+        }
+
 
         // return false;
         throw new \Exception('No Company Found');
@@ -408,7 +410,7 @@ class User extends Authenticatable implements MustVerifyEmail
         $nmo->settings = $this->account->default_company->settings;
         $nmo->company = $this->account->default_company;
 
-        NinjaMailerJob::dispatch($nmo);
+        NinjaMailerJob::dispatch($nmo, true);
 
         //$this->notify(new ResetPasswordNotification($token));
     }

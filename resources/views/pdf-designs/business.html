@@ -29,7 +29,7 @@
     }
 
     .company-logo {
-        zoom: 50%; /** Adapt the zoom size, if you think it's necessary. **/
+        max-width: 65%;
     }
     
     .header-container > span {
@@ -184,6 +184,7 @@
         padding-left: 1rem;
         padding-top: 0.5rem;
         padding-bottom: 0.8rem;
+        margin-right: .5rem;
     }
 
     #table-totals .totals-table-right-side>* {
@@ -193,6 +194,13 @@
 
     #table-totals>.totals-table-right-side>*> :nth-child(1) {
         text-align: left;
+        margin-top: .75rem;
+    }
+
+    #table-totals>.totals-table-right-side> * > :not([hidden]) ~ :not([hidden]) {
+        --tw-space-y-reverse: 0;
+        margin-top: calc(.75rem * calc(1 - var(--tw-space-y-reverse)));
+        margin-bottom: calc(.75rem * var(--tw-space-y-reverse));
     }
 
     #table-totals>.totals-table-right-side>*> :nth-child(2) {
@@ -226,6 +234,14 @@
 
     #footer {
         margin-top: 30px;
+    }
+
+    /** Markdown-specific styles. **/
+    #product-table h3,
+    #task-table h3,
+    #delivery-note-table h3 {
+        font-size: 1rem;
+        margin-bottom: 0;
     }
 </style>
 

@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Transformers;
@@ -51,7 +51,7 @@ class CompanyUserTransformer extends EntityTransformer
             'archived_at' => (int) $company_user->deleted_at,
             'created_at' => (int) $company_user->created_at,
             'permissions_updated_at' => (int) $company_user->permissions_updated_at,
-            //'number_years_active' => (int) $company_user->number_years_active,
+            'ninja_portal_url' => (string) $company_user->ninja_portal_url,
         ];
     }
 

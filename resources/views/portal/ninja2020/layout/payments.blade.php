@@ -11,7 +11,7 @@
 @endpush
 
 @section('body')
-    @livewire('required-client-info', ['fields' => method_exists($gateway, 'getClientRequiredFields') ? $gateway->getClientRequiredFields() : [], 'contact' => auth('contact')->user(), 'countries' => $countries])
+    @livewire('required-client-info', ['fields' => method_exists($gateway, 'getClientRequiredFields') ? $gateway->getClientRequiredFields() : [], 'contact' => auth('contact')->user(), 'countries' => $countries, 'company' => $company])
 
     <div class="container mx-auto grid grid-cols-12 opacity-25 pointer-events-none" data-ref="gateway-container">
         <div class="col-span-12 lg:col-span-6 lg:col-start-4 overflow-hidden bg-white shadow rounded-lg">
@@ -56,6 +56,14 @@
             document
                 .querySelector('div[data-ref="gateway-container"]')
                 .scrollIntoView({behavior: "smooth"});
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            let toggleWithToken = document.querySelector('.toggle-payment-with-token');
+
+            if (toggleWithToken) {
+                toggleWithToken.click();
+            }
         });
     </script>
 @endpush

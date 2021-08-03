@@ -6,14 +6,16 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers\Auth;
 
 use App\Events\Contact\ContactLoggedIn;
 use App\Http\Controllers\Controller;
+use App\Models\Account;
 use App\Models\ClientContact;
+use App\Models\Company;
 use App\Utils\Ninja;
 use Auth;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
@@ -31,9 +33,28 @@ class ContactLoginController extends Controller
         $this->middleware('guest:contact', ['except' => ['logout']]);
     }
 
-    public function showLoginForm()
+    public function showLoginForm(Request $request)
     {
-        return $this->render('auth.login');
+        //if we are on the root domain invoicing.co do not show any company logos
+        if(Ninja::isHosted() && count(explode('.', request()->getHost())) == 2){
+            $company = null;
+        }elseif (strpos($request->getHost(), 'invoicing.co') !== false) {
+            $subdomain = explode('.', $request->getHost())[0];
+            $company = Company::where('subdomain', $subdomain)->first();
+        } elseif(Ninja::isHosted() && $company = Company::where('portal_domain', $request->getSchemeAndHttpHost())->first()){
+
+        }
+        elseif (Ninja::isSelfHost()) {
+            $company = Account::first()->default_company;
+        } else {
+            $company = null;
+        }
+
+        $account_id = $request->get('account_id');
+        $account = Account::find($account_id);
+
+        return $this->render('auth.login', ['account' => $account, 'company' => $company]);
+
     }
 
     public function login(Request $request)

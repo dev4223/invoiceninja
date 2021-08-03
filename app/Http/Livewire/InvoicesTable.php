@@ -7,11 +7,12 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Livewire;
 
+use App\Libraries\MultiDB;
 use App\Models\Invoice;
 use App\Utils\Traits\WithSorting;
 use Carbon\Carbon;
@@ -26,8 +27,12 @@ class InvoicesTable extends Component
 
     public $status = [];
 
+    public $company;
+    
     public function mount()
     {
+        MultiDB::setDb($this->company->db);
+
         $this->sort_asc = false;
 
         $this->sort_field = 'date';
@@ -39,6 +44,7 @@ class InvoicesTable extends Component
 
         $query = Invoice::query()
             ->orderBy($this->sort_field, $this->sort_asc ? 'asc' : 'desc')
+            ->where('company_id', $this->company->id)
             ->where('is_deleted', false);
 
         if (in_array('paid', $this->status)) {

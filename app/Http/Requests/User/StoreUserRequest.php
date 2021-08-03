@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Requests\User;
@@ -14,10 +14,12 @@ namespace App\Http\Requests\User;
 use App\DataMapper\DefaultSettings;
 use App\Factory\UserFactory;
 use App\Http\Requests\Request;
+use App\Http\ValidationRules\Ninja\CanAddUserRule;
 use App\Http\ValidationRules\User\AttachableUser;
 use App\Http\ValidationRules\ValidUserForCompany;
 use App\Libraries\MultiDB;
 use App\Models\User;
+use App\Utils\Ninja;
 use Illuminate\Validation\Rule;
 
 class StoreUserRequest extends Request
@@ -45,8 +47,7 @@ class StoreUserRequest extends Request
             $rules['email'] = ['email', new AttachableUser()];
         }
 
-
-        if (auth()->user()->company()->account->isFreeHostedClient()) {
+        if (Ninja::isHosted()) {
             $rules['hosted_users'] = new CanAddUserRule(auth()->user()->company()->account);
         }
 

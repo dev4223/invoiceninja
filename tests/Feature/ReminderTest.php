@@ -75,10 +75,98 @@ class ReminderTest extends TestCase
 
         $this->company->settings = $settings;
         $this->invoice->service()->markSent();
-        $this->invoice->setReminder($settings);
+        $this->invoice->service()->setReminder($settings)->save();
 
-        $this->assertEquals($this->invoice->next_send_date, Carbon::now()->addDays(7)->format('Y-m-d'));
+        $this->assertEquals(Carbon::parse($this->invoice->next_send_date)->format('Y-m-d'), Carbon::now()->addDays(7)->format('Y-m-d'));
 
-        ReminderJob::dispatchNow();
+     //   ReminderJob::dispatchNow();
     }
+
+    public function testReminderHitsScenarioH1()
+    {
+        $this->invoice->date = now()->format('Y-m-d');
+        $this->invoice->due_date = Carbon::now()->addDays(30)->format('Y-m-d');
+
+        $settings = $this->company->settings;
+        $settings->enable_reminder1 = true;
+        $settings->schedule_reminder1 = 'before_due_date';
+        $settings->num_days_reminder1 = 2;
+        $settings->enable_reminder2 = true;
+        $settings->schedule_reminder2 = 'after_due_date';
+        $settings->num_days_reminder2 = 14;
+        $settings->enable_reminder3 = true;
+        $settings->schedule_reminder3 = 'after_due_date';
+        $settings->num_days_reminder3 = 30;
+
+        $this->company->settings = $settings;
+        $this->invoice->service()->markSent();
+        $this->invoice->service()->setReminder($settings)->save();
+
+        $this->assertEquals(Carbon::parse($this->invoice->next_send_date)->format('Y-m-d'), Carbon::now()->addDays(30)->subDays(2)->format('Y-m-d'));
+
+     //   ReminderJob::dispatchNow();
+    }
+
+    /* Cant set a reminder in the past so need to skip reminder 2 and go straigh to reminder 3*/
+    public function testReminderNextSendRecalculation()
+    {
+
+        $this->invoice->date = now()->subDays(2)->format('Y-m-d');
+        $this->invoice->due_date = now()->addDays(30)->format('Y-m-d');
+        $this->invoice->reminder1_sent = now()->subDays(1)->format('Y-m-d');
+        $this->invoice->last_sent_date = now()->subDays(1)->format('Y-m-d');
+        $this->invoice->next_send_date = now()->subDays(1)->format('Y-m-d');
+        $this->invoice->reminder2_sent = null;
+
+        $settings = $this->company->settings;
+        $settings->enable_reminder1 = true;
+        $settings->schedule_reminder1 = 'after_invoice_date';
+        $settings->num_days_reminder1 = 1;
+        $settings->enable_reminder2 = true;
+        $settings->schedule_reminder2 = 'after_invoice_date';
+        $settings->num_days_reminder2 = 2;
+        $settings->enable_reminder3 = true;
+        $settings->schedule_reminder3 = 'after_invoice_date';
+        $settings->num_days_reminder3 = 3;
+
+        $this->company->settings = $settings;
+        $this->invoice->service()->markSent();
+        $this->invoice->service()->setReminder($settings)->save();
+
+        $this->invoice->fresh();
+
+        $this->assertEquals(Carbon::parse($this->invoice->next_send_date)->format('Y-m-d'), now()->addDay()->format('Y-m-d'));
+        
+    }
+
+
+    public function testReminder3NextSendRecalculation()
+    {
+
+        $this->invoice->date = now()->subDays(3)->format('Y-m-d');
+        $this->invoice->due_date = Carbon::now()->addDays(30)->format('Y-m-d');
+        $this->invoice->reminder1_sent = now()->subDays(2)->format('Y-m-d');
+        $this->invoice->reminder2_sent = now()->subDays(1)->format('Y-m-d');
+        
+        $settings = $this->company->settings;
+        $settings->enable_reminder1 = true;
+        $settings->schedule_reminder1 = 'after_invoice_date';
+        $settings->num_days_reminder1 = 1;
+        $settings->enable_reminder2 = true;
+        $settings->schedule_reminder2 = 'after_invoice_date';
+        $settings->num_days_reminder2 = 2;
+        $settings->enable_reminder3 = true;
+        $settings->schedule_reminder3 = 'after_invoice_date';
+        $settings->num_days_reminder3 = 3;
+
+        $this->company->settings = $settings;
+        $this->invoice->service()->markSent();
+        $this->invoice->service()->setReminder($settings)->save();
+
+        $this->invoice->fresh();
+        
+        $this->assertEquals(Carbon::parse($this->invoice->next_send_date)->format('Y-m-d'), now()->format('Y-m-d'));
+        
+    }
+
 }

@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\DataMapper;
@@ -18,6 +18,8 @@ class InvoiceItem
     public $cost = 0;
 
     public $product_key = '';
+
+    public $product_cost = 0;
 
     public $notes = '';
 
@@ -57,6 +59,7 @@ class InvoiceItem
         'type_id' => 'string',
         'quantity' => 'float',
         'cost' => 'float',
+        'product_cost' => 'float',
         'product_key' => 'string',
         'notes' => 'string',
         'discount' => 'float',

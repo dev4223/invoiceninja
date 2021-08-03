@@ -2,16 +2,16 @@
 
 namespace App\Mail;
 
-use Illuminate\Bus\Queueable;
+use App\Models\Company;
 use Illuminate\Mail\Mailable;
-use Illuminate\Queue\SerializesModels;
 
 class MigrationFailed extends Mailable
 {
-    // use Queueable, SerializesModels;
-
     public $exception;
+
     public $content;
+
+    public $company;
 
     /**
      * Create a new message instance.
@@ -19,10 +19,11 @@ class MigrationFailed extends Mailable
      * @param $content
      * @param $exception
      */
-    public function __construct($exception, $content = null)
+    public function __construct($exception, Company $company, $content = null)
     {
         $this->exception = $exception;
         $this->content = $content;
+        $this->company = $company;
     }
 
     /**
@@ -32,7 +33,11 @@ class MigrationFailed extends Mailable
      */
     public function build()
     {
-        return $this->from(config('mail.from.address'), config('mail.from.name'))
-                    ->view('email.migration.failed');
+        return $this
+            ->from(config('mail.from.address'), config('mail.from.name'))
+            ->view('email.migration.failed', [
+                'logo' => $this->company->present()->logo(),
+                'settings' => $this->company->settings,
+            ]);
     }
 }

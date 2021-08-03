@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Requests\ClientGatewayToken;
@@ -37,8 +37,9 @@ class StoreClientGatewayTokenRequest extends Request
 
     public function rules()
     {
+        //ensure client is present
         $rules = [
-            'client_id' => 'required',
+            'client_id' => 'required|exists:clients,id,company_id,'.auth()->user()->company()->id,
             'company_gateway_id' => 'required',
             'gateway_type_id' => 'required|integer',
             'meta' => 'required',

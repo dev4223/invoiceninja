@@ -6,11 +6,12 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Jobs\Company;
 
+use App\Libraries\MultiDB;
 use App\Models\TaskStatus;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -44,6 +45,12 @@ class CreateCompanyTaskStatuses
      */
     public function handle()
     {
+
+        MultiDB::setDb($this->company->db);
+        
+        if(TaskStatus::where('company_id', $this->company->id)->count() > 0)
+            return;
+        
         $task_statuses = [
             ['name' => ctrans('texts.backlog'), 'company_id' => $this->company->id, 'user_id' => $this->user->id, 'created_at' => now(), 'updated_at' => now(), 'status_order' => 1],
             ['name' => ctrans('texts.ready_to_do'), 'company_id' => $this->company->id, 'user_id' => $this->user->id, 'created_at' => now(), 'updated_at' => now(), 'status_order' => 2],

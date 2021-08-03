@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Helpers\Mail;
@@ -60,12 +60,12 @@ class GmailTransport extends Transport
         $this->gmail->message($message->getBody());
 
         $this->gmail->cc($message->getCc());
-        $this->gmail->bcc($message->getBcc());
+
+        if(is_array($message->getBcc()))
+            $this->gmail->bcc(array_keys($message->getBcc()));
 
         foreach ($message->getChildren() as $child) 
         {
-
-            nlog("trying to attach");
 
             if($child->getContentType() != 'text/plain')
             {
@@ -74,13 +74,11 @@ class GmailTransport extends Transport
             
             }
 
-
         } 
 
         $this->gmail->send();
 
         $this->sendPerformed($message);
-
 
         return $this->numberOfRecipients($message);
     }

@@ -7,11 +7,12 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Livewire;
 
+use App\Libraries\MultiDB;
 use App\Models\ClientContact;
 use App\Models\Subscription;
 use Illuminate\Support\Facades\Cache;
@@ -71,8 +72,12 @@ class SubscriptionPlanSwitch extends Component
      */
     public $hash;
 
+    public $company;
+    
     public function mount()
     {
+        MultiDB::setDb($this->company->db);
+        
         $this->total = $this->amount;
 
         $this->methods = $this->contact->client->service()->getPaymentMethods($this->amount);
@@ -85,24 +90,40 @@ class SubscriptionPlanSwitch extends Component
         
         $this->state['show_loading_bar'] = true;
 
-            $this->state['invoice'] = $this->target->service()->createChangePlanInvoice([
+            $payment_required = $this->target->service()->changePlanPaymentCheck([
                 'recurring_invoice' => $this->recurring_invoice,
                 'subscription' => $this->subscription,
                 'target' => $this->target,
                 'hash' => $this->hash,
             ]);
 
-            Cache::put($this->hash, [
-                'subscription_id' => $this->target->id,
-                'target_id' => $this->target->id,
-                'recurring_invoice' => $this->recurring_invoice->id,
-                'client_id' => $this->recurring_invoice->client->id,
-                'invoice_id' => $this->state['invoice']->id,
-                'context' => 'change_plan',
-                now()->addMinutes(60)]
-            );
+            if($payment_required)
+            {
 
-        $this->state['payment_initialised'] = true;
+                $this->state['invoice'] = $this->target->service()->createChangePlanInvoice([
+                    'recurring_invoice' => $this->recurring_invoice,
+                    'subscription' => $this->subscription,
+                    'target' => $this->target,
+                    'hash' => $this->hash,
+                ]);
+
+                Cache::put($this->hash, [
+                    'subscription_id' => $this->target->id,
+                    'target_id' => $this->target->id,
+                    'recurring_invoice' => $this->recurring_invoice->id,
+                    'client_id' => $this->recurring_invoice->client->id,
+                    'invoice_id' => $this->state['invoice']->id,
+                    'context' => 'change_plan',
+                    now()->addMinutes(60)]
+                );
+
+                $this->state['payment_initialised'] = true;
+                
+            }
+            else
+                $this->handlePaymentNotRequired();
+
+
 
         $this->emit('beforePaymentEventsCompleted');
     }

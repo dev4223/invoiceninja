@@ -1,4 +1,13 @@
 <?php
+/**
+ * Invoice Ninja (https://invoiceninja.com).
+ *
+ * @link https://github.com/invoiceninja/invoiceninja source repository
+ *
+ * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ *
+ * @license https://www.elastic.co/licensing/elastic-license
+ */
 
 namespace App\Http\Controllers\Auth;
 
@@ -15,7 +24,7 @@ class ContactRegisterController extends Controller
 {
     public function __construct()
     {
-        $this->middleware(['guest', 'contact.register']);
+        $this->middleware(['guest']);
     }
 
     public function showRegisterForm(string $company_key = '')
@@ -24,7 +33,7 @@ class ContactRegisterController extends Controller
 
         $company = Company::where('company_key', $key)->firstOrFail();
 
-        return render('auth.register', ['company' => $company]);
+        return render('auth.register', ['company' => $company, 'account' => $company->account]);
     }
 
     public function register(RegisterRequest $request)

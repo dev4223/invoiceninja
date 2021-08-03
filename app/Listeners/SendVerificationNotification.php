@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Listeners;
@@ -16,6 +16,7 @@ use App\Jobs\Mail\NinjaMailerJob;
 use App\Jobs\Mail\NinjaMailerObject;
 use App\Libraries\MultiDB;
 use App\Mail\Admin\VerifyUserObject;
+use App\Mail\User\UserAdded;
 use App\Notifications\Ninja\VerifyUser;
 use App\Utils\Ninja;
 use Exception;
@@ -51,6 +52,14 @@ class SendVerificationNotification implements ShouldQueue
         MultiDB::setDB($event->company->db);
 
         $event->user->service()->invite($event->company);
+
+        $nmo = new NinjaMailerObject;
+        $nmo->mailable = new UserAdded($event->company, $event->creating_user, $event->user);
+        $nmo->company = $event->company;
+        $nmo->settings = $event->company->settings;
+        $nmo->to_user = $event->creating_user;
+        NinjaMailerJob::dispatch($nmo);
+
 
     }
 }

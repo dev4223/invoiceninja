@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Recurring;
@@ -37,7 +37,7 @@ class GetInvoicePdf extends AbstractService
 
         $invitation = $this->entity->invitations->where('client_contact_id', $this->contact->id)->first();
 
-        $path = $this->entity->client->recurring_invoice_filepath();
+        $path = $this->entity->client->recurring_invoice_filepath($invitation);
 
         $file_path = $path.$this->entity->hashed_id.'.pdf';
 
@@ -48,13 +48,7 @@ class GetInvoicePdf extends AbstractService
         if (! $file) {
             $file_path = CreateEntityPdf::dispatchNow($invitation);
         }
-
-
-        /* Copy from remote disk to local when using cloud file storage. */
-        if(config('filesystems.default') == 's3')
-            return TempFile::path(Storage::disk($disk)->url($file_path));
-
-        // return Storage::disk($disk)->url($file_path);
-        return Storage::disk($disk)->path($file_path);
+ 
+        return $file_path;
     }
 }

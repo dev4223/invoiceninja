@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers;
@@ -16,6 +16,7 @@ use App\Utils\CurlUtils;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use stdClass;
+use Carbon\Carbon;
 
 class LicenseController extends BaseController
 {
@@ -152,7 +153,7 @@ class LicenseController extends BaseController
     {
         $account = auth()->user()->company()->account;
 
-        if($account->plan == 'white_label' && $account->plan_expires->lt(now())){
+        if($account->plan == 'white_label' && Carbon::parse($account->plan_expires)->lt(now())){
             $account->plan = null;
             $account->plan_expires = null;
             $account->save();

@@ -7,7 +7,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers\ClientPortal;
@@ -68,7 +68,7 @@ class DocumentController extends Controller
 
         $documents->map(function ($document) {
             if (auth()->user('contact')->client->id != $document->documentable->id) {
-                abort(401);
+                abort(401, 'Permission denied');
             }
         });
 

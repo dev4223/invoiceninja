@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Middleware;
@@ -51,12 +51,19 @@ class QueryLogging
             $count = count($queries);
             $timeEnd = microtime(true);
             $time = $timeEnd - $timeStart;
-
-            //nlog($request->method().' - '.urldecode($request->url()).": $count queries - ".$time);
-            //  if($count > 50)
-            //nlog($queries);
+        
+            // if($count > 150)
+            //     nlog($queries);
             
-           LightLogs::create(new DbQuery($request->method(), urldecode($request->url()), $count, $time, request()->ip()))
+            $ip = '';
+            
+            if(request()->header('Cf-Connecting-Ip'))
+                $ip = request()->header('Cf-Connecting-Ip');
+            else{
+                $ip = request()->ip();
+            }
+
+           LightLogs::create(new DbQuery($request->method(), urldecode($request->url()), $count, $time, $ip))
                  ->batch();
         }
         

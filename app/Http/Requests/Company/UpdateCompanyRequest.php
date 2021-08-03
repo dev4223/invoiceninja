@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Requests\Company;
@@ -50,7 +50,7 @@ class UpdateCompanyRequest extends Request
         } else {
 
             if(Ninja::isHosted()){
-                $rules['subdomain'] = ['nullable', 'alpha_num', new ValidSubdomain($this->all())];
+                $rules['subdomain'] = ['nullable', 'regex:/^[a-zA-Z0-9.-]+[a-zA-Z0-9]$/', new ValidSubdomain($this->all())];
             }
             else
                 $rules['subdomain'] = 'nullable|alpha_num';
@@ -67,8 +67,8 @@ class UpdateCompanyRequest extends Request
     {
         $input = $this->all();
 
-        // if(array_key_exists('portal_domain', $input) && strlen($input['portal_domain']) > 1)
-        //     $input['portal_domain'] = str_replace("http:", "https:", $input['portal_domain']);
+        if(Ninja::isHosted() && array_key_exists('portal_domain', $input) && strlen($input['portal_domain']) > 1)
+            $input['portal_domain'] = $this->addScheme($input['portal_domain']);
 
         if (array_key_exists('settings', $input)) {
             $input['settings'] = $this->filterSaveableSettings($input['settings']);
@@ -104,5 +104,16 @@ class UpdateCompanyRequest extends Request
         }
 
         return $settings;
+    }
+
+    private function addScheme($url, $scheme = 'https://')
+    {
+
+      $url = str_replace("http://", "", $url);
+
+      $url =  parse_url($url, PHP_URL_SCHEME) === null ? $scheme . $url : $url;
+
+      return rtrim($url, '/');
+
     }
 }

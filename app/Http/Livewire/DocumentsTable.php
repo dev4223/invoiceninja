@@ -7,11 +7,12 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Livewire;
 
+use App\Libraries\MultiDB;
 use App\Models\Client;
 use App\Utils\Traits\WithSorting;
 use Livewire\Component;
@@ -25,8 +26,13 @@ class DocumentsTable extends Component
 
     public $per_page = 10;
 
+    public $company;
+
     public function mount($client)
     {
+
+        MultiDB::setDb($this->company->db);
+
         $this->client = $client;
     }
 

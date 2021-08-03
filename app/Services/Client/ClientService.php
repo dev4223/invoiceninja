@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Client;
@@ -48,20 +48,28 @@ class ClientService
 
     public function getCreditBalance() :float
     {
-        $credits = $this->client->credits
+        $credits = $this->client->credits()
                       ->where('is_deleted', false)
                       ->where('balance', '>', 0)
-                      ->sortBy('created_at');
+                      ->where(function ($query){
+                            $query->whereDate('due_date', '<=', now()->format('Y-m-d'))
+                                  ->orWhereNull('due_date');
+                      })
+                      ->orderBy('created_at','ASC');
 
         return Number::roundValue($credits->sum('balance'), $this->client->currency()->precision);
     }
 
-    public function getCredits() :Collection
+    public function getCredits() 
     {
-        return $this->client->credits
+        return $this->client->credits()
                   ->where('is_deleted', false)
                   ->where('balance', '>', 0)
-                  ->sortBy('created_at');
+                  ->where(function ($query){
+                        $query->whereDate('due_date', '<=', now()->format('Y-m-d'))
+                              ->orWhereNull('due_date');
+                  })
+                  ->orderBy('created_at','ASC')->get();
     }
 
     public function getPaymentMethods(float $amount)

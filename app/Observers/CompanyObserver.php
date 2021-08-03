@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Observers;
@@ -39,10 +39,6 @@ class CompanyObserver
 
         if(Ninja::isHosted() && $company->portal_mode == 'domain' && $company->isDirty('portal_domain'))
         {
-        nlog('company observer - updated');
-        nlog($company->portal_domain);
-        nlog($company->getOriginal('portal_domain'));
-
             //fire event to build new custom portal domain 
             \Modules\Admin\Jobs\Domain\CustomDomain::dispatch($company->getOriginal('portal_domain'), $company)->onQueue('domain');
         }

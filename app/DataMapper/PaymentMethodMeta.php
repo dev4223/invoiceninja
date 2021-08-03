@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\DataMapper;
@@ -27,4 +27,7 @@ class PaymentMethodMeta
 
     /** @var int */
     public $type;
+
+    /** @var string */
+    public $state;
 }

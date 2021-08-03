@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Console\Commands;
@@ -91,6 +91,8 @@ class CreateAccount extends Command
         $account = Account::factory()->create();
         $company = Company::factory()->create([
             'account_id' => $account->id,
+            'portal_domain' => config('ninja.app_url'),
+            'portal_mode' => 'domain',
         ]);
 
         $account->default_company_id = $company->id;

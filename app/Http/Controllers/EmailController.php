@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers;
@@ -131,8 +131,8 @@ class EmailController extends BaseController
                 
                 $entity_obj->service()->markSent()->save();
 
-                EmailEntity::dispatch($invitation->fresh(), $invitation->company, $template, $data)
-                            ->delay(now()->addSeconds(5));
+                EmailEntity::dispatch($invitation->fresh(), $invitation->company, $template, $data);
+                             // ->delay(now()->addSeconds(45));
                 
             }
 

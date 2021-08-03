@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Transformers;
@@ -51,6 +51,7 @@ class DesignTransformer extends EntityTransformer
             'archived_at' => (int) $design->deleted_at,
             'created_at' => (int) $design->created_at,
             'is_deleted' => (bool) $design->is_deleted,
+            'is_free' => ($design->id <= 4) ? true : false,
         ];
     }
 }

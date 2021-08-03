@@ -34,6 +34,7 @@ Route::group(['middleware' => ['api_db', 'token_auth', 'locale'], 'prefix' => 'a
     Route::post('claim_license', 'LicenseController@index')->name('license.index');
 
     Route::resource('clients', 'ClientController'); // name = (clients. index / create / show / update / destroy / edit
+    Route::put('clients/{client}/adjust_ledger', 'ClientController@adjustLedger')->name('clients.adjust_ledger');
     Route::put('clients/{client}/upload', 'ClientController@upload')->name('clients.upload');
     Route::post('clients/bulk', 'ClientController@bulk')->name('clients.bulk');
 
@@ -84,6 +85,7 @@ Route::group(['middleware' => ['api_db', 'token_auth', 'locale'], 'prefix' => 'a
     Route::post('group_settings/bulk', 'GroupSettingController@bulk');
 
     Route::post('import', 'ImportController@import')->name('import.import');
+    Route::post('import_json', 'ImportJsonController@import')->name('import.import_json');
     Route::post('preimport', 'ImportController@preimport')->name('import.preimport');
 
     Route::resource('invoices', 'InvoiceController'); // name = (invoices. index / create / show / update / destroy / edit
@@ -112,6 +114,7 @@ Route::group(['middleware' => ['api_db', 'token_auth', 'locale'], 'prefix' => 'a
     Route::post('payment_terms/bulk', 'PaymentTermController@bulk')->name('payment_terms.bulk');
 
     Route::post('preview', 'PreviewController@show')->name('preview.show');
+    Route::post('live_preview', 'PreviewController@live')->name('preview.live');
 
     Route::resource('products', 'ProductController'); // name = (products. index / create / show / update / destroy / edit
     Route::post('products/bulk', 'ProductController@bulk')->name('products.bulk');
@@ -161,6 +164,7 @@ Route::group(['middleware' => ['api_db', 'token_auth', 'locale'], 'prefix' => 'a
 
     Route::get('settings/enable_two_factor', 'TwoFactorController@setupTwoFactor');
     Route::post('settings/enable_two_factor', 'TwoFactorController@enableTwoFactor');
+    Route::post('settings/disable_two_factor', 'TwoFactorController@disableTwoFactor');
 
     Route::resource('vendors', 'VendorController'); // name = (vendors. index / create / show / update / destroy / edit
     Route::post('vendors/bulk', 'VendorController@bulk')->name('vendors.bulk');
@@ -195,8 +199,13 @@ Route::match(['get', 'post'], 'payment_webhook/{company_key}/{company_gateway_id
     ->middleware(['guest'])
     ->name('payment_webhook');
 
+Route::match(['get', 'post'], 'payment_notification_webhook/{company_key}/{company_gateway_id}/{client}', 'PaymentNotificationWebhookController')
+    ->middleware(['guest'])
+    ->name('payment_notification_webhook');
+
 Route::post('api/v1/postmark_webhook', 'PostMarkController@webhook');
 Route::get('token_hash_router', 'OneTimeTokenController@router');
 Route::get('webcron', 'WebCronController@index');
+Route::post('api/v1/get_migration_account', 'HostedMigrationController@getAccount')->middleware('guest');
 
 Route::fallback('BaseController@notFound');

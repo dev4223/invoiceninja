@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Utils;
@@ -106,7 +106,8 @@ class TemplateEngine
         }
 
         App::forgetInstance('translator');
-        Lang::replace(Ninja::transformTranslations($this->settings));
+        $t = app('translator');
+        $t->replace(Ninja::transformTranslations($this->settings));
 
         return $this;
     }
@@ -193,6 +194,7 @@ class TemplateEngine
         $data['title'] = '';
         $data['body'] = '$body';
         $data['footer'] = '';
+        $data['logo'] = auth()->user()->company()->present()->logo();
 
         $data = array_merge($data, Helpers::sharedEmailVariables($this->entity_obj->client));
 
@@ -210,15 +212,21 @@ class TemplateEngine
             } else {
                 $wrapper = '';
             }
-        } else {
+        }
+        elseif ($email_style == 'plain') {
             $wrapper = view($this->getTemplatePath($email_style), $data)->render();
+            $injection = '';
+            $wrapper = str_replace('<head>', $injection, $wrapper);
+        }
+        else {
+            $wrapper = view($this->getTemplatePath('client'), $data)->render();
             $injection = '';
             $wrapper = str_replace('<head>', $injection, $wrapper);
         }
 
         $data = [
             'subject' => $this->subject,
-            'body' => $email_style == 'custom' ? $this->body : self::wrapElementsIntoTables(strtr('<div id="content-wrapper"></div>', ['$body' => '']), $this->body, $this->entity_obj->client->getMergedSettings()),
+            'body' => $this->body,
             'wrapper' => $wrapper,
             'raw_body' => $this->raw_body,
             'raw_subject' => $this->raw_subject
@@ -231,7 +239,7 @@ class TemplateEngine
 
     private function mockEntity()
     {
-        DB::beginTransaction();
+        DB::connection(config('database.default'))->beginTransaction();
 
         $client = Client::factory()->create([
                 'user_id' => auth()->user()->id,
@@ -269,52 +277,6 @@ class TemplateEngine
 
     private function tearDown()
     {
-        DB::rollBack();
-    }
-
-    public static function wrapElementsIntoTables(string $wrapper, string $body, $settings): ?string
-    {
-        $documents['wrapper'] = new \DOMDocument();
-        @$documents['wrapper']->loadHTML($wrapper);
-
-        $documents['master'] = new \DOMDocument();
-
-        $documents['master']->loadHTML(
-          view('email.template.master', ['header' => '', 'slot' => '', 'settings' => $settings])->render()
-        );
-
-        $styles = $documents['master']->getElementsByTagName('style')->item(0)->nodeValue;
-
-        $documents['wrapper']->saveHTML();
-
-        $documents['body'] = new \DOMDocument();
-        $documents['body']->loadHTML(empty($body) ? '<div></div>' : mb_convert_encoding((new CssToInlineStyles())->convert($body, $styles), 'HTML-ENTITIES', 'UTF-8'));
-
-        $table_html ='
-            <table style="font-family:arial,helvetica,sans-serif;" role="presentation" cellpadding="0" cellspacing="0" width="100%" border="0">
-                <tbody>
-                    <tr>
-                        <td style="overflow-wrap:break-word;word-break:break-word;padding:5px;font-family:arial,helvetica,sans-serif;" align="left">
-                            <div style="color: #000000; line-height: 140%; text-align: left; word-wrap: break-word;" id="table-content" class="content-contrast-color"></div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>';
-
-        foreach ($documents['body']->getElementsByTagName('body')->item(0)->childNodes as $element) {
-            $table = new \DOMDocument();
-
-            $table->loadHTML($table_html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-
-            $element = $table->importNode($element, true);
-
-            $table->getElementById('table-content')->appendChild($element);
-
-            $node = $documents['wrapper']->importNode($table->documentElement, true);
-
-            $documents['wrapper']->getElementById('content-wrapper')->appendChild($node);
-        }
-
-        return $documents['wrapper']->getElementById('content-wrapper')->ownerDocument->saveHTML($documents['wrapper']->getElementById('content-wrapper'));
+        DB::connection(config('database.default'))->rollBack();
     }
 }

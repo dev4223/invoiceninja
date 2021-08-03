@@ -7,11 +7,12 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\PaymentDrivers;
 
+use App\Exceptions\PaymentFailed;
 use App\Factory\PaymentFactory;
 use App\Http\Requests\Payments\PaymentWebhookRequest;
 use App\Http\Requests\Request;
@@ -31,7 +32,9 @@ use App\PaymentDrivers\Stripe\UpdatePaymentMethods;
 use App\PaymentDrivers\Stripe\Utilities;
 use App\Utils\Traits\MakesHash;
 use Exception;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Carbon;
+use Laracasts\Presenter\Exceptions\PresenterException;
 use Stripe\Account;
 use Stripe\Customer;
 use Stripe\Exception\ApiErrorException;
@@ -51,7 +54,7 @@ class StripePaymentDriver extends BaseDriver
 
     public $can_authorise_credit_card = true;
 
-    /** @var \Stripe\StripeClient */
+    /** @var StripeClient */
     public $stripe;
 
     protected $customer_reference = 'customerReferenceParam';
@@ -111,11 +114,9 @@ class StripePaymentDriver extends BaseDriver
     public function gatewayTypes(): array
     {
         $types = [
-            GatewayType::CREDIT_CARD,
-            GatewayType::CRYPTO,
-//            GatewayType::SEPA, // TODO: Missing implementation
-//            GatewayType::APPLE_PAY, // TODO:: Missing implementation
-        ];
+            // GatewayType::CRYPTO,
+            GatewayType::CREDIT_CARD
+        ];        
 
         if ($this->client
             && isset($this->client->country)
@@ -125,7 +126,8 @@ class StripePaymentDriver extends BaseDriver
 
         if ($this->client
             && isset($this->client->country)
-            && in_array($this->client->country->iso_3166_3, ['USA'])) {
+            && in_array($this->client->country->iso_3166_3, ['USA'])
+            ) {
             $types[] = GatewayType::BANK_TRANSFER;
         }
 
@@ -166,16 +168,10 @@ class StripePaymentDriver extends BaseDriver
 
     public function getClientRequiredFields(): array
     {
-        $fields = [
-            ['name' => 'client_postal_code', 'label' => ctrans('texts.postal_code'), 'type' => 'text', 'validation' => 'required'],
-        ];
+        $fields = [];
 
         if ($this->company_gateway->require_client_name) {
             $fields[] = ['name' => 'client_name', 'label' => ctrans('texts.client_name'), 'type' => 'text', 'validation' => 'required'];
-        }
-
-        if ($this->company_gateway->require_client_phone) {
-            $fields[] = ['name' => 'client_phone', 'label' => ctrans('texts.client_phone'), 'type' => 'tel', 'validation' => 'required'];
         }
 
         if ($this->company_gateway->require_contact_name) {
@@ -187,22 +183,30 @@ class StripePaymentDriver extends BaseDriver
             $fields[] = ['name' => 'contact_email', 'label' => ctrans('texts.email'), 'type' => 'text', 'validation' => 'required,email:rfc'];
         }
 
+        if ($this->company_gateway->require_client_phone) {
+            $fields[] = ['name' => 'client_phone', 'label' => ctrans('texts.client_phone'), 'type' => 'tel', 'validation' => 'required'];
+        }
+
         if ($this->company_gateway->require_billing_address) {
             $fields[] = ['name' => 'client_address_line_1', 'label' => ctrans('texts.address1'), 'type' => 'text', 'validation' => 'required'];
-            $fields[] = ['name' => 'client_address_line_2', 'label' => ctrans('texts.address2'), 'type' => 'text', 'validation' => 'sometimes'];
+//            $fields[] = ['name' => 'client_address_line_2', 'label' => ctrans('texts.address2'), 'type' => 'text', 'validation' => 'nullable'];
             $fields[] = ['name' => 'client_city', 'label' => ctrans('texts.city'), 'type' => 'text', 'validation' => 'required'];
             $fields[] = ['name' => 'client_state', 'label' => ctrans('texts.state'), 'type' => 'text', 'validation' => 'required'];
             $fields[] = ['name' => 'client_country_id', 'label' => ctrans('texts.country'), 'type' => 'text', 'validation' => 'required'];
         }
 
+        if($this->company_gateway->require_postal_code)
+            $fields[] = ['name' => 'client_postal_code', 'label' => ctrans('texts.postal_code'), 'type' => 'text', 'validation' => 'required'];
+
         if ($this->company_gateway->require_shipping_address) {
             $fields[] = ['name' => 'client_shipping_address_line_1', 'label' => ctrans('texts.shipping_address1'), 'type' => 'text', 'validation' => 'required'];
-            $fields[] = ['name' => 'client_shipping_address_line_2', 'label' => ctrans('texts.shipping_address2'), 'type' => 'text', 'validation' => 'sometimes'];
+//            $fields[] = ['name' => 'client_shipping_address_line_2', 'label' => ctrans('texts.shipping_address2'), 'type' => 'text', 'validation' => 'sometimes'];
             $fields[] = ['name' => 'client_shipping_city', 'label' => ctrans('texts.shipping_city'), 'type' => 'text', 'validation' => 'required'];
             $fields[] = ['name' => 'client_shipping_state', 'label' => ctrans('texts.shipping_state'), 'type' => 'text', 'validation' => 'required'];
             $fields[] = ['name' => 'client_shipping_postal_code', 'label' => ctrans('texts.shipping_postal_code'), 'type' => 'text', 'validation' => 'required'];
             $fields[] = ['name' => 'client_shipping_country_id', 'label' => ctrans('texts.shipping_country'), 'type' => 'text', 'validation' => 'required'];
         }
+
 
         return $fields;
     }
@@ -211,7 +215,7 @@ class StripePaymentDriver extends BaseDriver
      * Proxy method to pass the data into payment method authorizeView().
      *
      * @param array $data
-     * @return \Illuminate\Http\RedirectResponse|mixed
+     * @return RedirectResponse|mixed
      */
     public function authorizeView(array $data)
     {
@@ -222,7 +226,7 @@ class StripePaymentDriver extends BaseDriver
      * Processes the gateway response for credit card authorization.
      *
      * @param \Illuminate\Http\Request $request
-     * @return \Illuminate\Http\RedirectResponse|mixed
+     * @return RedirectResponse|mixed
      */
     public function authorizeResponse($request)
     {
@@ -233,7 +237,7 @@ class StripePaymentDriver extends BaseDriver
      * Process the payment with gateway.
      *
      * @param array $data
-     * @return \Illuminate\Http\RedirectResponse|mixed
+     * @return RedirectResponse|mixed
      */
     public function processPaymentView(array $data)
     {
@@ -255,7 +259,7 @@ class StripePaymentDriver extends BaseDriver
     public function createPaymentIntent($data): ?PaymentIntent
     {
         $this->init();
-        
+
         $meta = $this->stripe_connect_auth;
 
         return PaymentIntent::create($data, $meta);
@@ -291,7 +295,7 @@ class StripePaymentDriver extends BaseDriver
      * Finds or creates a Stripe Customer object.
      *
      * @return null|Customer A Stripe customer object
-     * @throws \Laracasts\Presenter\Exceptions\PresenterException
+     * @throws PresenterException
      * @throws ApiErrorException
      */
     public function findOrCreateCustomer(): ?Customer
@@ -299,7 +303,7 @@ class StripePaymentDriver extends BaseDriver
         $customer = null;
 
         $this->init();
-        
+
         $client_gateway_token = ClientGatewayToken::whereClientId($this->client->id)->whereCompanyGatewayId($this->company_gateway->id)->first();
 
         if ($client_gateway_token && $client_gateway_token->gateway_customer_reference) {
@@ -308,7 +312,7 @@ class StripePaymentDriver extends BaseDriver
 
             $data['name'] = $this->client->present()->name();
             $data['phone'] = $this->client->present()->phone();
-
+            
             if (filter_var($this->client->present()->email(), FILTER_VALIDATE_EMAIL)) {
                 $data['email'] = $this->client->present()->email();
             }
@@ -335,7 +339,7 @@ class StripePaymentDriver extends BaseDriver
         try {
             $response = $this->stripe
                 ->refunds
-                ->create(['charge' => $payment->transaction_reference, 'amount' => $this->convertToStripeAmount($amount, $this->client->currency()->precision)], $meta);
+                ->create(['charge' => $payment->transaction_reference, 'amount' => $this->convertToStripeAmount($amount, $this->client->currency()->precision, $this->client->currency())], $meta);
 
             if ($response->status == $response::STATUS_SUCCEEDED) {
                 SystemLogger::dispatch(['server_response' => $response, 'data' => request()->all(),], SystemLog::CATEGORY_GATEWAY_RESPONSE, SystemLog::EVENT_GATEWAY_SUCCESS, SystemLog::TYPE_STRIPE, $this->client, $this->client->company);
@@ -390,6 +394,13 @@ class StripePaymentDriver extends BaseDriver
             $payment->save();
         }
 
+        if ($request->type == 'charge.succeeded') {
+            $payment->status_id = Payment::STATUS_COMPLETED;
+            $payment->save();
+        }
+
+        // charge.failed, charge.refunded
+
         return response([], 200);
     }
 
@@ -420,12 +431,12 @@ class StripePaymentDriver extends BaseDriver
             nlog($e->getMessage());
 
             SystemLogger::dispatch([
-                'server_response' => $e->getMessage(), 
+                'server_response' => $e->getMessage(),
                 'data' => request()->all(),
-            ], 
-            SystemLog::CATEGORY_GATEWAY_RESPONSE, 
-            SystemLog::EVENT_GATEWAY_FAILURE, 
-            SystemLog::TYPE_STRIPE, 
+            ],
+            SystemLog::CATEGORY_GATEWAY_RESPONSE,
+            SystemLog::EVENT_GATEWAY_FAILURE,
+            SystemLog::TYPE_STRIPE,
             $this->client, $this->client->company);
 
         }
@@ -444,7 +455,7 @@ class StripePaymentDriver extends BaseDriver
         $this->init();
 
         try{
-            
+
             $pm = $this->getStripePaymentMethod($token->token);
             $pm->detach([], $this->stripe_connect_auth);
 
@@ -453,12 +464,12 @@ class StripePaymentDriver extends BaseDriver
             nlog($e->getMessage());
 
             SystemLogger::dispatch([
-                'server_response' => $e->getMessage(), 
+                'server_response' => $e->getMessage(),
                 'data' => request()->all(),
-            ], 
-            SystemLog::CATEGORY_GATEWAY_RESPONSE, 
-            SystemLog::EVENT_GATEWAY_FAILURE, 
-            SystemLog::TYPE_STRIPE, 
+            ],
+            SystemLog::CATEGORY_GATEWAY_RESPONSE,
+            SystemLog::EVENT_GATEWAY_FAILURE,
+            SystemLog::TYPE_STRIPE,
             $this->client, $this->client->company);
 
         }
@@ -483,9 +494,7 @@ class StripePaymentDriver extends BaseDriver
             return PaymentMethod::retrieve($source, $this->stripe_connect_auth);
 
         } catch (ApiErrorException | Exception $e) {
-
-            return $this->processInternallyFailedPayment($this, $e);
-
+            throw new PaymentFailed($e->getMessage(), $e->getCode());
         }
     }
 
@@ -499,18 +508,18 @@ class StripePaymentDriver extends BaseDriver
     /**
      * Pull all client payment methods and update
      * the respective tokens in the system.
-     *     
+     *
      */
-    // public function updateAllPaymentMethods()
-    // {
-    //     return (new UpdatePaymentMethods($this))->run();
-    // }
+    public function updateAllPaymentMethods()
+    {
+        return (new UpdatePaymentMethods($this))->run();
+    }
 
     /**
      * Imports stripe customers and their payment methods
-     * Matches users in the system based on the $match_on_record 
+     * Matches users in the system based on the $match_on_record
      * ie. email
-     *     
+     *
      * Phone
      * Email
      */

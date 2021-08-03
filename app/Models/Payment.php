@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
@@ -59,6 +59,8 @@ class Payment extends BaseModel
         'date',
         'transaction_reference',
         'number',
+        'exchange_currency_id',
+        'exchange_rate',
         // 'is_manual',
         'private_notes',
         'custom_value1',

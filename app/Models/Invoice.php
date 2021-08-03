@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
@@ -92,6 +92,8 @@ class Invoice extends BaseModel
         'assigned_user_id',
         'exchange_rate',
         'subscription_id',
+        'auto_bill_enabled',
+        'uses_inclusive_taxes',
     ];
 
     protected $casts = [
@@ -164,7 +166,7 @@ class Invoice extends BaseModel
 
     public function recurring_invoice()
     {
-        return $this->belongsTo(RecurringInvoice::class)->withTrashed();
+        return $this->belongsTo(RecurringInvoice::class, 'recurring_id', 'id')->withTrashed();
     }
 
     public function assigned_user()
@@ -408,13 +410,13 @@ class Invoice extends BaseModel
         if(!$invitation)
             throw new \Exception('Hard fail, could not create an invitation - is there a valid contact?');
 
-        $file_path = $this->client->invoice_filepath().$this->numberFormatter().'.pdf';
+        $file_path = $this->client->invoice_filepath($invitation).$this->numberFormatter().'.pdf';
 
         if(Ninja::isHosted() && $portal && Storage::disk(config('filesystems.default'))->exists($file_path)){
             return Storage::disk(config('filesystems.default'))->{$type}($file_path);
         }
-        elseif(Ninja::isHosted() && $portal){
-            $file_path = CreateEntityPdf::dispatchNow($invitation,config('filesystems.default'));
+        elseif(Ninja::isHosted()){
+            $file_path = CreateEntityPdf::dispatchNow($invitation, config('filesystems.default'));
             return Storage::disk(config('filesystems.default'))->{$type}($file_path);
         }
         
@@ -450,7 +452,7 @@ class Invoice extends BaseModel
                 return false;
                 break;
             case 'when_sent':
-                return $this->status_id == self::STATUS_DRAFT;
+                return $this->status_id == self::STATUS_SENT;
                 break;
             case 'when_paid':
                 return $this->status_id == self::STATUS_PAID || $this->status_id == self::STATUS_PARTIAL;
@@ -475,19 +477,19 @@ class Invoice extends BaseModel
     {
         switch ($reminder_template) {
             case 'invoice':
-                event(new InvoiceWasEmailed($invitation, $invitation->company, Ninja::eventVars(), $template));
+                event(new InvoiceWasEmailed($invitation, $invitation->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null), $template));
                 break;
             case 'reminder1':
-                event(new InvoiceReminderWasEmailed($invitation, $invitation->company, Ninja::eventVars(), Activity::INVOICE_REMINDER1_SENT));
+                event(new InvoiceReminderWasEmailed($invitation, $invitation->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null), Activity::INVOICE_REMINDER1_SENT));
                 break;
             case 'reminder2':
-                event(new InvoiceReminderWasEmailed($invitation, $invitation->company, Ninja::eventVars(), Activity::INVOICE_REMINDER2_SENT));
+                event(new InvoiceReminderWasEmailed($invitation, $invitation->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null), Activity::INVOICE_REMINDER2_SENT));
                 break;
             case 'reminder3':
-                event(new InvoiceReminderWasEmailed($invitation, $invitation->company, Ninja::eventVars(), Activity::INVOICE_REMINDER3_SENT));
+                event(new InvoiceReminderWasEmailed($invitation, $invitation->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null), Activity::INVOICE_REMINDER3_SENT));
                 break;
             case 'reminder_endless':
-                event(new InvoiceReminderWasEmailed($invitation, $invitation->company, Ninja::eventVars(), Activity::INVOICE_REMINDER_ENDLESS_SENT));
+                event(new InvoiceReminderWasEmailed($invitation, $invitation->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null), Activity::INVOICE_REMINDER_ENDLESS_SENT));
                 break;
             default:
                 # code...

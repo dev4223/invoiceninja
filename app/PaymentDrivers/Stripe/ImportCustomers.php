@@ -7,7 +7,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
 */
 
 namespace App\PaymentDrivers\Stripe;
@@ -56,7 +56,7 @@ class ImportCustomers
         }   
 
         /* Now call the update payment methods handler*/
-        $this->stripe->updateAllPaymentMethods();
+        // $this->stripe->updateAllPaymentMethods();
 
     }
 
@@ -82,7 +82,7 @@ class ImportCustomers
         }
 
         nlog("inserting a customer");
-        nlog($customer);
+        //nlog($customer);
         
         $client = ClientFactory::create($this->stripe->company_gateway->company_id, $this->stripe->company_gateway->user_id);
 

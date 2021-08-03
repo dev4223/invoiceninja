@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Quote;
@@ -50,6 +50,11 @@ class QuoteService
         $this->invoice = $convert_quote;
 
         $this->quote->fresh();
+
+        if ($this->quote->client->getSetting('auto_archive_quote')) {
+            $quote_repo = new QuoteRepository();
+            $quote_repo->archive($this->quote);
+        }
 
         return $this;
     }
@@ -129,10 +134,6 @@ class QuoteService
     public function convertToInvoice()
     {
 
-        //to prevent circular references we need to explicit call this here.
-        // $mark_approved = new MarkApproved($this->quote->client);
-        // $this->quote = $mark_approved->run($this->quote);
-
         $this->convert();
 
         $this->invoice->service()->createInvitations();
@@ -178,7 +179,11 @@ class QuoteService
 
     public function deletePdf()
     {
-        UnlinkFile::dispatchNow(config('filesystems.default'), $this->quote->client->quote_filepath() . $this->quote->numberFormatter().'.pdf');
+        $this->quote->invitations->each(function ($invitation){
+
+            UnlinkFile::dispatchNow(config('filesystems.default'), $this->quote->client->quote_filepath($invitation) . $this->quote->numberFormatter().'.pdf');
+
+        });
 
         return $this;
     }

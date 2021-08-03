@@ -6,13 +6,15 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Jobs\Company;
 
 use App\DataMapper\CompanySettings;
+use App\Libraries\MultiDB;
 use App\Models\Company;
+use App\Utils\Ninja;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Http\Request;
@@ -60,6 +62,12 @@ class CreateCompany
         $company->subdomain = isset($this->request['subdomain']) ? $this->request['subdomain'] : '';
         $company->custom_fields = new \stdClass;
         $company->default_password_timeout = 1800000;
+
+        if(Ninja::isHosted())
+            $company->subdomain = MultiDB::randomSubdomainGenerator();
+        else 
+            $company->subdomain = '';
+        
         $company->save();
 
         return $company;

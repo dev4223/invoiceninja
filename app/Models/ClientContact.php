@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
@@ -198,6 +198,10 @@ class ClientContact extends Authenticatable implements HasLocalePreference
 
     public function sendPasswordResetNotification($token)
     {
+
+        $this->token = $token;
+        $this->save();
+
         $nmo = new NinjaMailerObject;
         $nmo->mailable = new NinjaMailer((new ClientContactResetPasswordObject($token, $this))->build());
         $nmo->to_user = $this;

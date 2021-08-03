@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Jobs\Account;
@@ -25,11 +25,14 @@ use App\Jobs\Util\VersionCheck;
 use App\Mail\Admin\AccountCreatedObject;
 use App\Mail\Admin\VerifyUserObject;
 use App\Models\Account;
+use App\Models\Timezone;
 use App\Notifications\Ninja\NewAccountCreated;
 use App\Utils\Ninja;
+use App\Utils\Traits\User\LoginCache;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 use Turbo124\Beacon\Facades\LightLogs;
@@ -37,12 +40,16 @@ use Turbo124\Beacon\Facades\LightLogs;
 class CreateAccount
 {
     use Dispatchable;
+    use LoginCache;
 
     protected $request;
 
-    public function __construct(array $sp660339)
+    protected $client_ip;
+
+    public function __construct(array $sp660339, $client_ip)
     {
         $this->request = $sp660339;
+        $this->client_ip = $client_ip;
     }
 
     public function handle()
@@ -70,6 +77,14 @@ class CreateAccount
             $sp794f3f->key = Str::random(32);
         }
 
+        if(Ninja::isHosted())
+        {
+        
+            $sp794f3f->trial_started = now();
+            $sp794f3f->trial_plan = 'pro';
+        
+        }
+        
         $sp794f3f->save();
 
         $sp035a66 = CreateCompany::dispatchNow($this->request, $sp794f3f);
@@ -87,6 +102,8 @@ class CreateAccount
         }
 
         $spaa9f78->setCompany($sp035a66);
+        $this->setLoginCache($spaa9f78);
+
         $spafe62e = isset($this->request['token_name']) ? $this->request['token_name'] : request()->server('HTTP_USER_AGENT');
         $sp2d97e8 = CreateCompanyToken::dispatchNow($sp035a66, $spaa9f78, $spafe62e);
 
@@ -99,7 +116,10 @@ class CreateAccount
         //todo implement SLACK notifications
         //$sp035a66->notification(new NewAccountCreated($spaa9f78, $sp035a66))->ninja();
 
-        VersionCheck::dispatchNow();
+        if(Ninja::isHosted())
+            \Modules\Admin\Jobs\Account\NinjaUser::dispatch([], $sp035a66);
+
+        VersionCheck::dispatch();
 
         LightLogs::create(new AnalyticsAccountCreated())
                  ->increment()
@@ -107,4 +127,48 @@ class CreateAccount
 
         return $sp794f3f;
     }
+
+    private function processSettings($settings)
+    {
+        if(Ninja::isHosted() && Cache::get('currencies'))
+        {
+
+            $currency = Cache::get('currencies')->filter(function ($item) use ($currency_code) {
+                return strtolower($item->code) == $currency_code;
+            })->first();
+
+            if ($currency) {
+                $settings->currency_id = (string)$currency->id;
+            }
+
+            $country = Cache::get('countries')->filter(function ($item) use ($country_code) {
+                return strtolower($item->iso_3166_2) == $country_code || strtolower($item->iso_3166_3) == $country_code;
+            })->first();
+
+            if ($country) {
+                $settings->country_id = (string)$country->id;
+            }
+            
+            $language = Cache::get('languages')->filter(function ($item) use ($currency_code) {
+                return strtolower($item->locale) == $currency_code;
+            })->first();
+
+            if ($language) {
+                $settings->language_id = (string)$language->id;
+            }
+
+            if($timezone) {
+                $settings->timezone_id = (string)$timezone->id;
+            }
+
+            return $settings;
+        }
+
+
+        return $settings;
+    }
 }
+
+
+
+

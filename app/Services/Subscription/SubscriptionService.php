@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Subscription;
@@ -20,6 +20,7 @@ use App\Jobs\Util\SubscriptionWebhookHandler;
 use App\Jobs\Util\SystemLogger;
 use App\Models\Client;
 use App\Models\ClientContact;
+use App\Models\Credit;
 use App\Models\Invoice;
 use App\Models\PaymentHash;
 use App\Models\Product;
@@ -52,8 +53,8 @@ class SubscriptionService
         $this->subscription = $subscription;
     }
 
-    /*  
-        Performs the initial purchase of a 
+    /*
+        Performs the initial purchase of a
         one time or recurring product
     */
     public function completePurchase(PaymentHash $payment_hash)
@@ -76,7 +77,8 @@ class SubscriptionService
             $recurring_invoice->next_send_date = now();
             $recurring_invoice = $recurring_invoice_repo->save([], $recurring_invoice);
             $recurring_invoice->next_send_date = $recurring_invoice->nextSendDate();
-
+            $recurring_invoice->auto_bill = $this->subscription->auto_bill;
+            
             /* Start the recurring service */
             $recurring_invoice->service()
                               ->start()
@@ -94,8 +96,6 @@ class SubscriptionService
             ];
 
             $response = $this->triggerWebhook($context);
-
-            // nlog($response);
 
             $this->handleRedirect('/client/recurring_invoices/'.$recurring_invoice->hashed_id);
 
@@ -184,13 +184,13 @@ class SubscriptionService
     /**
      * Returns an upgrade price when moving between plans
      *
-     * However we only allow people to  move between plans 
+     * However we only allow people to  move between plans
      * if their account is in good standing.
-     * 
-     * @param  RecurringInvoice $recurring_invoice 
-     * @param  Subscription     $target            
-     * 
-     * @return float                              
+     *
+     * @param  RecurringInvoice $recurring_invoice
+     * @param  Subscription     $target
+     *
+     * @return float
      */
     public function calculateUpgradePrice(RecurringInvoice $recurring_invoice, Subscription $target) :?float
     {
@@ -210,15 +210,25 @@ class SubscriptionService
                                          ->where('client_id', $recurring_invoice->client_id)
                                          ->where('is_deleted', 0)
                                          ->orderBy('id', 'desc')
-                                         ->first();   
+                                         ->first();
 
+         //sometimes the last document could be a credit if the user is paying for their service with credits.
+        if(!$outstanding_invoice){
+        
+        $outstanding_invoice = Credit::where('subscription_id', $this->subscription->id)
+                                         ->where('client_id', $recurring_invoice->client_id)
+                                         ->where('is_deleted', 0)
+                                         ->orderBy('id', 'desc')
+                                         ->first();
+        
+        }
         if ($outstanding->count() == 0){
             //nothing outstanding
-            return $target->price - $this->calculateProRataRefund($outstanding_invoice);
+            return $target->price - $this->calculateProRataRefundForSubscription($outstanding_invoice);
         }
         elseif ($outstanding->count() == 1){
             //user has multiple amounts outstanding
-            return $target->price - $this->calculateProRataRefund($outstanding_invoice);
+            return $target->price - $this->calculateProRataRefundForSubscription($outstanding_invoice);
         }
         elseif ($outstanding->count() > 1) {
             //user is changing plan mid frequency cycle
@@ -232,15 +242,44 @@ class SubscriptionService
 
     /**
      * We refund unused days left.
-     * 
-     * @param  Invoice $invoice 
-     * @return float 
+     *
+     * @param  Invoice $invoice
+     * @return float
+     */
+    private function calculateProRataRefundForSubscription($invoice) :float
+    {
+        if(!$invoice || !$invoice->date)
+            return 0;
+
+        $start_date = Carbon::parse($invoice->date);
+
+        $current_date = now();
+
+        $days_of_subscription_used = $start_date->diffInDays($current_date);
+
+        $days_in_frequency = $this->getDaysInFrequency();
+
+        $pro_rata_refund = round((($days_in_frequency - $days_of_subscription_used)/$days_in_frequency) * $this->subscription->price ,2);
+
+        // nlog("days in frequency = {$days_in_frequency} - days of subscription used {$days_of_subscription_used}");
+        // nlog("invoice amount = {$invoice->amount}");
+        // nlog("pro rata refund = {$pro_rata_refund}");
+
+        return $pro_rata_refund;
+
+    }    
+
+    /**
+     * We refund unused days left.
+     *
+     * @param  Invoice $invoice
+     * @return float
      */
     private function calculateProRataRefund($invoice) :float
     {
-        if(!$this->invoice->date)
+        if(!$invoice || !$invoice->date)
             return 0;
-        
+
         $start_date = Carbon::parse($invoice->date);
 
         $current_date = now();
@@ -251,6 +290,10 @@ class SubscriptionService
 
         $pro_rata_refund = round((($days_in_frequency - $days_of_subscription_used)/$days_in_frequency) * $invoice->amount ,2);
 
+        // nlog("days in frequency = {$days_in_frequency} - days of subscription used {$days_of_subscription_used}");
+        // nlog("invoice amount = {$invoice->amount}");
+        // nlog("pro rata refund = {$pro_rata_refund}");
+
         return $pro_rata_refund;
 
     }
@@ -259,12 +302,15 @@ class SubscriptionService
      * Returns refundable set of line items
      * transformed for direct injection into
      * the invoice
-     * 
-     * @param  Invoice $invoice 
-     * @return array      
+     *
+     * @param  Invoice $invoice
+     * @return array
      */
     private function calculateProRataRefundItems($invoice, $is_credit = false) :array
     {
+        if(!$invoice)
+            return [];
+
         /* depending on whether we are creating an invoice or a credit*/
         $multiplier = $is_credit ? 1 : -1;
 
@@ -285,14 +331,14 @@ class SubscriptionService
 
             if($item->product_key != ctrans('texts.refund'))
             {
-                
+
                 $item->cost = ($item->cost*$ratio*$multiplier);
                 $item->product_key = ctrans('texts.refund');
                 $item->notes = ctrans('texts.refund') . ": ". $item->notes;
-            
+
 
                 $line_items[] = $item;
-            
+
             }
         }
 
@@ -302,13 +348,13 @@ class SubscriptionService
 
     /**
      * We only charge for the used days
-     * 
-     * @param  Invoice $invoice 
-     * @return float        
+     *
+     * @param  Invoice $invoice
+     * @return float
      */
     private function calculateProRataCharge($invoice) :float
     {
-        
+
         $start_date = Carbon::parse($invoice->date);
 
         $current_date = now();
@@ -317,10 +363,10 @@ class SubscriptionService
 
         $days_in_frequency = $this->getDaysInFrequency();
 
-        nlog("days to charge = {$days_to_charge} fays in frequency = {$days_in_frequency}");
+        nlog("days to charge = {$days_to_charge} days in frequency = {$days_in_frequency}");
 
         $pro_rata_charge = round(($days_to_charge/$days_in_frequency) * $invoice->amount ,2);
-        
+
         nlog("pro rata charge = {$pro_rata_charge}");
 
         return $pro_rata_charge;
@@ -329,26 +375,42 @@ class SubscriptionService
     /**
      * When downgrading, we may need to create
      * a credit
-     * 
-     * @param  array $data 
+     *
+     * @param  array $data
      */
     public function createChangePlanCredit($data)
     {
         $recurring_invoice = $data['recurring_invoice'];
         $old_subscription = $data['subscription'];
         $target_subscription = $data['target'];
-        
+
         $pro_rata_charge_amount = 0;
         $pro_rata_refund_amount = 0;
+        $is_credit = false;
 
         $last_invoice = Invoice::where('subscription_id', $recurring_invoice->subscription_id)
                                          ->where('client_id', $recurring_invoice->client_id)
                                          ->where('is_deleted', 0)
                                          ->withTrashed()
                                          ->orderBy('id', 'desc')
-                                         ->first();   
+                                         ->first();
 
-        if($last_invoice->balance > 0) 
+        if(!$last_invoice){
+
+            $is_credit = true;
+
+            $last_invoice = Credit::where('subscription_id', $recurring_invoice->subscription_id)
+                                 ->where('client_id', $recurring_invoice->client_id)
+                                 ->where('is_deleted', 0)
+                                 ->withTrashed()
+                                 ->orderBy('id', 'desc')
+                                 ->first();            
+
+            $pro_rata_refund_amount = $this->calculateProRataRefund($last_invoice, $old_subscription);
+
+        }
+
+        elseif($last_invoice->balance > 0)
         {
             $pro_rata_charge_amount = $this->calculateProRataCharge($last_invoice, $old_subscription);
             nlog("pro rata charge = {$pro_rata_charge_amount}");
@@ -363,8 +425,8 @@ class SubscriptionService
 
         nlog("total payable = {$total_payable}");
 
-        $credit = $this->createCredit($last_invoice, $target_subscription);
-        
+        $credit = $this->createCredit($last_invoice, $target_subscription, $is_credit);
+
         $new_recurring_invoice = $this->createNewRecurringInvoice($recurring_invoice);
 
             $context = [
@@ -384,14 +446,9 @@ class SubscriptionService
 
     }
 
-    /**
-     * When changing plans, we need to generate a pro rata invoice
-     * 
-     * @param  array $data 
-     * @return Invoice       
-     */
-    public function createChangePlanInvoice($data)
+    public function changePlanPaymentCheck($data)
     {
+
         $recurring_invoice = $data['recurring_invoice'];
         $old_subscription = $data['subscription'];
         $target_subscription = $data['target'];
@@ -404,9 +461,58 @@ class SubscriptionService
                                          ->where('is_deleted', 0)
                                          ->withTrashed()
                                          ->orderBy('id', 'desc')
-                                         ->first();   
+                                         ->first();
+        if(!$last_invoice)
+            return true;
 
-        if($last_invoice->balance > 0) 
+        if($last_invoice->balance > 0)
+        {
+            $pro_rata_charge_amount = $this->calculateProRataCharge($last_invoice, $old_subscription);
+            nlog("pro rata charge = {$pro_rata_charge_amount}");
+
+        }
+        else
+        {
+            $pro_rata_refund_amount = $this->calculateProRataRefund($last_invoice, $old_subscription) * -1;
+            nlog("pro rata refund = {$pro_rata_refund_amount}");
+        }
+
+        $total_payable = $pro_rata_refund_amount + $pro_rata_charge_amount + $this->subscription->price;
+
+        if($total_payable > 0)
+            return true;
+
+        return false;
+
+    }
+
+    /**
+     * When changing plans, we need to generate a pro rata invoice
+     *
+     * @param  array $data
+     * @return Invoice
+     */
+    public function createChangePlanInvoice($data)
+    {
+
+        $recurring_invoice = $data['recurring_invoice'];
+        $old_subscription = $data['subscription'];
+        $target_subscription = $data['target'];
+
+        $pro_rata_charge_amount = 0;
+        $pro_rata_refund_amount = 0;
+
+        $last_invoice = Invoice::where('subscription_id', $recurring_invoice->subscription_id)
+                                         ->where('client_id', $recurring_invoice->client_id)
+                                         ->where('is_deleted', 0)
+                                         ->withTrashed()
+                                         ->orderBy('id', 'desc')
+                                         ->first();
+
+        if(!$last_invoice){
+            //do nothing
+        }
+        else if($last_invoice->balance > 0)
         {
             $pro_rata_charge_amount = $this->calculateProRataCharge($last_invoice, $old_subscription);
             nlog("pro rata charge = {$pro_rata_charge_amount}");
@@ -419,49 +525,50 @@ class SubscriptionService
 
         $total_payable = $pro_rata_refund_amount + $pro_rata_charge_amount + $this->subscription->price;
 
-        return $this->proRataInvoice($last_invoice, $target_subscription);
+        return $this->proRataInvoice($last_invoice, $target_subscription, $recurring_invoice->client_id);
 
     }
 
     /**
-     * Response from payment service on 
+     * Response from payment service on
      * return from a plan change
-     * 
-     * @param  PaymentHash $payment_hash 
+     *
+     * @param  PaymentHash $payment_hash
      */
     private function handlePlanChange($payment_hash)
     {
+        nlog("handle plan change");
 
         $old_recurring_invoice = RecurringInvoice::find($payment_hash->data->billing_context->recurring_invoice);
 
         $recurring_invoice = $this->createNewRecurringInvoice($old_recurring_invoice);
 
-            $context = [
-                'context' => 'change_plan',
-                'recurring_invoice' => $recurring_invoice->hashed_id,
-                'invoice' => $this->encodePrimaryKey($payment_hash->fee_invoice_id),
-                'client' => $recurring_invoice->client->hashed_id,
-                'subscription' => $this->subscription->hashed_id,
-                'contact' => auth('contact')->user()->hashed_id,
-            ];
+        $context = [
+            'context' => 'change_plan',
+            'recurring_invoice' => $recurring_invoice->hashed_id,
+            'invoice' => $this->encodePrimaryKey($payment_hash->fee_invoice_id),
+            'client' => $recurring_invoice->client->hashed_id,
+            'subscription' => $this->subscription->hashed_id,
+            'contact' => auth('contact')->user()->hashed_id,
+        ];
 
 
-            $response = $this->triggerWebhook($context);
+        $response = $this->triggerWebhook($context);
 
-            nlog($response);
+        nlog($response);
 
-            return $this->handleRedirect('/client/recurring_invoices/'.$recurring_invoice->hashed_id);
+        return $this->handleRedirect('/client/recurring_invoices/'.$recurring_invoice->hashed_id);
 
     }
 
     /**
      * Creates a new recurring invoice when changing
      * plans
-     * 
-     * @param  RecurringInvoice $old_recurring_invoice 
-     * @return RecurringInvoice                        
+     *
+     * @param  RecurringInvoice $old_recurring_invoice
+     * @return RecurringInvoice
      */
-    private function createNewRecurringInvoice($old_recurring_invoice) :RecurringInvoice
+    public function createNewRecurringInvoice($old_recurring_invoice) :RecurringInvoice
     {
 
         $old_recurring_invoice->service()->stop()->save();
@@ -484,40 +591,16 @@ class SubscriptionService
     }
 
     /**
-     * Handle a plan change where no payment is required
-     * 
-     * @param  array $data 
-     */
-    public function handlePlanChangeNoPayment($data)
-    {
-
-        $recurring_invoice = $this->createNewRecurringInvoice($data['recurring_invoice']);
-
-            $context = [
-                'context' => 'change_plan',
-                'recurring_invoice' => $recurring_invoice->hashed_id,
-                'invoice' => $this->encodePrimaryKey($payment_hash->fee_invoice_id),
-                'client' => $recurring_invoice->client->hashed_id,
-                'subscription' => $this->subscription->hashed_id,
-                'contact' => auth('contact')->user()->hashed_id,
-            ];
-
-            $response = $this->triggerWebhook($context);
-
-            // nlog($response);
-
-            return $this->handleRedirect('/client/recurring_invoices/'.$recurring_invoice->hashed_id);
-    }
-
-    /**
      * Creates a credit note if the plan change requires
-     * 
-     * @param  Invoice $last_invoice 
-     * @param  Subscription $target       
-     * @return Credit               
+     *
+     * @param  Invoice $last_invoice
+     * @param  Subscription $target
+     * @return Credit
      */
-    private function createCredit($last_invoice, $target)
+    private function createCredit($last_invoice, $target, $is_credit = false)
     {
+
+        $last_invoice_is_credit = $is_credit ? false : true;
 
         $subscription_repo = new SubscriptionRepository();
         $credit_repo = new CreditRepository();
@@ -526,9 +609,9 @@ class SubscriptionService
         $credit->date = now()->format('Y-m-d');
         $credit->subscription_id = $this->subscription->id;
 
-        $line_items = $subscription_repo->generateLineItems($target);
+        $line_items = $subscription_repo->generateLineItems($target, false, true);
 
-        $credit->line_items = array_merge($line_items, $this->calculateProRataRefundItems($last_invoice, true));
+        $credit->line_items = array_merge($line_items, $this->calculateProRataRefundItems($last_invoice, $last_invoice_is_credit));
 
         $data = [
             'client_id' => $last_invoice->client_id,
@@ -543,24 +626,24 @@ class SubscriptionService
     /**
      * When changing plans we need to generate a pro rata
      * invoice which takes into account any credits.
-     * 
-     * @param  Invoice $last_invoice 
-     * @param  Subscription $target       
-     * @return Invoice               
+     *
+     * @param  Invoice $last_invoice
+     * @param  Subscription $target
+     * @return Invoice
      */
-    private function proRataInvoice($last_invoice, $target)
+    private function proRataInvoice($last_invoice, $target, $client_id)
     {
         $subscription_repo = new SubscriptionRepository();
         $invoice_repo = new InvoiceRepository();
 
         $invoice = InvoiceFactory::create($this->subscription->company_id, $this->subscription->user_id);
         $invoice->date = now()->format('Y-m-d');
-        $invoice->subscription_id = $this->subscription->id;
+        $invoice->subscription_id = $target->id;
 
         $invoice->line_items = array_merge($subscription_repo->generateLineItems($target), $this->calculateProRataRefundItems($last_invoice));
 
         $data = [
-            'client_id' => $last_invoice->client_id,
+            'client_id' => $client_id,
             'quantity' => 1,
             'date' => now()->format('Y-m-d'),
         ];
@@ -575,9 +658,9 @@ class SubscriptionService
 
     /**
      * Generates the first invoice when a subscription is purchased
-     * 
-     * @param  array $data 
-     * @return Invoice       
+     *
+     * @param  array $data
+     * @return Invoice
      */
     public function createInvoice($data): ?\App\Models\Invoice
     {
@@ -602,9 +685,9 @@ class SubscriptionService
     /**
      * Generates a recurring invoice based on
      * the specifications of the subscription
-     * 
+     *
      * @param  int $client_id The Client Id
-     * @return RecurringInvoice            
+     * @return RecurringInvoice
      */
     public function convertInvoiceToRecurring($client_id) :RecurringInvoice
     {
@@ -625,14 +708,17 @@ class SubscriptionService
     /**
      * Hit a 3rd party API if defined in the subscription
      *
-     * @param  array $context 
+     * @param  array $context
      */
     public function triggerWebhook($context)
     {
-        /* If no webhooks have been set, then just return gracefully */
-        if(!array_key_exists('post_purchase_url', $this->subscription->webhook_configuration) || !array_key_exists('post_purchase_rest_method', $this->subscription->webhook_configuration)) {
-            return true;
+        nlog("trigger webook");
+
+        if (empty($this->subscription->webhook_configuration['post_purchase_url']) || is_null($this->subscription->webhook_configuration['post_purchase_url']) || strlen($this->subscription->webhook_configuration['post_purchase_url']) < 1) {
+            return ["message" => "Success", "status_code" => 200];
         }
+
+        nlog("past first if");
 
         $response = false;
 
@@ -644,6 +730,8 @@ class SubscriptionService
 
         $response = $this->sendLoad($this->subscription, $body);
 
+        nlog("after response");
+
         /* Append the response to the system logger body */
         if(is_array($response)){
 
@@ -652,25 +740,27 @@ class SubscriptionService
         }
         else {
 
-            $status = $response->getStatusCode();
-
-            //$response_body = $response->getReasonPhrase();
-            $body = array_merge($body, ['status' => $status, 'response_body' => $response_body]);
+            $body = $response->getStatusCode();
 
         }
 
-        $client = \App\Models\Client::find($this->decodePrimaryKey($body['client']));
+        $client = Client::where('id', $this->decodePrimaryKey($body['client']))->withTrashed()->first();
 
             SystemLogger::dispatch(
                 $body,
                 SystemLog::CATEGORY_WEBHOOK,
                 SystemLog::EVENT_WEBHOOK_RESPONSE,
                 SystemLog::TYPE_WEBHOOK_RESPONSE,
-                $client, 
+                $client,
                 $client->company,
             );
+        
+        nlog("ready to fire back");
 
-        return $response;
+        if(is_array($body))
+          return $response;
+        else
+          return ['message' => 'There was a problem encountered with the webhook', 'status_code' => 500];
 
     }
 
@@ -717,9 +807,9 @@ class SubscriptionService
 
     /**
      * Handle the cancellation of a subscription
-     * 
-     * @param  RecurringInvoice $recurring_invoice 
-     * 
+     *
+     * @param  RecurringInvoice $recurring_invoice
+     *
      */
     public function handleCancellation(RecurringInvoice $recurring_invoice)
     {
@@ -729,7 +819,7 @@ class SubscriptionService
                                      ->where('client_id', $recurring_invoice->client_id)
                                      ->where('is_deleted', 0)
                                      ->orderBy('id', 'desc')
-                                     ->first();   
+                                     ->first();
 
         $invoice_start_date = Carbon::parse($outstanding_invoice->date);
         $refund_end_date = $invoice_start_date->addSeconds($this->subscription->refund_period);
@@ -806,15 +896,15 @@ class SubscriptionService
             default:
                 return 0;
         }
-    
+
     }
-    
+
 
     /**
     * 'email' => $this->email ?? $this->contact->email,
     * 'quantity' => $this->quantity,
     * 'contact_id' => $this->contact->id,
-    */        
+    */
     public function handleNoPaymentRequired(array $data)
     {
 
@@ -826,7 +916,7 @@ class SubscriptionService
 
         // Hit the redirect
         return $this->handleRedirect($context['redirect_url']);
-        
+
     }
 
     /**
@@ -839,5 +929,23 @@ class SubscriptionService
             return redirect($this->subscription->webhook_configuration['return_url']);
 
         return redirect($default_redirect);
-    }    
+    }
+
+    public function planPaid($invoice)
+    {
+        $recurring_invoice_hashed_id = $invoice->recurring_invoice()->exists() ? $invoice->recurring_invoice->hashed_id : null;
+
+            $context = [
+                'context' => 'plan_paid',
+                'subscription' => $this->subscription->hashed_id,
+                'recurring_invoice' => $recurring_invoice_hashed_id,
+                'client' => $invoice->client->hashed_id,
+                'contact' => $invoice->client->primary_contact()->first() ? $invoice->client->contacts->first() : false,
+                'invoice' => $invoice->hashed_id,
+            ];
+
+        $response = $this->triggerWebhook($context);
+
+        return true;
+    }
 }

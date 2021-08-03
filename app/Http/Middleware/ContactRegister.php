@@ -19,23 +19,56 @@ class ContactRegister
      */
     public function handle($request, Closure $next)
     {
-        // Resolving based on subdomain. Used in version 5 hosted platform.
-        if ($request->subdomain) {
-            $company = Company::where('subdomain', $request->subdomain)->firstOrFail();
 
-            abort_unless($company->getSetting('enable_client_registration'), 404);
+        if (strpos($request->getHost(), 'invoicing.co') !== false) 
+        {
+            $subdomain = explode('.', $request->getHost())[0];
+            
+            $query = [
+                'subdomain' => $subdomain,
+                'portal_mode' => 'subdomain',
+            ];
+
+            $company = Company::where($query)->first();
+
+            if($company)
+            {
+                if(! $company->client_can_register)
+                    abort(400, 'Registration disabled');
+
+                $request->merge(['key' => $company->company_key]);
+
+                return $next($request);
+            }
+
+        }
+
+       $query = [
+            'portal_domain' => $request->getSchemeAndHttpHost(),
+            'portal_mode' => 'domain',
+        ];
+
+        if($company = Company::where($query)->first())
+        {
+
+            if(! $company->client_can_register)
+                abort(400, 'Registration disabled');
 
             $request->merge(['key' => $company->company_key]);
 
             return $next($request);
         }
 
+
         // For self-hosted platforms with multiple companies, resolving is done using company key
         // if it doesn't resolve using a domain.
         if ($request->route()->parameter('company_key') && Ninja::isSelfHost()) {
             $company = Company::where('company_key', $request->company_key)->firstOrFail();
 
-            abort_unless($company->client_can_register, 404);
+            if(! (bool)$company->client_can_register);
+                abort(400, 'Registration disabled');
+
+            $request->merge(['key' => $company->company_key]);
 
             return $next($request);
         }
@@ -45,13 +78,14 @@ class ContactRegister
         if (!$request->route()->parameter('company_key') && Ninja::isSelfHost()) {
             $company = Account::first()->default_company;
 
-            abort_unless($company->client_can_register, 404);
+            if(! $company->client_can_register)
+                abort(400, 'Registration disabled');
 
             $request->merge(['key' => $company->company_key]);
 
             return $next($request);
         }
 
-        return abort(404);
+        abort(404, 'ContactRegister Middlware');
     }
 }

@@ -6,11 +6,12 @@
  *
  * @copyright Copyright (c) 2021. Credit Ninja LLC (https://creditninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Mail\Engine;
 
+use App\Models\Account;
 use App\Utils\HtmlEngine;
 use App\Utils\Ninja;
 use App\Utils\Number;
@@ -44,7 +45,11 @@ class CreditEmailEngine extends BaseEmailEngine
     public function build()
     {
         App::forgetInstance('translator');
-        Lang::replace(Ninja::transformTranslations($this->client->getMergedSettings()));
+        $t = app('translator');
+        $t->replace(Ninja::transformTranslations($this->client->getMergedSettings()));
+        
+        if($this->reminder_template == 'endless_reminder')
+            $this->reminder_template = 'reminder_endless';
         
         if (is_array($this->template_data) &&  array_key_exists('body', $this->template_data) && strlen($this->template_data['body']) > 0) {
             $body_template = $this->template_data['body'];
@@ -97,9 +102,9 @@ class CreditEmailEngine extends BaseEmailEngine
         if ($this->client->getSetting('pdf_email_attachment') !== false && $this->credit->company->account->hasFeature(Account::FEATURE_PDF_ATTACHMENT)) {
 
             if(Ninja::isHosted())
-                $this->setAttachments([$this->credit->pdf_file_path(null, 'url', true)]);
+                $this->setAttachments([$this->credit->pdf_file_path($this->invitation, 'url', true)]);
             else
-                $this->setAttachments([$this->credit->pdf_file_path()]);
+                $this->setAttachments([$this->credit->pdf_file_path($this->invitation)]);
             
         }
 

@@ -7,7 +7,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers;
@@ -29,12 +29,14 @@ class StripeController extends BaseController
 
 		}
 
-		
 		return response()->json(['message' => 'Unauthorized'], 403);
 	}
 
 	public function import()
 	{
+
+		// return response()->json(['message' => 'Processing'], 200);
+
 
 		if(auth()->user()->isAdmin())
 		{
@@ -44,7 +46,6 @@ class StripeController extends BaseController
 			return response()->json(['message' => 'Processing'], 200);
 
 		}
-
 		
 		return response()->json(['message' => 'Unauthorized'], 403);
 	}
