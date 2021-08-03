@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Jobs\Util;
@@ -20,6 +20,7 @@ use App\Libraries\MultiDB;
 use App\Mail\MigrationFailed;
 use App\Models\Company;
 use App\Models\User;
+use App\Utils\Ninja;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -91,16 +92,6 @@ class StartMigration implements ShouldQueue
         $archive = $zip->open(public_path("storage/{$this->filepath}"));
         $filename = pathinfo($this->filepath, PATHINFO_FILENAME);
 
-            // if($this->company->id == $this->company->account->default_company_id)
-            // {
-            //     $new_default_company = $this->company->account->companies->first();
-
-            //     if ($new_default_company) {
-            //         $this->company->account->default_company_id = $new_default_company->id;
-            //         $this->company->account->save();
-            //     }
-            // }
-
         $update_product_flag = $this->company->update_products;
 
         $this->company->update_products = false;
@@ -128,9 +119,6 @@ class StartMigration implements ShouldQueue
 
             Storage::deleteDirectory(public_path("storage/migrations/{$filename}"));
 
-            // $this->company->account->default_company_id = $this->company->id;
-            // $this->company->account->save();
-
             $this->company->update_products = $update_product_flag;
             $this->company->save();
 
@@ -139,7 +127,11 @@ class StartMigration implements ShouldQueue
             $this->company->update_products = $update_product_flag;
             $this->company->save();
 
-            Mail::to($this->user->email, $this->user->name())->send(new MigrationFailed($e, $e->getMessage()));
+
+            if(Ninja::isHosted())
+                app('sentry')->captureException($e);
+            
+            Mail::to($this->user->email, $this->user->name())->send(new MigrationFailed($e, $this->company, $e->getMessage()));
 
             if (app()->environment() !== 'production') {
                 info($e->getMessage());

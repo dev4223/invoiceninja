@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Factory;
@@ -21,7 +21,7 @@ class TaskStatusFactory
         $task_status->user_id = $user_id;
         $task_status->company_id = $company_id;
         $task_status->name = '';
-        $task_status->color = '#fff';
+        $task_status->color = '';
         $task_status->status_order = 9999;
         
         return $task_status;

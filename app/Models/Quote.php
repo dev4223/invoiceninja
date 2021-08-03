@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
@@ -71,10 +71,6 @@ class Quote extends BaseModel
         'custom_surcharge2',
         'custom_surcharge3',
         'custom_surcharge4',
-        // 'custom_surcharge_tax1',
-        // 'custom_surcharge_tax2',
-        // 'custom_surcharge_tax3',
-        // 'custom_surcharge_tax4',
         'design_id',
         'assigned_user_id',
         'exchange_rate',
@@ -223,7 +219,7 @@ class Quote extends BaseModel
         if(!$invitation)
             throw new \Exception('Hard fail, could not create an invitation - is there a valid contact?');
 
-        $file_path = $this->client->quote_filepath().$this->numberFormatter().'.pdf';
+        $file_path = $this->client->quote_filepath($invitation).$this->numberFormatter().'.pdf';
 
         if(Ninja::isHosted() && $portal && Storage::disk(config('filesystems.default'))->exists($file_path)){
             return Storage::disk(config('filesystems.default'))->{$type}($file_path);

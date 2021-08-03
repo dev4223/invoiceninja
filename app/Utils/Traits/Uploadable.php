@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Utils\Traits;
@@ -32,10 +32,6 @@ trait Uploadable
     {
         if ($file) {
             $path = UploadAvatar::dispatchNow($file, $company->company_key);
-
-            //$path = str_replace(config("ninja.app_url"), "", $path);
-
-            info("the path {$path}");
 
             if ($path) {
                 $settings = $entity->settings;

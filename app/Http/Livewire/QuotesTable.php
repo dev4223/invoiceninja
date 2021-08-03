@@ -7,11 +7,12 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Livewire;
 
+use App\Libraries\MultiDB;
 use App\Models\Quote;
 use App\Utils\Traits\WithSorting;
 use Livewire\Component;
@@ -23,7 +24,16 @@ class QuotesTable extends Component
     use WithPagination;
 
     public $per_page = 10;
+
     public $status = [];
+
+    public $company;
+    
+    public function mount()
+    {
+        MultiDB::setDb($this->company->db);
+
+    }
 
     public function render()
     {
@@ -35,6 +45,7 @@ class QuotesTable extends Component
         }
 
         $query = $query
+            ->where('company_id', $this->company->id)
             ->where('client_id', auth('contact')->user()->client->id)
             ->where('status_id', '<>', Quote::STATUS_DRAFT)
             ->paginate($this->per_page);

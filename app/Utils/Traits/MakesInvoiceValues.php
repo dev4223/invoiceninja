@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Utils\Traits;
@@ -273,13 +273,13 @@ trait MakesInvoiceValues
 
         foreach ($items as $key => $item) {
             if ($table_type == '$product' && $item->type_id != 1) {
-                if ($item->type_id != 4 && $item->type_id != 6) {
+                if ($item->type_id != 4 && $item->type_id != 6 && $item->type_id != 5) {
                     continue;
                 }
             }
 
             if ($table_type == '$task' && $item->type_id != 2) {
-                if ($item->type_id != 4) {
+                if ($item->type_id != 4 && $item->type_id != 5) {
                     continue;
                 }
             }
@@ -474,7 +474,7 @@ trait MakesInvoiceValues
                 }
 
                 if ($matches->keys()->first() == ':MONTH') {
-                    $output = \Carbon\Carbon::create()->month($output)->localeMonth;
+                    $output = \Carbon\Carbon::create()->month($output)->translatedFormat('F');
                 }
 
                 $value = preg_replace(

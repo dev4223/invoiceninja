@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Listeners\Quote;
@@ -43,9 +43,13 @@ class QuoteEmailActivity implements ShouldQueue
 
         $fields = new stdClass;
 
+
+        $user_id = array_key_exists('user_id', $event->event_vars) ? $event->event_vars['user_id'] : $event->invitation->quote->user_id;
+
+        $fields->user_id = $user_id;
+
         $fields->quote_id = $event->invitation->quote->id;
         $fields->client_id = $event->invitation->quote->client_id;
-        $fields->user_id = $event->invitation->quote->user_id;
         $fields->company_id = $event->invitation->quote->company_id;
         $fields->client_contact_id = $event->invitation->quote->client_contact_id;
         $fields->client_id = $event->invitation->quote->client_id;

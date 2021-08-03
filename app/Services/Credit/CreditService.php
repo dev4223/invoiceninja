@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Credit;
@@ -140,7 +140,11 @@ class CreditService
 
     public function deletePdf()
     {
-        UnlinkFile::dispatchNow(config('filesystems.default'), $this->credit->client->credit_filepath() . $this->credit->numberFormatter().'.pdf');
+        $this->credit->invitations->each(function ($invitation){
+
+        UnlinkFile::dispatchNow(config('filesystems.default'), $this->credit->client->credit_filepath($invitation) . $this->credit->numberFormatter().'.pdf');
+
+        });
 
         return $this;
     }

@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Repositories;
@@ -58,8 +58,13 @@ class ClientRepository extends BaseRepository
             return $client;
         }
 
-        $client->fill($data);
+        if(!$client->id && auth()->user() && auth()->user()->company() && (!array_key_exists('country_id', $data) || empty($data['country_id']))){
+            $data['country_id'] = auth()->user()->company()->settings->country_id;
+        }
 
+        $client->fill($data);
+        $client->save();
+        
         if (!isset($client->number) || empty($client->number)) {
             $client->number = $this->getNextClientNumber($client);
         }
@@ -67,7 +72,7 @@ class ClientRepository extends BaseRepository
         if (empty($data['name'])) {
             $data['name'] = $client->present()->name();
         }
-        
+
         $client->save();
 
         $this->contact_repo->save($data, $client);

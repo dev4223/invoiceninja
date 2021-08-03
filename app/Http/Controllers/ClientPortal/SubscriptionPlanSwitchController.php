@@ -7,7 +7,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers\ClientPortal;
@@ -43,8 +43,7 @@ class SubscriptionPlanSwitchController extends Controller
          */
         if(is_null($amount))
             render('subscriptions.denied');
-
-
+        
         return render('subscriptions.switch', [
             'subscription' => $recurring_invoice->subscription,
             'recurring_invoice' => $recurring_invoice,

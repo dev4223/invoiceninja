@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Quote;
@@ -15,6 +15,7 @@ use App\Factory\ClientContactFactory;
 use App\Factory\QuoteInvitationFactory;
 use App\Models\Quote;
 use App\Models\QuoteInvitation;
+use Illuminate\Support\Str;
 
 class CreateInvitations
 {

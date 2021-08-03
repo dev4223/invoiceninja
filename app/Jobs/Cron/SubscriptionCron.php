@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Jobs\Cron;
@@ -62,6 +62,7 @@ class SubscriptionCron
                           ->whereIn('status_id', [Invoice::STATUS_SENT, Invoice::STATUS_PARTIAL])
                           ->where('balance', '>', 0)
                           ->whereDate('due_date', '<=', now()->addDay()->startOfDay())
+                          ->whereNull('deleted_at')
                           ->whereNotNull('subscription_id')
                           ->cursor();
 

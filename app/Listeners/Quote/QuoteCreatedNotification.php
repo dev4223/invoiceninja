@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Quote Ninja LLC (https://quoteninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Listeners\Quote;
@@ -60,7 +60,7 @@ class QuoteCreatedNotification implements ShouldQueue
             $methods = $this->findUserNotificationTypes($quote->invitations()->first(), $company_user, 'quote', ['all_notifications', 'quote_created', 'quote_created_all']);
 
             /* If one of the methods is email then we fire the EntitySentMailer */
-            if (($key = array_search('mail', $methods)) !== false && $first_notification_sent === true) {
+            if (($key = array_search('mail', $methods)) !== false) {
                 unset($methods[$key]);
 
                 

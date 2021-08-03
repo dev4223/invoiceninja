@@ -7,7 +7,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Utils\Traits\Pdf;
@@ -32,6 +32,11 @@ trait PdfMaker
 
         if (config('ninja.snappdf_chromium_path')) {
             $pdf->setChromiumPath(config('ninja.snappdf_chromium_path'));
+        }
+
+        if (config('ninja.snappdf_chromium_arguments')) {
+            $pdf->clearChromiumArguments();
+            $pdf->addChromiumArguments(config('ninja.snappdf_chromium_arguments'));
         }
 
         $generated  = $pdf

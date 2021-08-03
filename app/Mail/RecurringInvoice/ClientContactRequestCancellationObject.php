@@ -6,10 +6,13 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Mail\RecurringInvoice;
+
+use App\Utils\Ninja;
+use Illuminate\Support\Facades\App;
 
 class ClientContactRequestCancellationObject
 {
@@ -33,9 +36,13 @@ class ClientContactRequestCancellationObject
     public function build()
     {
 
+        App::forgetInstance('translator');
+        $t = app('translator');
+        $t->replace(Ninja::transformTranslations($this->company->settings));
+
         $data = [
             'title' => ctrans('texts.recurring_cancellation_request', ['contact' => $this->client_contact->present()->name()]),
-            'message' => ctrans('texts.recurring_cancellation_request_body', ['contact' => $this->client_contact->present()->name(), 'client' => $this->client_contact->client->present()->name(), 'invoice' => $this->recurring_invoice->number]),
+            'content' => ctrans('texts.recurring_cancellation_request_body', ['contact' => $this->client_contact->present()->name(), 'client' => $this->client_contact->client->present()->name(), 'invoice' => $this->recurring_invoice->number]),
             'url' => config('ninja.web_url'),
             'button' => ctrans('texts.account_login'),
             'signature' => $this->company->settings->email_signature,

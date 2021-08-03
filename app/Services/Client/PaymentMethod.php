@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Client;
@@ -188,7 +188,7 @@ class PaymentMethod
 
                 $fee_label = $gateway->calcGatewayFeeLabel($this->amount, $this->client, $gateway_type_id);
 
-                if(!$gateway_type_id){
+                if(!$gateway_type_id || (GatewayType::CUSTOM == $gateway_type_id)){
 
                     $this->payment_urls[] = [
                         'label' => $gateway->getConfigField('name') . $fee_label,

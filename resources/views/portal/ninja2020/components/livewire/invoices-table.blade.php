@@ -45,13 +45,13 @@
                             </span>
                         </th>
                         <th class="px-6 py-3 text-xs font-medium leading-4 tracking-wider text-left text-white uppercase border-b border-gray-200 bg-primary">
-                            <span role="button" wire:click="sortBy('balance')" class="cursor-pointer">
-                                {{ ctrans('texts.balance') }}
+                            <span role="button" wire:click="sortBy('amount')" class="cursor-pointer">
+                                {{ ctrans('texts.amount') }}
                             </span>
                         </th>
                         <th class="px-6 py-3 text-xs font-medium leading-4 tracking-wider text-left text-white uppercase border-b border-gray-200 bg-primary">
-                            <span role="button" wire:click="sortBy('amount')" class="cursor-pointer">
-                                {{ ctrans('texts.amount') }}
+                            <span role="button" wire:click="sortBy('balance')" class="cursor-pointer">
+                                {{ ctrans('texts.balance') }}
                             </span>
                         </th>
                         <th class="px-6 py-3 text-xs font-medium leading-4 tracking-wider text-left text-white uppercase border-b border-gray-200 bg-primary">
@@ -82,10 +82,10 @@
                                 {{ $invoice->formatDate($invoice->date, $invoice->client->date_format()) }}
                             </td>
                             <td class="px-6 py-4 text-sm leading-5 text-gray-500 whitespace-no-wrap">
-                                {{ App\Utils\Number::formatMoney($invoice->balance, $invoice->client) }}
+                                {{ App\Utils\Number::formatMoney($invoice->amount, $invoice->client) }}
                             </td>
                             <td class="px-6 py-4 text-sm leading-5 text-gray-500 whitespace-no-wrap">
-                                {{ App\Utils\Number::formatMoney($invoice->amount, $invoice->client) }}
+                            {{ App\Utils\Number::formatMoney($invoice->balance, $invoice->client) }}
                             </td>
                             <td class="px-6 py-4 text-sm leading-5 text-gray-500 whitespace-no-wrap">
                                 {{ $invoice->formatDate($invoice->due_date, $invoice->client->date_format()) }}
@@ -94,12 +94,12 @@
                                 {!! App\Models\Invoice::badgeForStatus($invoice->status) !!}
                             </td>
                             <td class="flex items-center justify-end px-6 py-4 text-sm font-medium leading-5 whitespace-no-wrap">
-                                @if($invoice->isPayable() && $invoice->balance > 0)
+                                @if($invoice->isPayable() && $invoice->balance > 0 && !empty(auth()->user()->client->service()->getPaymentMethods(0)))
                                     <form action="{{ route('client.invoices.bulk') }}" method="post">
                                         @csrf
                                         <input type="hidden" name="invoices[]" value="{{ $invoice->hashed_id }}">
                                         <input type="hidden" name="action" value="payment">
-                                        <button class="px-2 py-1 mr-3 text-xs uppercase button button-primary bg-primary" data-cy="pay-now">
+                                        <button class="px-2 py-1 mr-3 text-xs uppercase button button-primary bg-primary" dusk="pay-now">
                                             {{ ctrans('texts.pay_now') }}
                                         </button>
                                     </form>

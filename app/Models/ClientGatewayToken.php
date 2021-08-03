@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
@@ -35,6 +35,7 @@ class ClientGatewayToken extends BaseModel
         'gateway_customer_reference',
         'gateway_type_id',
         'meta',
+        'client_id',
     ];
 
     public function getEntityType()

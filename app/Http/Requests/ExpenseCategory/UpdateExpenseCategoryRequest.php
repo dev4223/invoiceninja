@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Requests\ExpenseCategory;
@@ -47,7 +47,7 @@ class UpdateExpenseCategoryRequest extends Request
         $input = $this->all();
 
             if(array_key_exists('color', $input) && is_null($input['color']))
-                $input['color'] = '#fff';
+                $input['color'] = '';
 
         $this->replace($input);
     }

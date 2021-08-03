@@ -7,7 +7,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Utils\Traits;
@@ -48,7 +48,7 @@ trait AppSetup
                     $orderBy = 'num_days';
                 } elseif ($name == 'fonts') {
                     $orderBy = 'sort_order';
-                } elseif (in_array($name, ['currencies', 'industries', 'languages', 'countries', 'banks'])) {
+                } elseif (in_array($name, ['currencies', 'industries', 'languages', 'countries', 'banks', 'timezones'])) {
                     $orderBy = 'name';
                 } else {
                     $orderBy = 'id';

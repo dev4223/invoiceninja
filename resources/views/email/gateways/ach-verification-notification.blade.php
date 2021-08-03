@@ -1,14 +1,8 @@
-@component('email.template.master', ['design' => 'light'])
-    @slot('header')
-        @include('email.components.header', ['logo' => 'https://www.invoiceninja.com/wp-content/uploads/2015/10/logo-white-horizontal-1.png'])
-    @endslot
+@component('email.template.client', ['logo' => $logo, 'settings' => $settings, 'company' => $company])
+    <div class="center">
+        <h1>{{ ctrans('texts.ach_verification_notification_label') }}</h1>
+        <p>{{ ctrans('texts.ach_verification_notification') }}</p>
 
-    <p>Hello,</p>
-
-    <p>Connecting bank accounts require verification. Stripe will automatically sends two
-        small deposits for this purpose. These deposits take 1-2 business days to appear on the customer's online
-        statement.
-    </p>
-
-    <p>Thank you!</p>
+        <a class="button" href="{{ $url }}">{{ ctrans('texts.complete_verification') }}</a>
+    </div>
 @endcomponent

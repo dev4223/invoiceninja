@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Utils\Traits;
@@ -35,19 +35,25 @@ trait  SubscriptionHooker
             'headers' => $headers,
         ]);
 
+        nlog("method name must be a string");
+        nlog($subscription->webhook_configuration['post_purchase_rest_method']);
+        nlog($subscription->webhook_configuration['post_purchase_url']);
+        
+        $post_purchase_rest_method = (string)$subscription->webhook_configuration['post_purchase_rest_method'];
+        $post_purchase_url = (string)$subscription->webhook_configuration['post_purchase_url'];
+
         try {
-            $response = $client->{$subscription->webhook_configuration['post_purchase_rest_method']}($subscription->webhook_configuration['post_purchase_url'],[
+            $response = $client->{$post_purchase_rest_method}($post_purchase_url,[
                 RequestOptions::JSON => ['body' => $body], RequestOptions::ALLOW_REDIRECTS => false
             ]);
 
-            return array_merge($body, ['exception' => json_decode($response->getBody(),true), 'status_code' => $response->getStatusCode()]);
+            return array_merge($body, json_decode($response->getBody(),true));
         }
         catch(\Exception $e)
         {
-            //;
-            // dd($e);
-            $body = array_merge($body, ['exception' => ['message' => $e->getMessage(), 'status_code' => 500]]);
-            return $body;
+
+            return array_merge($body, ['message' => $e->getMessage(), 'status_code' => 500]);
+
         }
 
 	}

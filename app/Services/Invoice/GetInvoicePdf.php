@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Invoice;
@@ -35,11 +35,12 @@ class GetInvoicePdf extends AbstractService
 
         $invitation = $this->invoice->invitations->where('client_contact_id', $this->contact->id)->first();
 
-        $path = $this->invoice->client->invoice_filepath();
+        $path = $this->invoice->client->invoice_filepath($invitation);
 
         $file_path = $path.$this->invoice->numberFormatter().'.pdf';
 
-        $disk = 'public';
+        // $disk = 'public';
+        $disk = config('filesystems.default');
 
         $file = Storage::disk($disk)->exists($file_path);
 
@@ -47,6 +48,8 @@ class GetInvoicePdf extends AbstractService
             $file_path = CreateEntityPdf::dispatchNow($invitation);
         }
 
-        return Storage::disk($disk)->path($file_path);
+        // return Storage::disk($disk)->path($file_path);
+        // 
+        return $file_path;
     }
 }

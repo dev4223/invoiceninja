@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Credit;
@@ -37,14 +37,17 @@ class GetCreditPdf extends AbstractService
             $this->contact = $this->credit->client->primary_contact()->first();
         }
 
-        $path = $this->credit->client->credit_filepath();
+        $path = $this->credit->client->credit_filepath($this->invitation);
 
         $file_path = $path.$this->credit->numberFormatter().'.pdf';
 
-        $disk = 'public';
+        // $disk = 'public';
+        $disk = config('filesystems.default');
 
         $file_path = CreateEntityPdf::dispatchNow($this->invitation);
 
-        return Storage::disk($disk)->path($file_path);
+nlog($file_path);
+        return $file_path;
+        // return Storage::disk($disk)->path($file_path);
     }
 }

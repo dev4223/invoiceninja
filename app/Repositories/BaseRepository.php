@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Repositories;
@@ -169,9 +169,13 @@ class BaseRepository
      */
     protected function alternativeSave($data, $model)
     {
-
-        if (array_key_exists('client_id', $data)) //forces the client_id if it doesn't exist
+        //forces the client_id if it doesn't exist
+        if(array_key_exists('client_id', $data)) 
             $model->client_id = $data['client_id'];
+
+        //pickup changes here to recalculate reminders
+        //if($model instanceof Invoice && ($model->isDirty('date') || $model->isDirty('due_date')))
+           // $model->service()->setReminder()->save();
 
         $client = Client::where('id', $model->client_id)->withTrashed()->first();    
 
@@ -189,7 +193,7 @@ class BaseRepository
             $data = array_merge($company_defaults, $data);
         }
 
-        $tmp_data = $data; //preserves the $data arrayss
+        $tmp_data = $data; //preserves the $data array
 
         /* We need to unset some variable as we sometimes unguard the model */
         if (isset($tmp_data['invitations'])) 
@@ -208,6 +212,9 @@ class BaseRepository
         $model->save();
 
         /* Model now persisted, now lets do some child tasks */
+
+        if($model instanceof Invoice)
+            $model->service()->setReminder()->save();
 
         /* Save any documents */
         if (array_key_exists('documents', $data)) 
@@ -295,12 +302,16 @@ class BaseRepository
         if((int)$model->balance != 0 && $model->partial > $model->amount)
             $model->partial = min($model->amount, $model->balance);
 
-        /* Update product details if necessary */
-        if ($model->company->update_products) 
+        /* Update product details if necessary - if we are inside a transaction - do nothing */
+        if ($model->company->update_products && $model->id && \DB::transactionLevel() == 0) 
             UpdateOrCreateProduct::dispatch($model->line_items, $model, $model->company);
 
         /* Perform model specific tasks */
         if ($model instanceof Invoice) {
+            
+            nlog("Finished amount = " . $state['finished_amount']);
+            nlog("Starting amount = " . $state['starting_amount']);
+            nlog("Diff = " . ($state['finished_amount'] - $state['starting_amount']));
 
             if (($state['finished_amount'] != $state['starting_amount']) && ($model->status_id != Invoice::STATUS_DRAFT)) {
 
@@ -322,8 +333,6 @@ class BaseRepository
 
             $model = $model->calc()->getCredit();
 
-            // $model->ledger()->updateCreditBalance(-1*($state['finished_amount'] - $state['starting_amount']));
-
             if (! $model->design_id) 
                 $model->design_id = $this->decodePrimaryKey($client->getSetting('credit_design_id'));
             
@@ -331,12 +340,18 @@ class BaseRepository
 
         if ($model instanceof Quote) {
 
+            if (! $model->design_id) 
+                $model->design_id = $this->decodePrimaryKey($client->getSetting('quote_design_id'));
+
             $model = $model->calc()->getQuote();
 
         }
 
         if ($model instanceof RecurringInvoice) {
 
+            if (! $model->design_id) 
+                $model->design_id = $this->decodePrimaryKey($client->getSetting('invoice_design_id'));
+            
             $model = $model->calc()->getRecurringInvoice();
 
         }

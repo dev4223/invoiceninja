@@ -6,12 +6,13 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Mail\Engine;
 
 use App\DataMapper\EmailTemplateDefaults;
+use App\Jobs\Entity\CreateEntityPdf;
 use App\Models\Account;
 use App\Utils\HtmlEngine;
 use App\Utils\Ninja;
@@ -47,7 +48,11 @@ class InvoiceEmailEngine extends BaseEmailEngine
     {
 
         App::forgetInstance('translator');
-        Lang::replace(Ninja::transformTranslations($this->client->getMergedSettings()));
+        $t = app('translator');
+        $t->replace(Ninja::transformTranslations($this->client->getMergedSettings()));
+
+        if($this->reminder_template == 'endless_reminder')
+            $this->reminder_template = 'reminder_endless';
 
         if (is_array($this->template_data) &&  array_key_exists('body', $this->template_data) && strlen($this->template_data['body']) > 0) {
             $body_template = $this->template_data['body'];
@@ -108,11 +113,9 @@ class InvoiceEmailEngine extends BaseEmailEngine
         if ($this->client->getSetting('pdf_email_attachment') !== false && $this->invoice->company->account->hasFeature(Account::FEATURE_PDF_ATTACHMENT)) {
 
             if(Ninja::isHosted())
-                $this->setAttachments([$this->invoice->pdf_file_path(null, 'url', true)]);
+                $this->setAttachments([$this->invoice->pdf_file_path($this->invitation, 'url', true)]);
             else
-                $this->setAttachments([$this->invoice->pdf_file_path()]);
-
-            // $this->setAttachments(['path' => $this->invoice->pdf_file_path(), 'name' => basename($this->invoice->pdf_file_path())]);
+                $this->setAttachments([$this->invoice->pdf_file_path($this->invitation)]);
 
         }
 

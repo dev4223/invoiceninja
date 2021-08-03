@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Middleware;
@@ -44,6 +44,14 @@ class PasswordProtection
         else
             $timeout = $timeout/1000;
 
+        //test if password if base64 encoded
+        $x_api_password = $request->header('X-API-PASSWORD');
+
+        if($request->header('X-API-PASSWORD-BASE64'))
+        {
+            $x_api_password = base64_decode($request->header('X-API-PASSWORD-BASE64'));
+        }
+
         if (Cache::get(auth()->user()->hashed_id.'_'.auth()->user()->account_id.'_logged_in')) {
 
             Cache::put(auth()->user()->hashed_id.'_'.auth()->user()->account_id.'_logged_in', Str::random(64), $timeout);
@@ -57,7 +65,7 @@ class PasswordProtection
             $user = false;
             $google = new Google();
             $user = $google->getTokenResponse(request()->header('X-API-OAUTH-PASSWORD'));
-
+            
             if (is_array($user)) {
                 
                 $query = [
@@ -66,13 +74,17 @@ class PasswordProtection
                 ];
 
                 //If OAuth and user also has a password set  - check both
-                if ($existing_user = MultiDB::hasUser($query) && auth()->user()->has_password && Hash::check(auth()->user()->password, $request->header('X-API-PASSWORD'))) {
+                if ($existing_user = MultiDB::hasUser($query) && auth()->user()->company()->oauth_password_required && auth()->user()->has_password && Hash::check(auth()->user()->password, $x_api_password)) {
+
+                    nlog("existing user with password");
 
                     Cache::put(auth()->user()->hashed_id.'_'.auth()->user()->account_id.'_logged_in', Str::random(64), $timeout);
 
                     return $next($request);
                 }
-                elseif($existing_user = MultiDB::hasUser($query) && !auth()->user()->has_password){
+                elseif($existing_user = MultiDB::hasUser($query) && !auth()->user()->company()->oauth_password_required){
+
+                    nlog("existing user without password");
 
                     Cache::put(auth()->user()->hashed_id.'_'.auth()->user()->account_id.'_logged_in', Str::random(64), $timeout);
                     return $next($request);                    
@@ -82,7 +94,7 @@ class PasswordProtection
             return response()->json($error, 412);
 
 
-        }elseif ($request->header('X-API-PASSWORD') && Hash::check($request->header('X-API-PASSWORD'), auth()->user()->password))  {
+        }elseif ($x_api_password && Hash::check($x_api_password, auth()->user()->password))  {
 
             Cache::put(auth()->user()->hashed_id.'_'.auth()->user()->account_id.'_logged_in', Str::random(64), $timeout);
 

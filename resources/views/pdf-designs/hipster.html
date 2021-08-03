@@ -72,6 +72,7 @@
 
     .company-logo {
         zoom: 18%; /** Adapt the zoom size, if you think it's necessary. **/
+        max-width: 65%;
     }
 
     h1.entity-label .entity-label-sub {
@@ -180,6 +181,7 @@
         display: grid;
         grid-template-columns: 2fr 1fr;
         padding-top: 0.5rem;
+        margin-right: .75rem;
         gap: 80px;
     }
 
@@ -190,6 +192,13 @@
 
     #table-totals>.totals-table-right-side>*> :nth-child(1) {
         text-align: left;
+        margin-top: .75rem;
+    }
+
+    #table-totals>.totals-table-right-side> * > :not([hidden]) ~ :not([hidden]) {
+        --tw-space-y-reverse: 0;
+        margin-top: calc(.75rem * calc(1 - var(--tw-space-y-reverse)));
+        margin-bottom: calc(.75rem * var(--tw-space-y-reverse));
     }
 
     #table-totals>.totals-table-right-side>*> :nth-child(2) {
@@ -222,6 +231,14 @@
         bottom: 0;
         margin-top: 30px;
         width: 100%;
+    }
+
+    /** Markdown-specific styles. **/
+    #product-table h3,
+    #task-table h3,
+    #delivery-note-table h3 {
+        font-size: 1rem;
+        margin-bottom: 0;
     }
 </style>
 <div id="header"></div>

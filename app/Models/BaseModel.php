@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
@@ -35,10 +35,6 @@ class BaseModel extends Model
     use MakesHash;
     use UserSessionAttributes;
     use HasFactory;
-
-    //todo customise names of archived_at / updated_at columns
-    ///const CREATED_AT = 'creation_date';
-    //const UPDATED_AT = 'last_update';
 
     protected $appends = [
         'hashed_id',

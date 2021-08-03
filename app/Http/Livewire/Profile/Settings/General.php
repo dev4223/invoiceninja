@@ -7,7 +7,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Livewire\Profile\Settings;
@@ -32,6 +32,7 @@ class General extends Component
         'first_name' => ['sometimes'],
         'last_name' => ['sometimes'],
         'email' => ['required', 'email'],
+        'phone' => ['sometimes'],
     ];
 
     public function mount()

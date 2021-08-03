@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Jobs\Ninja;
@@ -127,8 +127,8 @@ class CheckCompanyData implements ShouldQueue
 
         $this->company->clients->where('is_deleted', 0)->each(function ($client) use ($wrong_balances) {
             $client->invoices->where('is_deleted', false)->whereIn('status_id', '!=', Invoice::STATUS_DRAFT)->each(function ($invoice) use ($wrong_balances, $client) {
-                $total_amount = $invoice->payments->whereIn('status_id', [Payment::STATUS_PAID, Payment:: STATUS_PENDING, Payment::STATUS_PARTIALLY_REFUNDED])->sum('pivot.amount');
-                $total_refund = $invoice->payments->whereIn('status_id', [Payment::STATUS_PAID, Payment:: STATUS_PENDING, Payment::STATUS_PARTIALLY_REFUNDED])->sum('pivot.refunded');
+                $total_amount = $invoice->payments->whereIn('status_id', [Payment::STATUS_COMPLETED, Payment:: STATUS_PENDING, Payment::STATUS_PARTIALLY_REFUNDED])->sum('pivot.amount');
+                $total_refund = $invoice->payments->whereIn('status_id', [Payment::STATUS_COMPLETED, Payment:: STATUS_PENDING, Payment::STATUS_PARTIALLY_REFUNDED])->sum('pivot.refunded');
                 $total_credit = $invoice->credits->sum('amount');
 
                 $total_paid = $total_amount - $total_refund;

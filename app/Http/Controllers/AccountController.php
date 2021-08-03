@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers;
@@ -142,7 +142,7 @@ class AccountController extends BaseController
      */
     public function store(CreateAccountRequest $request)
     {
-        $account = CreateAccount::dispatchNow($request->all());
+        $account = CreateAccount::dispatchNow($request->all(), $request->getClientIp());
 
         if (! ($account instanceof Account)) {
             return $account;

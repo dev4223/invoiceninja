@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers;
@@ -17,6 +17,7 @@ use App\Models\CompanyUser;
 use App\Models\User;
 use App\Transformers\CompanyUserTransformer;
 use App\Transformers\UserTransformer;
+use App\Utils\Traits\User\LoginCache;
 use Google_Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -24,6 +25,7 @@ use Illuminate\Support\Str;
 
 class ConnectedAccountController extends BaseController
 {
+    use LoginCache;
 
     protected $entity_type = User::class;
 
@@ -102,8 +104,13 @@ class ConnectedAccountController extends BaseController
             $refresh_token = '';
             $token = '';
 
+            $email = $google->harvestEmail($user);
+
+            if(auth()->user()->email != $email && MultiDB::checkUserEmailExists($email))
+                return response()->json(['message' => ctrans('texts.email_already_register')], 400);
+
             $connected_account = [
-                'email' => $google->harvestEmail($user),
+                'email' => $email,
                 'oauth_user_id' => $google->harvestSubField($user),
                 'oauth_provider_id' => 'google',
                 'email_verified_at' =>now()
@@ -113,9 +120,8 @@ class ConnectedAccountController extends BaseController
             auth()->user()->email_verified_at = now();
             auth()->user()->save();
             
-            $timeout = auth()->user()->company()->default_password_timeout;
-            Cache::put(auth()->user()->hashed_id.'_'.auth()->user()->account_id.'_logged_in', Str::random(64), $timeout);
-
+            $this->setLoginCache(auth()->user());
+            
             return $this->itemResponse(auth()->user());
 
         }

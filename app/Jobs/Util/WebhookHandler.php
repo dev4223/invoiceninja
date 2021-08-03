@@ -6,8 +6,9 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
+
 namespace App\Jobs\Util;
 
 use App\Jobs\Util\SystemLogger;
@@ -35,9 +36,9 @@ class WebhookHandler implements ShouldQueue
 
     private $company;
 
-    public $tries = 5; //number of retries
+    public $tries = 3; //number of retries
 
-    public $backoff = 5; //seconds to wait until retry
+    public $backoff = 10; //seconds to wait until retry
 
     public $deleteWhenMissingModels = true;
 
@@ -110,12 +111,9 @@ class WebhookHandler implements ShouldQueue
 
         try {
 
-        $response = $client->post($subscription->target_url, [
-                        RequestOptions::JSON => $data, // or 'json' => [...]
-                    ]);
-
-            if ($response->getStatusCode() == 410 || $response->getStatusCode() == 200)
-                $subscription->delete();
+            $response = $client->post($subscription->target_url, [
+                RequestOptions::JSON => $data, // or 'json' => [...]
+            ]);
 
             SystemLogger::dispatch(
                 $response,
@@ -126,10 +124,13 @@ class WebhookHandler implements ShouldQueue
                 $this->company
             );
 
+            // if ($response->getStatusCode() == 410 || $response->getStatusCode() == 200)
+            //     return true;// $subscription->delete();
+
         }
         catch(\Exception $e){
 
-        // nlog($e->getMessage());
+        nlog($e->getMessage());
 
                 SystemLogger::dispatch(
                 $e->getMessage(),
@@ -141,8 +142,6 @@ class WebhookHandler implements ShouldQueue
             );
 
         }
-
-
 
     }
 

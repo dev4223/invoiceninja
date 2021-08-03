@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Requests\Account;
@@ -40,13 +40,14 @@ class CreateAccountRequest extends Request
             'password'          => 'required|string|min:6',
             'email'             => 'bail|required|email:rfc,dns',
             'email'             => new NewUniqueUserRule(),
-            'privacy_policy'    => 'required',
-            'terms_of_service'  => 'required',
+            'privacy_policy'    => 'required|boolean',
+            'terms_of_service'  => 'required|boolean',
         ];
     }
 
     protected function prepareForValidation()
     {
+        
         $input = $this->all();
 
         $input['user_agent'] = request()->server('HTTP_USER_AGENT');

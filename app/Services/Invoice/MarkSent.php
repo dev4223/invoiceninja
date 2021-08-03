@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Invoice;
@@ -39,8 +39,6 @@ class MarkSent extends AbstractService
 
         $this->invoice->markInvitationsSent();
 
-        $this->invoice->setReminder();
-
         $this->invoice
              ->service()
              ->setStatus(Invoice::STATUS_SENT)
@@ -48,6 +46,7 @@ class MarkSent extends AbstractService
              ->setDueDate()
              ->updateBalance($this->invoice->amount)
              ->deletePdf()
+             ->setReminder()
              ->save();
 
         $this->client->service()->updateBalance($this->invoice->balance)->save();

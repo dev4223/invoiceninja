@@ -6,14 +6,15 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers\ClientPortal;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\ClientPortal\ProcessInvoicesInBulkRequest;
-use App\Http\Requests\ClientPortal\ShowInvoiceRequest;
+use App\Http\Requests\ClientPortal\Invoices\ShowInvoicesRequest;
+use App\Http\Requests\ClientPortal\Invoices\ProcessInvoicesInBulkRequest;
+use App\Http\Requests\ClientPortal\Invoices\ShowInvoiceRequest;
 use App\Models\Invoice;
 use App\Utils\Number;
 use App\Utils\TempFile;
@@ -23,6 +24,7 @@ use Illuminate\Contracts\View\Factory;
 use Illuminate\View\View;
 use ZipStream\Option\Archive;
 use ZipStream\ZipStream;
+use Illuminate\Support\Facades\Storage;
 
 class InvoiceController extends Controller
 {
@@ -33,7 +35,7 @@ class InvoiceController extends Controller
      *
      * @return Factory|View
      */
-    public function index()
+    public function index(ShowInvoicesRequest $request)
     {
         return $this->render('invoices.index');
     }
@@ -88,6 +90,7 @@ class InvoiceController extends Controller
     {
         $invoices = Invoice::whereIn('id', $ids)
                             ->whereClientId(auth()->user()->client->id)
+                            ->withTrashed()
                             ->get();
 
         //filter invoices which are payable
@@ -164,10 +167,14 @@ class InvoiceController extends Controller
 
         //if only 1 pdf, output to buffer for download
         if ($invoices->count() == 1) {
-
-           $file = $invoices->first()->pdf_file_path();
-           return response()->download($file, basename($file), ['Cache-Control:' => 'no-cache'])->deleteFileAfterSend(true);;
-
+            $invoice = $invoices->first();
+            $invitation = $invoice->invitations->first();
+           //$file = $invoice->pdf_file_path($invitation);
+           $file = $invoice->service()->getInvoicePdf(auth()->user());
+           // return response()->download($file, basename($file), ['Cache-Control:' => 'no-cache'])->deleteFileAfterSend(true);;
+            return response()->streamDownload(function () use($file) {
+                    echo Storage::get($file);
+            },  basename($file), ['Content-Type' => 'application/pdf']);
         }
 
         // enable output of HTTP headers
@@ -178,7 +185,10 @@ class InvoiceController extends Controller
         $zip = new ZipStream(date('Y-m-d').'_'.str_replace(' ', '_', trans('texts.invoices')).'.zip', $options);
 
         foreach ($invoices as $invoice) {
-            $zip->addFileFromPath(basename($invoice->pdf_file_path()), TempFile::path($invoice->pdf_file_path()));
+
+            #add it to the zip
+            $zip->addFile(basename($invoice->pdf_file_path()), file_get_contents($invoice->pdf_file_path(null, 'url', true)));
+
         }
 
         // finish the zip stream

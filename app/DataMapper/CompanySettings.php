@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\DataMapper;
@@ -28,6 +28,7 @@ class CompanySettings extends BaseSettings
     public $lock_invoices = 'off'; //off,when_sent,when_paid //@implemented
 
     public $enable_client_portal_tasks = false; //@ben to implement
+    public $show_all_tasks_client_portal = 'invoiced'; // all, uninvoiced, invoiced
     public $enable_client_portal_password = false; //@implemented
     public $enable_client_portal = true; //@implemented
     public $enable_client_portal_dashboard = false; // @TODO There currently is no dashboard so this is pending
@@ -65,10 +66,12 @@ class CompanySettings extends BaseSettings
     public $auto_convert_quote = true; //@implemented
     public $auto_email_invoice = true; //@only used for Recurring Invoices, if set to false, we never send?
 
+    public $entity_send_time = 0;
+
     public $inclusive_taxes = false; //@implemented
     public $quote_footer = ''; //@implmented
 
-    public $translations; //@TODO not used anywhere
+    public $translations; 
 
     public $counter_number_applied = 'when_saved'; // when_saved , when_sent //@implemented
     public $quote_number_applied = 'when_saved'; // when_saved , when_sent //@implemented
@@ -150,8 +153,8 @@ class CompanySettings extends BaseSettings
     public $email_sending_method = 'default'; //enum 'default','gmail' //@implemented
     public $gmail_sending_user_id = '0'; //@implemented
 
-    public $reply_to_email = ''; //@TODO
-    public $reply_to_name = ''; //@TODO
+    public $reply_to_email = ''; //@implemented
+    public $reply_to_name = ''; //@implemented
     public $bcc_email = ''; //@TODO
     public $pdf_email_attachment = false; //@implemented
     public $ubl_email_attachment = false; //@implemented
@@ -202,7 +205,7 @@ class CompanySettings extends BaseSettings
     public $schedule_reminder2 = ''; // (enum: after_invoice_date, before_due_date, after_due_date) implmemented
     public $schedule_reminder3 = ''; // (enum: after_invoice_date, before_due_date, after_due_date) implmemented
 
-    public $reminder_send_time = 32400; //number of seconds from UTC +0 to send reminders @TODO
+    public $reminder_send_time = 0; //number of seconds from UTC +0 to send reminders @TODO
 
     public $late_fee_amount1 = 0; //@implemented
     public $late_fee_amount2 = 0; //@implemented
@@ -240,13 +243,13 @@ class CompanySettings extends BaseSettings
     public $font_size = 7; //@implemented
     public $primary_font = 'Roboto';
     public $secondary_font = 'Roboto';
-    public $primary_color = '#142cb5';
+    public $primary_color = '#298AAB';
     public $secondary_color = '#7081e0';
 
     public $hide_paid_to_date = false; //@TODO where?
     public $embed_documents = false; //@TODO where?
-    public $all_pages_header = false; //@implemented
-    public $all_pages_footer = false; //@implemented
+    public $all_pages_header = false; //@deprecated 31-05-2021
+    public $all_pages_footer = false; //@deprecated 31-05-2021
     public $pdf_variables = ''; //@implemented
 
     public $portal_custom_head = ''; //@TODO @BEN
@@ -254,7 +257,7 @@ class CompanySettings extends BaseSettings
     public $portal_custom_footer = ''; //@TODO @BEN
     public $portal_custom_js = ''; //@TODO @BEN
 
-    public $client_can_register = false; //@implemented
+    public $client_can_register = false; //@deorecated 04/06/2021
     public $client_portal_terms = ''; //@TODO @BEN
     public $client_portal_privacy_policy = ''; //@TODO @BEN
     public $client_portal_enable_uploads = false; //@implemented
@@ -266,6 +269,8 @@ class CompanySettings extends BaseSettings
     public $hide_empty_columns_on_pdf = false;
 
     public static $casts = [
+        'show_all_tasks_client_portal'       => 'string',
+        'entity_send_time'                   => 'int',
         'shared_invoice_credit_counter'      => 'bool',
         'reply_to_name'                      => 'string',
         'hide_empty_columns_on_pdf'          => 'bool',
@@ -393,7 +398,6 @@ class CompanySettings extends BaseSettings
         'email_template_reminder2'           => 'string',
         'email_template_reminder3'           => 'string',
         'email_template_reminder_endless'    => 'string',
-        'enable_client_portal_password'      => 'bool',
         'inclusive_taxes'                    => 'bool',
         'invoice_number_pattern'             => 'string',
         'invoice_number_counter'             => 'integer',
@@ -659,6 +663,7 @@ class CompanySettings extends BaseSettings
                 '$task.line_total',
             ],
             'total_columns' => [
+                '$net_subtotal',
                 '$subtotal',
                 '$discount',
                 '$custom_surcharge1',
@@ -667,8 +672,9 @@ class CompanySettings extends BaseSettings
                 '$custom_surcharge4',
                 '$total_taxes',
                 '$line_taxes',
-                '$paid_to_date',
                 '$total',
+                '$paid_to_date',
+                '$outstanding',
             ],
         ];
 

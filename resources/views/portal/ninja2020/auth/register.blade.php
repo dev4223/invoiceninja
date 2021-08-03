@@ -3,7 +3,7 @@
 
 @section('body')
     <div class="grid lg:grid-cols-12 py-8">
-        <div class="lg:col-span-4 lg:col-start-5 px-6">
+        <div class="col-span-12 lg:col-span-8 lg:col-start-3 xl:col-span-6 xl:col-start-4 px-6">
             <div class="flex justify-center">
                 <img class="h-32 w-auto" src="{{ $company->present()->logo() }}" alt="{{ ctrans('texts.logo') }}">
             </div>
@@ -28,11 +28,15 @@
                                 <input type="checkbox" name="terms" class="form-checkbox mr-2 cursor-pointer" checked>
                                 <span class="text-sm text-gray-800">
 
-                                {{ ctrans('texts.i_agree') }}
+                                {{ ctrans('texts.i_agree_to_the') }}
                             @endif
 
                             @includeWhen(!empty($company->settings->client_portal_terms), 'portal.ninja2020.auth.includes.register.popup', ['property' => 'terms_of_service', 'title' => ctrans('texts.terms_of_service'), 'content' => $company->settings->client_portal_terms])
                             @includeWhen(!empty($company->settings->client_portal_privacy_policy), 'portal.ninja2020.auth.includes.register.popup', ['property' => 'privacy_policy', 'title' => ctrans('texts.privacy_policy'), 'content' => $company->settings->client_portal_privacy_policy])
+
+                            @error('terms')
+                                <p class="text-red-600">{{ $message }}</p>
+                            @enderror
                         </span>
                     </span>
 

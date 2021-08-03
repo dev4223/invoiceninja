@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\PaymentDrivers;
@@ -26,6 +26,7 @@ use App\Models\Client;
 use App\Models\ClientContact;
 use App\Models\ClientGatewayToken;
 use App\Models\CompanyGateway;
+use App\Models\GatewayType;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\PaymentHash;
@@ -161,6 +162,17 @@ class BaseDriver extends AbstractPaymentDriver
     }
 
     /**
+     * Detaches a payment method from the gateway
+     * 
+     * @param  ClientGatewayToken $token The gateway token
+     * @return bool                      boolean response
+     */
+    public function detach(ClientGatewayToken $token)
+    {
+        return true;
+    }
+
+    /**
      * Set the inbound request payment method type for access.
      *
      * @param int $payment_method_id The Payment Method ID
@@ -188,7 +200,7 @@ class BaseDriver extends AbstractPaymentDriver
     public function attachInvoices(Payment $payment, PaymentHash $payment_hash): Payment
     {
         $paid_invoices = $payment_hash->invoices();
-        $invoices = Invoice::whereIn('id', $this->transformKeys(array_column($paid_invoices, 'invoice_id')))->get();
+        $invoices = Invoice::whereIn('id', $this->transformKeys(array_column($paid_invoices, 'invoice_id')))->withTrashed()->get();
         $payment->invoices()->sync($invoices);
 
         $invoices->each(function ($invoice) use ($payment) {
@@ -244,6 +256,10 @@ class BaseDriver extends AbstractPaymentDriver
         if (property_exists($this->payment_hash->data, 'billing_context')) {
             $billing_subscription = \App\Models\Subscription::find($this->payment_hash->data->billing_context->subscription_id);
 
+            // To access campaign hash => $this->payment_hash->data->billing_context->campaign;
+            // To access campaign data => Cache::get(CAMPAIGN_HASH)
+            // To access utm data => session()->get('utm-' . CAMPAIGN_HASH);
+
             (new SubscriptionService($billing_subscription))->completePurchase($this->payment_hash);
         }
 
@@ -267,7 +283,7 @@ class BaseDriver extends AbstractPaymentDriver
         $fee_total = $this->payment_hash->fee_total;
 
         /*Hydrate invoices*/
-        $invoices = Invoice::whereIn('id', $this->transformKeys(array_column($payment_invoices, 'invoice_id')))->get();
+        $invoices = Invoice::whereIn('id', $this->transformKeys(array_column($payment_invoices, 'invoice_id')))->withTrashed()->get();
 
         $invoices->each(function ($invoice) use ($fee_total) {
             if (collect($invoice->line_items)->contains('type_id', '3')) {
@@ -287,7 +303,7 @@ class BaseDriver extends AbstractPaymentDriver
      */
     public function unWindGatewayFees(PaymentHash $payment_hash)
     {
-        $invoices = Invoice::whereIn('id', $this->transformKeys(array_column($payment_hash->invoices(), 'invoice_id')))->get();
+        $invoices = Invoice::whereIn('id', $this->transformKeys(array_column($payment_hash->invoices(), 'invoice_id')))->withTrashed()->get();
 
         $invoices->each(function ($invoice) {
             $invoice->service()->removeUnpaidGatewayFees();
@@ -368,7 +384,7 @@ class BaseDriver extends AbstractPaymentDriver
         $nmo->company = $gateway->client->company;
         $nmo->settings = $gateway->client->company->settings;
 
-        $invoices = Invoice::whereIn('id', $this->transformKeys(array_column($this->payment_hash->invoices(), 'invoice_id')))->get();
+        $invoices = Invoice::whereIn('id', $this->transformKeys(array_column($this->payment_hash->invoices(), 'invoice_id')))->withTrashed()->get();
 
         $invoices->each(function ($invoice){
 
@@ -530,5 +546,34 @@ class BaseDriver extends AbstractPaymentDriver
             $this->client,
             $this->client->company,
         );
+    }
+
+    public function genericWebhookUrl()
+    {
+        return route('payment_notification_webhook', [
+            'company_key' => $this->client->company->company_key, 
+            'company_gateway_id' => $this->encodePrimaryKey($this->company_gateway->id), 
+            'client' => $this->encodePrimaryKey($this->client->id),
+        ]);
+    }
+
+    /* Performs an extra iterate on the gatewayTypes() array and passes back only the enabled gateways*/
+    public function gatewayTypeEnabled($type)
+    {
+        $types = [];
+
+        // if($type == GatewayType::BANK_TRANSFER && $this->company_gateway->fees_and_limits->{GatewayType::BANK_TRANSFER}->is_enabled)
+        // {
+        //     $types[] = $type;    
+        // }
+        // elseif($type == GatewayType::CREDIT_CARD && $this->company_gateway->fees_and_limits->{GatewayType::CREDIT_CARD}->is_enabled)
+        // {
+        //     $types[] = $type;    
+        // }
+
+        $types[] = GatewayType::CREDIT_CARD;
+        $types[] = GatewayType::BANK_TRANSFER;
+
+        return $types;
     }
 }

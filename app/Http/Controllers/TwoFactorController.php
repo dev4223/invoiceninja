@@ -6,16 +6,22 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers;
 
-use PragmaRX\Google2FA\Google2FA;
+use App\Models\User;
+use App\Transformers\UserTransformer;
 use Crypt;
+use PragmaRX\Google2FA\Google2FA;
 
 class TwoFactorController extends BaseController
 {
+    protected $entity_type = User::class;
+
+    protected $entity_transformer = UserTransformer::class;
+    
     public function setupTwoFactor()
     {
         $user = auth()->user();
@@ -71,4 +77,12 @@ class TwoFactorController extends BaseController
         
     }
     
+    public function disableTwoFactor()
+    {
+        $user = auth()->user();
+        $user->google_2fa_secret = null;
+        $user->save();
+
+        return $this->itemResponse($user);
+    }
 }

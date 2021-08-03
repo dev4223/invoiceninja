@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers;
@@ -470,7 +470,7 @@ class ProductController extends BaseController
 
         $ids = request()->input('ids');
 
-        $products = Product::withTrashed()->find($this->transformKeys($ids));
+        $products = Product::withTrashed()->whereIn('id', $this->transformKeys($ids))->cursor();
 
         $products->each(function ($product, $key) use ($action) {
             if (auth()->user()->can('edit', $product)) {

@@ -7,7 +7,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\PaymentDrivers\Stripe;
@@ -60,7 +60,7 @@ class CreditCard
     public function paymentView(array $data)
     {
         $payment_intent_data = [
-            'amount' => $this->stripe->convertToStripeAmount($data['total']['amount_with_fee'], $this->stripe->client->currency()->precision),
+            'amount' => $this->stripe->convertToStripeAmount($data['total']['amount_with_fee'], $this->stripe->client->currency()->precision, $this->stripe->client->currency()),
             'currency' => $this->stripe->client->getCurrencyCode(),
             'customer' => $this->stripe->findOrCreateCustomer(),
             'description' => ctrans('texts.invoices') . ': ' . collect($data['invoices'])->pluck('invoice_number'), // TODO: More meaningful description.
@@ -115,7 +115,7 @@ class CreditCard
         $data = [
             'payment_method' => $this->stripe->payment_hash->data->server_response->payment_method,
             'payment_type' => PaymentType::parseCardType(strtolower($stripe_method->card->brand)),
-            'amount' => $this->stripe->convertFromStripeAmount($this->stripe->payment_hash->data->server_response->amount, $this->stripe->client->currency()->precision),
+            'amount' => $this->stripe->convertFromStripeAmount($this->stripe->payment_hash->data->server_response->amount, $this->stripe->client->currency()->precision, $this->stripe->client->currency()),
             'transaction_reference' => optional($this->stripe->payment_hash->data->payment_intent->charges->data[0])->id,
             'gateway_type_id' => GatewayType::CREDIT_CARD,
         ];

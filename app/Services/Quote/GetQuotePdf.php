@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Quote;
@@ -35,14 +35,16 @@ class GetQuotePdf extends AbstractService
 
         $invitation = $this->quote->invitations->where('client_contact_id', $this->contact->id)->first();
 
-        $path = $this->quote->client->quote_filepath();
+        $path = $this->quote->client->quote_filepath($invitation);
 
         $file_path = $path.$this->quote->numberFormatter().'.pdf';
 
-        $disk = 'public';
-
+        // $disk = 'public';
+        $disk = config('filesystems.default');
+        
         $file_path = CreateEntityPdf::dispatchNow($invitation);
         
-        return Storage::disk($disk)->path($file_path);
+        return $file_path;
+        //return Storage::disk($disk)->path($file_path);
     }
 }

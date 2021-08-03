@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
@@ -103,6 +103,15 @@ class Activity extends StaticModel
         'deleted_at' => 'timestamp',
     ];
 
+    protected $appends = [
+        'hashed_id',
+    ];
+
+    public function getHashedIdAttribute()
+    {
+        return $this->encodePrimaryKey($this->id);
+    }
+    
     public function getEntityType()
     {
         return self::class;

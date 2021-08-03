@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Requests\Client;
@@ -144,7 +144,10 @@ class StoreClientRequest extends Request
             return $item->iso_3166_2 == $country_code || $item->iso_3166_3 == $country_code;
         })->first();
 
-        return (string) $country->id;
+        if($country)
+            return (string) $country->id;
+
+        return "";
     }
 
     private function getCurrencyCode($code)

@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Utils\Traits;
@@ -36,6 +36,7 @@ trait CompanySettingsSaver
      */
     public function saveSettings($settings, $entity)
     {
+
         /* No Settings, No Save!*/
         if (! $settings) {
             return;
@@ -58,14 +59,17 @@ trait CompanySettingsSaver
             }
         }
 
+        if(property_exists($settings, 'translations'))
+        {
         //this pass will handle any null values that are in the translations
-        foreach ($settings->translations as $key => $value) {
-            if (is_null($settings->translations[$key])) {
-                $settings->translations[$key] = '';
+            foreach ($settings->translations as $key => $value) {
+                if (is_null($settings->translations[$key])) {
+                    $settings->translations[$key] = '';
+                }
             }
-        }
 
-        $company_settings->translations = $settings->translations;
+            $company_settings->translations = $settings->translations;
+        }
 
         $entity->settings = $company_settings;
 

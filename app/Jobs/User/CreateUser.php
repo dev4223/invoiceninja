@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Jobs\User;
@@ -58,7 +58,7 @@ class CreateUser
     {
         $user = new User();
         $user->account_id = $this->account->id;
-        $user->password = bcrypt($this->request['password']);
+        $user->password = $this->request['password'] ? bcrypt($this->request['password']) : '';
         $user->accepted_terms_version = config('ninja.terms_version');
         $user->confirmation_code = $this->createDbHash(config('database.default'));
         $user->fill($this->request);

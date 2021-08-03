@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http;
@@ -16,6 +16,7 @@ use App\Http\Middleware\Authenticate;
 use App\Http\Middleware\CheckClientExistence;
 use App\Http\Middleware\CheckForMaintenanceMode;
 use App\Http\Middleware\ClientPortalEnabled;
+use App\Http\Middleware\ContactAccount;
 use App\Http\Middleware\ContactKeyLogin;
 use App\Http\Middleware\ContactRegister;
 use App\Http\Middleware\ContactSetDb;
@@ -29,6 +30,7 @@ use App\Http\Middleware\QueryLogging;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\SetDb;
 use App\Http\Middleware\SetDbByCompanyKey;
+use App\Http\Middleware\SetDocumentDb;
 use App\Http\Middleware\SetDomainNameDb;
 use App\Http\Middleware\SetEmailDb;
 use App\Http\Middleware\SetInviteDb;
@@ -69,7 +71,7 @@ class Kernel extends HttpKernel
         TrimStrings::class,
         ConvertEmptyStringsToNull::class,
         TrustProxies::class,
-        //\Fruitcake\Cors\HandleCors::class,
+        // \Fruitcake\Cors\HandleCors::class,
         Cors::class,
 
     ];
@@ -84,7 +86,6 @@ class Kernel extends HttpKernel
             EncryptCookies::class,
             AddQueuedCookiesToResponse::class,
             StartSession::class,
-            // \Illuminate\Session\Middleware\AuthenticateSession::class,
             ShareErrorsFromSession::class,
             VerifyCsrfToken::class,
             SubstituteBindings::class,
@@ -95,7 +96,6 @@ class Kernel extends HttpKernel
             'throttle:300,1',
             'bindings',
             'query_logging',
-            Cors::class,
         ],
         'contact' => [
             'throttle:60,1',
@@ -141,6 +141,7 @@ class Kernel extends HttpKernel
         'api_secret_check' => ApiSecretCheck::class,
         'contact_token_auth' => ContactTokenAuth::class,
         'contact_db' => ContactSetDb::class,
+        'contact_account' => ContactAccount::class,
         'domain_db' => SetDomainNameDb::class,
         'email_db' => SetEmailDb::class,
         'invite_db' => SetInviteDb::class,
@@ -152,16 +153,18 @@ class Kernel extends HttpKernel
         'api_db' => SetDb::class,
         'company_key_db' => SetDbByCompanyKey::class,
         'locale' => Locale::class,
-        'contact.register' => ContactRegister::class,
+        'contact_register' => ContactRegister::class,
         'shop_token_auth' => ShopTokenAuth::class,
         'phantom_secret' => PhantomSecret::class,
         'contact_key_login' => ContactKeyLogin::class,
         'check_client_existence' => CheckClientExistence::class,
         'user_verified' => UserVerified::class,
+        'document_db' => SetDocumentDb::class,
     ];
 
 
     protected $middlewarePriority = [
+        Cors::class,
         SetDomainNameDb::class,
         SetDb::class,
         SetWebDb::class,
@@ -182,5 +185,6 @@ class Kernel extends HttpKernel
         PasswordProtection::class,
         Locale::class,
         SubstituteBindings::class,
+        ContactAccount::class,
     ];
 }

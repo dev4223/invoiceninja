@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Utils\PhantomJS;
@@ -26,9 +26,9 @@ use App\Utils\CurlUtils;
 use App\Utils\HtmlEngine;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 class Phantom
@@ -62,19 +62,19 @@ class Phantom
         $entity_obj = $invitation->{$entity};
 
         if ($entity == 'invoice') {
-            $path = $entity_obj->client->invoice_filepath();
+            $path = $entity_obj->client->invoice_filepath($invitation);
         }
 
         if ($entity == 'quote') {
-            $path = $entity_obj->client->quote_filepath();
+            $path = $entity_obj->client->quote_filepath($invitation);
         }
 
         if ($entity == 'credit') {
-            $path = $entity_obj->client->credit_filepath();
+            $path = $entity_obj->client->credit_filepath($invitation);
         }
 
         if ($entity == 'recurring_invoice') {
-            $path = $entity_obj->client->recurring_invoice_filepath();
+            $path = $entity_obj->client->recurring_invoice_filepath($invitation);
         }
 
         $file_path = $path.$entity_obj->numberFormatter().'.pdf';
@@ -90,6 +90,9 @@ class Phantom
 
         $this->checkMime($pdf, $invitation, $entity);
         
+        if(!Storage::disk(config('filesystems.default'))->exists($path))
+            Storage::disk(config('filesystems.default'))->makeDirectory($path, 0775);
+                
         $instance = Storage::disk(config('filesystems.default'))->put($file_path, $pdf);
 
         return $file_path;

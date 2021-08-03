@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Factory;
@@ -22,7 +22,7 @@ class ExpenseCategoryFactory
         $expense->company_id = $company_id;
         $expense->name = '';
         $expense->is_deleted = false;
-        $expense->color = '#fff';
+        $expense->color = '';
         
         return $expense;
     }

@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
@@ -54,8 +54,8 @@ class Account extends BaseModel
         'deleted_at',
         'promo_expires',
         'discount_expires',
-        'trial_started',
-        'plan_expires'
+        // 'trial_started',
+        // 'plan_expires'
     ];
 
     const PLAN_FREE = 'free';
@@ -105,9 +105,6 @@ class Account extends BaseModel
         return $this->hasOne(Company::class, 'id', 'default_company_id');
     }
 
-    /**
-     * @return BelongsTo
-     */
     public function payment()
     {
         return $this->belongsTo(Payment::class)->withTrashed();
@@ -121,6 +118,11 @@ class Account extends BaseModel
     public function company_users()
     {
         return $this->hasMany(CompanyUser::class);
+    }
+
+    public function owner()
+    {
+        return $this->hasMany(CompanyUser::class)->where('is_owner', true)->first() ? $this->hasMany(CompanyUser::class)->where('is_owner', true)->first()->user : false;
     }
 
     public function getPlan()
@@ -207,7 +209,7 @@ class Account extends BaseModel
             return false;
         }
 
-        return $this->plan == 'free';
+        return $this->plan == 'free' || is_null($this->plan);
     }
 
     public function isEnterpriseClient()
@@ -230,6 +232,21 @@ class Account extends BaseModel
         return $plan_details && $plan_details['trial'];
     }
 
+    public function startTrial($plan)
+    {
+        if (! Ninja::isNinja()) {
+            return;
+        }
+
+        if ($this->trial_started && $this->trial_started != '0000-00-00') {
+            return;
+        }
+
+        $this->trial_plan = $plan;
+        $this->trial_started = now();
+        $this->save();
+    }
+
     public function getPlanDetails($include_inactive = false, $include_trial = true)
     {
         $plan = $this->plan;
@@ -244,7 +261,7 @@ class Account extends BaseModel
 
         if ($trial_plan && $include_trial) {
             $trial_started = $this->trial_started;
-            $trial_expires = $this->trial_started->addSeconds($this->trial_duration);
+            $trial_expires = Carbon::parse($this->trial_started)->addSeconds($this->trial_duration);
 
             if($trial_expires->greaterThan(now())){
                 $trial_active = true;
@@ -323,4 +340,5 @@ class Account extends BaseModel
             ];
         }
     }
+
 }

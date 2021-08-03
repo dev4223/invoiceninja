@@ -7,7 +7,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\PaymentDrivers\Stripe;
@@ -52,7 +52,7 @@ class Charge
     public function tokenBilling(ClientGatewayToken $cgt, PaymentHash $payment_hash)
     {
         $amount = array_sum(array_column($payment_hash->invoices(), 'amount')) + $payment_hash->fee_total;
-        $invoice = Invoice::whereIn('id', $this->transformKeys(array_column($payment_hash->invoices(), 'invoice_id')))->first();
+        $invoice = Invoice::whereIn('id', $this->transformKeys(array_column($payment_hash->invoices(), 'invoice_id')))->withTrashed()->first();
 
         if ($invoice) {
             $description = "Invoice {$invoice->number} for {$amount} for client {$this->stripe->client->present()->name()}";
@@ -62,20 +62,19 @@ class Charge
 
         $this->stripe->init();
 
-
         $response = null;
 
         try {
 
             $data = [
-              'amount' => $this->stripe->convertToStripeAmount($amount, $this->stripe->client->currency()->precision),
+              'amount' => $this->stripe->convertToStripeAmount($amount, $this->stripe->client->currency()->precision, $this->stripe->client->currency()),
               'currency' => $this->stripe->client->getCurrencyCode(),
               'payment_method' => $cgt->token,
               'customer' => $cgt->gateway_customer_reference,
               'confirm' => true,
               'description' => $description,
             ];
-
+nlog($data);
             $response = $this->stripe->createPaymentIntent($data, $this->stripe->stripe_connect_auth);
             // $response = $local_stripe->paymentIntents->create($data);
 

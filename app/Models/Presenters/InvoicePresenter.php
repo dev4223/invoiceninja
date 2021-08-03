@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models\Presenters;
@@ -40,5 +40,36 @@ class InvoicePresenter extends EntityPresenter
         } else {
             return '';
         }
+    }
+
+    public function rBits()
+    {
+        $properties = new \stdClass();
+        $properties->terms_text = $this->terms;
+        $properties->note = $this->public_notes;
+        $properties->itemized_receipt = [];
+
+        foreach ($this->line_items as $item) {
+            $properties->itemized_receipt[] = $this->itemRbits($item);
+        }
+
+        $data = new stdClass();
+        $data->receive_time = time();
+        $data->type = 'transaction_details';
+        $data->source = 'user';
+        $data->properties = $properties;
+
+        return [$data];
+    }
+
+    public function itemRbits($item)
+    {
+        $data = new stdClass();
+        $data->description = $item->notes;
+        $data->item_price = floatval($item->cost);
+        $data->quantity = floatval($item->quantity);
+        $data->amount = round($data->item_price * $data->quantity, 2);
+
+        return $data;
     }
 }

@@ -7,7 +7,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\PaymentDrivers;
@@ -61,7 +61,7 @@ class CustomPaymentDriver extends BaseDriver
 
         if (count($this->payment_hash->invoices()) > 0) {
             $invoice_id = $this->decodePrimaryKey($this->payment_hash->invoices()[0]->invoice_id);
-            $invoice = Invoice::findOrFail($invoice_id);
+            $invoice = Invoice::withTrashed()->find($invoice_id);
 
             $variables = (new HtmlEngine($invoice->invitations->first()))->generateLabelsAndValues();
         }

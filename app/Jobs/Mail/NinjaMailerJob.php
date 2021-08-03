@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Jobs\Mail;
@@ -47,9 +47,9 @@ class NinjaMailerJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, MakesHash;
 
-    public $tries = 5; //number of retries
+    public $tries = 3; //number of retries
 
-    public $backoff = 5; //seconds to wait until retry
+    public $backoff = 10; //seconds to wait until retry
 
     public $deleteWhenMissingModels = true;
 
@@ -59,19 +59,22 @@ class NinjaMailerJob implements ShouldQueue
 
     public $company;
 
+    private $mailer;
+
     public function __construct(NinjaMailerObject $nmo, bool $override = false)
     {
 
         $this->nmo = $nmo;
+        $this->override = $override;
 
     }
 
     public function handle()
     {
-        /*If we are migrating data we don't want to fire any emails*/
-        if ($this->nmo->company->is_disabled && !$this->override) 
-            return true;
         
+        if($this->preFlightChecksFail())
+            return;
+
         /*Set the correct database*/
         MultiDB::setDb($this->nmo->company->db);
 
@@ -95,19 +98,13 @@ class NinjaMailerJob implements ShouldQueue
             $this->nmo->mailable->replyTo($this->company->owner()->email, $this->company->owner()->present()->name());
         }
 
-
-        if (strlen($this->nmo->settings->bcc_email) > 1) {
-            nlog('bcc list available');
-            nlog($this->nmo->settings->bcc_email);
-            $this->nmo->mailable->bcc(explode(",", $this->nmo->settings->bcc_email), 'Blind Copy');
-        }
-        
-
         //send email
         try {
-            nlog("trying to send");
-            
-            Mail::to($this->nmo->to_user->email)
+            nlog("trying to send to {$this->nmo->to_user->email} ". now()->toDateTimeString());
+            nlog("Using mailer => ". $this->mailer);
+
+            Mail::mailer($this->mailer)
+                ->to($this->nmo->to_user->email)
                 ->send($this->nmo->mailable);
 
             LightLogs::create(new EmailSuccess($this->nmo->company->company_key))
@@ -115,6 +112,10 @@ class NinjaMailerJob implements ShouldQueue
 
         } catch (\Exception $e) {
 
+            // if($e instanceof GuzzleHttp\Exception\ClientException){
+
+            // }
+            
             nlog("error failed with {$e->getMessage()}");
 
             if($this->nmo->entity)
@@ -150,25 +151,21 @@ class NinjaMailerJob implements ShouldQueue
     {
         /* Singletons need to be rebooted each time just in case our Locale is changing*/
         App::forgetInstance('translator');
-        App::forgetInstance('mail.manager'); //singletons must be destroyed!
-        App::forgetInstance('mailer');
-        App::forgetInstance('laravelgmail');
-
-        /* Inject custom translations if any exist */
-        Lang::replace(Ninja::transformTranslations($this->nmo->settings));
+        $t = app('translator');
+        $t->replace(Ninja::transformTranslations($this->nmo->settings));
 
         switch ($this->nmo->settings->email_sending_method) {
             case 'default':
-                //config(['mail.driver' => config('mail.default')]);
+                $this->mailer = config('mail.default');
                 break;
             case 'gmail':
+                $this->mailer = 'gmail';
                 $this->setGmailMailer();
                 break;
             default:
                 break;
         }
 
-        (new MailServiceProvider(app()))->register();
     }
 
     private function setGmailMailer()
@@ -185,16 +182,19 @@ class NinjaMailerJob implements ShouldQueue
         $google = (new Google())->init();
 
         try{
+
+            if ($google->getClient()->isAccessTokenExpired()) {
+                $google->refreshToken($user);
+                $user = $user->fresh();
+            }
+
             $google->getClient()->setAccessToken(json_encode($user->oauth_user_token));
+
         }
         catch(\Exception $e) {
             $this->logMailError('Gmail Token Invalid', $this->company->clients()->first());
             $this->nmo->settings->email_sending_method = 'default';
             return $this->setMailDriver();
-        }
-
-        if ($google->getClient()->isAccessTokenExpired()) {
-            $google->refreshToken($user);
         }
 
         /*
@@ -203,8 +203,8 @@ class NinjaMailerJob implements ShouldQueue
          *  just for this request.
         */
 
-        config(['mail.driver' => 'gmail']);
-        (new MailServiceProvider(app()))->register();
+        // config(['mail.driver' => 'gmail']);
+        // (new MailServiceProvider(app()))->register();
 
         $token = $user->oauth_user_token->access_token;
 
@@ -215,6 +215,19 @@ class NinjaMailerJob implements ShouldQueue
                 $message->getHeaders()->addTextHeader('GmailToken', $token);     
              });
 
+    }
+
+    private function preFlightChecksFail()
+    {
+        /* If we are migrating data we don't want to fire any emails */
+        if ($this->nmo->company->is_disabled && !$this->override) 
+            return true;
+
+        /* On the hosted platform we set default contacts a @example.com email address - we shouldn't send emails to these types of addresses */
+        if(Ninja::isHosted() && strpos($this->nmo->to_user->email, '@example.com') !== false)
+            return true;
+
+        return false;
     }
 
     private function logMailError($errors, $recipient_object)

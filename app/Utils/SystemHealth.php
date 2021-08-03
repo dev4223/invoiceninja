@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Utils;
@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\Queue;
 class SystemHealth
 {
     private static $extensions = [
-        'mysqli',
+        // 'mysqli',
         'gd',
         'curl',
         'zip',
@@ -34,7 +34,7 @@ class SystemHealth
         'mbstring',
         'xml',
         'bcmath',
-        'mysqlnd',
+        // 'mysqlnd',
         //'intl', //todo double check whether we need this for email dns validation
     ];
 
@@ -83,6 +83,7 @@ class SystemHealth
             'flutter_renderer' => (string)config('ninja.flutter_canvas_kit'),
             'jobs_pending' => (int) Queue::size(),
             'pdf_engine' => (string) self::getPdfEngine(),
+            'queue' => (string) config('queue.default'),
         ];
     }
 

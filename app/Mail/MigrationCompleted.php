@@ -36,13 +36,11 @@ class MigrationCompleted extends Mailable
         $data['settings'] = $this->company->settings;
         $data['company'] = $this->company->fresh();
         $data['whitelabel'] = $this->company->account->isPaid() ? true : false;
-        $data['check_data'] = $this->check_data;
-
+        $data['check_data'] = $this->check_data ?: '';
+        $data['logo'] = $this->company->present()->logo();
+        
         $result = $this->from(config('mail.from.address'), config('mail.from.name'))
                     ->view('email.import.completed', $data);
-
-        if($this->company->invoices->count() >=1)
-            $result->attach($this->company->invoices->first()->pdf_file_path());
 
         return $result;
     }

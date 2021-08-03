@@ -6,13 +6,15 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ClientPortal\Contact\ContactPasswordResetRequest;
 use App\Libraries\MultiDB;
+use App\Models\Account;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Foundation\Auth\SendsPasswordResetEmails;
 use Illuminate\Http\Request;
@@ -50,11 +52,15 @@ class ContactForgotPasswordController extends Controller
      *
      * @return Factory|View
      */
-    public function showLinkRequestForm()
+    public function showLinkRequestForm(Request $request)
     {
+        $account_id = $request->get('account_id');
+        $account = Account::find($account_id);
+
         return $this->render('auth.passwords.request', [
             'title' => 'Client Password Reset',
             'passwordEmailRoute' => 'client.password.email',
+            'account' => $account
         ]);
     }
 
@@ -68,10 +74,8 @@ class ContactForgotPasswordController extends Controller
         return Password::broker('contacts');
     }
 
-    public function sendResetLinkEmail(Request $request)
+    public function sendResetLinkEmail(ContactPasswordResetRequest $request)
     {
-        //MultiDB::userFindAndSetDb($request->input('email'));
-        
         $user = MultiDB::hasContact($request->input('email'));
 
         $this->validateEmail($request);

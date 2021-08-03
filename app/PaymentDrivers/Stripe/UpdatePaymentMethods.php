@@ -7,7 +7,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\PaymentDrivers\Stripe;
@@ -58,7 +58,7 @@ class UpdatePaymentMethods
 
     // }
 
-    private function updateMethods(Customer $customer, Client $client)
+    public function updateMethods(Customer $customer, Client $client)
     {
                 $card_methods = PaymentMethod::all([
                     'customer' => $customer->id,
@@ -145,7 +145,7 @@ class UpdatePaymentMethods
 
     }
 
-    private function buildPaymentMethodMeta(PaymentMethod $method, GatewayType $type_id)
+    private function buildPaymentMethodMeta(PaymentMethod $method, $type_id)
     {
 
         switch ($type_id) {

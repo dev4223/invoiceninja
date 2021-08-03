@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers;
@@ -30,8 +30,10 @@ use App\Transformers\RecurringInvoiceTransformer;
 use App\Utils\Ninja;
 use App\Utils\Traits\MakesHash;
 use App\Utils\Traits\SavesDocuments;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Class RecurringInvoiceController.
@@ -204,6 +206,10 @@ class RecurringInvoiceController extends BaseController
         $recurring_invoice = $this->recurring_invoice_repo->save($request->all(), RecurringInvoiceFactory::create(auth()->user()->company()->id, auth()->user()->id));
 
         event(new RecurringInvoiceWasCreated($recurring_invoice, $recurring_invoice->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
+
+        $offset = $recurring_invoice->client->timezone_offset();
+        $recurring_invoice->next_send_date = Carbon::parse($recurring_invoice->next_send_date)->startOfDay()->addSeconds($offset);
+        $recurring_invoice->save();
 
         return $this->itemResponse($recurring_invoice);
     }
@@ -495,9 +501,12 @@ class RecurringInvoiceController extends BaseController
         $contact = $invitation->contact;
         $recurring_invoice = $invitation->recurring_invoice;
 
-        $file_path = $recurring_invoice->service()->getInvoicePdf($contact);
+        $file = $recurring_invoice->service()->getInvoicePdf($contact);
 
-        return response()->download($file_path, basename($file_path), ['Cache-Control:' => 'no-cache'])->deleteFileAfterSend(true);
+        return response()->streamDownload(function () use($file) {
+                echo Storage::get($file);
+        },  basename($file), ['Content-Type' => 'application/pdf']);
+
     }
 
     /**

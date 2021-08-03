@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers;
@@ -123,8 +123,8 @@ class CompanyUserController extends BaseController
         if (auth()->user()->isAdmin()) {
             $company_user->fill($request->input('company_user'));
         } else {
-            $company_user->fill($request->input('company_user')['settings']);
-            $company_user->fill($request->input('company_user')['notifications']);
+            $company_user->settings = $request->input('company_user')['settings'];
+            $company_user->notifications = $request->input('company_user')['notifications'];
         }
 
         $company_user->save();

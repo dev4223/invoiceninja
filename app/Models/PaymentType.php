@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
@@ -29,6 +29,7 @@ class PaymentType extends StaticModel
     const NOVA = 11;
     const CREDIT_CARD_OTHER = 12;
     const PAYPAL = 13;
+    const CHECK = 15;
     const CARTE_BLANCHE = 16;
     const UNIONPAY = 17;
     const JCB = 18;

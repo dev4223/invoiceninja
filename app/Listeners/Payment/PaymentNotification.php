@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Listeners\Payment;
@@ -70,7 +70,6 @@ class PaymentNotification implements ShouldQueue
             }
 
         }
-
 
         /*Google Analytics Track Revenue*/
         if (isset($payment->company->google_analytics_key)) {

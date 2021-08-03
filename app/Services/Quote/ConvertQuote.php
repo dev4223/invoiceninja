@@ -7,7 +7,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Quote;
@@ -40,6 +40,7 @@ class ConvertQuote
         $invoice->fresh();
 
         $invoice->service()
+                ->fillDefaults()
                 // ->markSent()
                 // ->createInvitations()
                 ->save();

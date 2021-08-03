@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Jobs\Ninja;
@@ -55,10 +55,15 @@ class CompanySizeCheck implements ShouldQueue
     private function check()
     {
         Company::cursor()->each(function ($company) {
-            if ($company->invoices->count() > 1000 || $company->products->count() > 1000 || $company->clients->count() > 1000) {
+
+            if ($company->invoices()->count() > 500 || $company->products()->count() > 500 || $company->clients()->count() > 500) {
+                
+                nlog("Marking company {$company->id} as large");
+
                 $company->is_large = true;
                 $company->save();
             }
+            
         });
     }
 }

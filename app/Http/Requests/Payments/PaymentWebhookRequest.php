@@ -7,7 +7,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Requests\Payments;
@@ -100,14 +100,15 @@ class PaymentWebhookRequest extends Request
     /**
      * Resolve client from payment hash.
      *
-     * @return null|\App\Models\Client
+     * @return null|\App\Models\Client|bool
      */
     public function getClient()
     {
         $hash = $this->getPaymentHash();
 
-        if($hash)
+        if($hash) {
             return Client::find($hash->data->client_id)->firstOrFail();
+        }
 
         return false;
     }

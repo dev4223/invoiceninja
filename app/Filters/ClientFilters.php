@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Filters;
@@ -92,9 +92,11 @@ class ClientFilters extends QueryFilters
         return  $this->builder->where(function ($query) use ($filter) {
             $query->where('clients.name', 'like', '%'.$filter.'%')
                           ->orWhere('clients.id_number', 'like', '%'.$filter.'%')
-                          ->orWhere('client_contacts.first_name', 'like', '%'.$filter.'%')
-                          ->orWhere('client_contacts.last_name', 'like', '%'.$filter.'%')
-                          ->orWhere('client_contacts.email', 'like', '%'.$filter.'%')
+                          ->orWhereHas('contacts', function ($query) use($filter){
+                            $query->where('first_name', 'like', '%'.$filter.'%');
+                            $query->orWhere('last_name', 'like', '%'.$filter.'%');
+                            $query->orWhere('email', 'like', '%'.$filter.'%');
+                          })
                           ->orWhere('clients.custom_value1', 'like', '%'.$filter.'%')
                           ->orWhere('clients.custom_value2', 'like', '%'.$filter.'%')
                           ->orWhere('clients.custom_value3', 'like', '%'.$filter.'%')

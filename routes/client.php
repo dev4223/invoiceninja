@@ -2,18 +2,18 @@
 
 use Illuminate\Support\Facades\Route;
 
-Route::get('client', 'Auth\ContactLoginController@showLoginForm')->name('client.catchall'); //catch all
+Route::get('client', 'Auth\ContactLoginController@showLoginForm')->name('client.catchall')->middleware(['domain_db', 'contact_account','locale']); //catch all
 
-Route::get('client/login', 'Auth\ContactLoginController@showLoginForm')->name('client.login')->middleware('locale');
+Route::get('client/login', 'Auth\ContactLoginController@showLoginForm')->name('client.login')->middleware(['domain_db', 'contact_account','locale']);
 Route::post('client/login', 'Auth\ContactLoginController@login')->name('client.login.submit');
 
-Route::get('client/register/{company_key?}', 'Auth\ContactRegisterController@showRegisterForm')->name('client.register');
-Route::post('client/register/{company_key?}', 'Auth\ContactRegisterController@register');
+Route::get('client/register/{company_key?}', 'Auth\ContactRegisterController@showRegisterForm')->name('client.register')->middleware(['domain_db', 'contact_account', 'contact_register','locale']);
+Route::post('client/register/{company_key?}', 'Auth\ContactRegisterController@register')->middleware(['domain_db', 'contact_account', 'contact_register', 'locale']);
 
-Route::get('client/password/reset', 'Auth\ContactForgotPasswordController@showLinkRequestForm')->name('client.password.request')->middleware('locale');
+Route::get('client/password/reset', 'Auth\ContactForgotPasswordController@showLinkRequestForm')->name('client.password.request')->middleware(['domain_db', 'contact_account','locale']);
 Route::post('client/password/email', 'Auth\ContactForgotPasswordController@sendResetLinkEmail')->name('client.password.email')->middleware('locale');
-Route::get('client/password/reset/{token}', 'Auth\ContactResetPasswordController@showResetForm')->name('client.password.reset')->middleware('locale');
-Route::post('client/password/reset', 'Auth\ContactResetPasswordController@reset')->name('client.password.update')->middleware('locale');
+Route::get('client/password/reset/{token}', 'Auth\ContactResetPasswordController@showResetForm')->name('client.password.reset')->middleware(['domain_db', 'contact_account','locale']);
+Route::post('client/password/reset', 'Auth\ContactResetPasswordController@reset')->name('client.password.update')->middleware(['domain_db', 'contact_account','locale']);
 
 Route::get('view/{entity_type}/{invitation_key}', 'ClientPortal\EntityViewController@index')->name('client.entity_view');
 Route::get('view/{entity_type}/{invitation_key}/password', 'ClientPortal\EntityViewController@password')->name('client.entity_view.password');
@@ -21,9 +21,9 @@ Route::post('view/{entity_type}/{invitation_key}/password', 'ClientPortal\Entity
 
 Route::get('tmp_pdf/{hash}', 'ClientPortal\TempRouteController@index')->name('tmp_pdf');
 
-Route::get('client/key_login/{contact_key}', 'ClientPortal\ContactHashLoginController@login')->name('client.contact_login')->middleware(['contact_key_login']);
-Route::get('client/magic_link/{magic_link}', 'ClientPortal\ContactHashLoginController@magicLink')->name('client.contact_magic_link')->middleware(['contact_key_login']);
-Route::get('documents/{document_hash}', 'ClientPortal\DocumentController@publicDownload')->name('documents.public_download');
+Route::get('client/key_login/{contact_key}', 'ClientPortal\ContactHashLoginController@login')->name('client.contact_login')->middleware(['domain_db','contact_key_login']);
+Route::get('client/magic_link/{magic_link}', 'ClientPortal\ContactHashLoginController@magicLink')->name('client.contact_magic_link')->middleware(['domain_db','contact_key_login']);
+Route::get('documents/{document_hash}', 'ClientPortal\DocumentController@publicDownload')->name('documents.public_download')->middleware(['document_db']);
 Route::get('error', 'ClientPortal\ContactHashLoginController@errorPage')->name('client.error');
 
 Route::group(['middleware' => ['auth:contact', 'locale', 'check_client_existence','domain_db'], 'prefix' => 'client', 'as' => 'client.'], function () {
@@ -80,6 +80,7 @@ Route::group(['middleware' => ['auth:contact', 'locale', 'check_client_existence
 
     Route::post('upload', 'ClientPortal\UploadController')->name('upload.store');
     Route::get('logout', 'Auth\ContactLoginController@logout')->name('logout');
+
 });
 
 Route::get('client/subscriptions/{subscription}/purchase', 'ClientPortal\SubscriptionPurchaseController@index')->name('client.subscription.purchase')->middleware('domain_db');
