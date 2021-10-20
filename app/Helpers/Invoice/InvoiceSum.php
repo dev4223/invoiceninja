@@ -30,7 +30,7 @@ class InvoiceSum
 
     public $invoice_item;
 
-    public $total_taxes;
+    public $total_taxes = 0;
 
     private $total;
 
@@ -42,6 +42,8 @@ class InvoiceSum
 
     private $sub_total;
 
+    private $gross_sub_total;
+
     /**
      * Constructs the object with Invoice and Settings object.
      *
@@ -50,6 +52,9 @@ class InvoiceSum
     public function __construct($invoice)
     {
         $this->invoice = $invoice;
+
+        // if(!$this->invoice->relationLoaded('client'))
+        //     $this->invoice->load('client');
 
         $this->tax_map = new Collection;
     }
@@ -75,7 +80,8 @@ class InvoiceSum
         $this->invoice->line_items = $this->invoice_items->getLineItems();
         $this->total = $this->invoice_items->getSubTotal();
         $this->setSubTotal($this->invoice_items->getSubTotal());
-
+        $this->setGrossSubTotal($this->invoice_items->getGrossSubTotal());
+        
         return $this;
     }
 
@@ -197,7 +203,7 @@ class InvoiceSum
     {
         //Build invoice values here and return Invoice
         $this->setCalculatedAttributes();
-        $this->invoice->save();
+        $this->invoice->saveQuietly();
 
         return $this->invoice;
     }
@@ -205,7 +211,7 @@ class InvoiceSum
     public function getQuote()
     {
         $this->setCalculatedAttributes();
-        $this->invoice->save();
+        $this->invoice->saveQuietly();
 
         return $this->invoice;
     }
@@ -213,7 +219,7 @@ class InvoiceSum
     public function getCredit()
     {
         $this->setCalculatedAttributes();
-        $this->invoice->save();
+        $this->invoice->saveQuietly();
 
         return $this->invoice;
     }
@@ -224,7 +230,7 @@ class InvoiceSum
         $this->invoice->total_taxes = $this->getTotalTaxes();
         $this->invoice->balance = $this->formatValue($this->getTotal(), $this->invoice->client->currency()->precision);
 
-        $this->invoice->save();
+        $this->invoice->saveQuietly();
 
         return $this->invoice;
     }
@@ -262,6 +268,18 @@ class InvoiceSum
     public function setSubTotal($value)
     {
         $this->sub_total = $value;
+
+        return $this;
+    }
+
+    public function getGrossSubTotal()
+    {
+        return $this->gross_sub_total;
+    }
+
+    public function setGrossSubTotal($value)
+    {
+        $this->gross_sub_total = $value;
 
         return $this;
     }

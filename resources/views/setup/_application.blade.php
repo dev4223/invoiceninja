@@ -39,7 +39,7 @@
                     <input type="checkbox" class="form-checkbox mr-1"
                            name="send_logs" {{ old('send_logs' ? 'checked': '') }}>
                     <span>{{ ctrans('texts.send_fail_logs_to_our_server') }}</span>
-                    <a class="button-link mt-1 block" href="https://www.invoiceninja.com/privacy-policy/">Read more
+                    <a class="button-link mt-1 block" target="_blank" href="https://www.invoiceninja.com/privacy-policy/">Read more
                         about how we use this.</a>
                 </dd>
             </div>
@@ -53,7 +53,7 @@
                     <div class="alert py-2 bg-white" id="test-pdf-response"></div>
                 </dd>
                 <a target="_blank" class="block text-sm text-gray-900 leading-5 underline"
-                   href="https://invoiceninja.github.io/selfhost.html#phantom-js">
+                   href="https://invoiceninja.github.io/docs/self-host-troubleshooting/#pdf-conversion-issues">
                     {{ ctrans('texts.setup_phantomjs_note') }}
                 </a>
             </div>

@@ -13,13 +13,13 @@ class SupportMessageSent extends Mailable
 {
  //   use Queueable, SerializesModels;
 
-    public $support_message;
+    public $data;
 
     public $send_logs;
 
-    public function __construct($support_message, $send_logs)
+    public function __construct(array $data, $send_logs)
     {
-        $this->support_message = $support_message;
+        $this->data = $data;
         $this->send_logs = $send_logs;
     }
 
@@ -45,35 +45,41 @@ class SupportMessageSent extends Mailable
 
             $log_file->seek(PHP_INT_MAX);
             $last_line = $log_file->key();
+            
             $lines = new LimitIterator($log_file, $last_line - 100, $last_line);
-
             $log_lines = iterator_to_array($lines);
         }
 
         $account = auth()->user()->account;
 
         $priority = '';
-        $plan = $account->plan ?: '';
+        $plan = $account->plan ?: 'customer support';
+        $plan = ucfirst($plan);
 
-        if(strlen($plan) >1)
+        if(strlen($account->plan) > 1)
             $priority = '[PRIORITY] ';
 
         $company = auth()->user()->company();
         $user = auth()->user();
+        $db = str_replace("db-ninja-", "", $company->db);
+        $is_large = $company->is_large ? "L" : "S";
+        $platform = array_key_exists('platform', $this->data) ? $this->data['platform'] : "U";
+        $migrated = strlen($company->company_key) == 32 ? "M" : ""; 
 
         if(Ninja::isHosted())
-            $subject = "{$priority}Hosted-{$company->db} :: Customer Support - {$plan} ".date('M jS, g:ia');
+            $subject = "{$priority}Hosted-{$db}-{$is_large}{$platform}{$migrated} :: {$plan} :: ".date('M jS, g:ia');
         else
-            $subject = "{$priority}Self Hosted :: Customer Support - [{$plan}] ".date('M jS, g:ia');
+            $subject = "{$priority}Self Hosted :: {$plan} :: {$platform} :: ".date('M jS, g:ia');
 
         return $this->from(config('mail.from.address'), $user->present()->name()) 
                 ->replyTo($user->email, $user->present()->name())
                 ->subject($subject)
                 ->view('email.support.message', [
-                    'support_message' => $this->support_message,
+                    'support_message' => $this->data['message'],
                     'system_info' => $system_info,
                     'laravel_log' => $log_lines,
                     'logo' => $company->present()->logo(),
+                    'settings' => $company->settings
                 ]);
     }
 }

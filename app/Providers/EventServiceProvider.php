@@ -68,11 +68,21 @@ use App\Events\Quote\QuoteWasEmailed;
 use App\Events\Quote\QuoteWasRestored;
 use App\Events\Quote\QuoteWasUpdated;
 use App\Events\Quote\QuoteWasViewed;
+use App\Events\RecurringExpense\RecurringExpenseWasArchived;
+use App\Events\RecurringExpense\RecurringExpenseWasCreated;
+use App\Events\RecurringExpense\RecurringExpenseWasDeleted;
+use App\Events\RecurringExpense\RecurringExpenseWasRestored;
+use App\Events\RecurringExpense\RecurringExpenseWasUpdated;
 use App\Events\RecurringInvoice\RecurringInvoiceWasArchived;
 use App\Events\RecurringInvoice\RecurringInvoiceWasCreated;
 use App\Events\RecurringInvoice\RecurringInvoiceWasDeleted;
 use App\Events\RecurringInvoice\RecurringInvoiceWasRestored;
 use App\Events\RecurringInvoice\RecurringInvoiceWasUpdated;
+use App\Events\RecurringQuote\RecurringQuoteWasArchived;
+use App\Events\RecurringQuote\RecurringQuoteWasCreated;
+use App\Events\RecurringQuote\RecurringQuoteWasDeleted;
+use App\Events\RecurringQuote\RecurringQuoteWasRestored;
+use App\Events\RecurringQuote\RecurringQuoteWasUpdated;
 use App\Events\Subscription\SubscriptionWasArchived;
 use App\Events\Subscription\SubscriptionWasCreated;
 use App\Events\Subscription\SubscriptionWasDeleted;
@@ -161,6 +171,7 @@ use App\Listeners\Payment\PaymentEmailedActivity;
 use App\Listeners\Payment\PaymentNotification;
 use App\Listeners\Payment\PaymentRestoredActivity;
 use App\Listeners\Quote\QuoteApprovedActivity;
+use App\Listeners\Quote\QuoteApprovedWebhook;
 use App\Listeners\Quote\QuoteArchivedActivity;
 use App\Listeners\Quote\QuoteCreatedNotification;
 use App\Listeners\Quote\QuoteDeletedActivity;
@@ -169,11 +180,21 @@ use App\Listeners\Quote\QuoteEmailedNotification;
 use App\Listeners\Quote\QuoteRestoredActivity;
 use App\Listeners\Quote\QuoteViewedActivity;
 use App\Listeners\Quote\ReachWorkflowSettings;
+use App\Listeners\RecurringExpense\CreatedRecurringExpenseActivity;
+use App\Listeners\RecurringExpense\RecurringExpenseArchivedActivity;
+use App\Listeners\RecurringExpense\RecurringExpenseDeletedActivity;
+use App\Listeners\RecurringExpense\RecurringExpenseRestoredActivity;
+use App\Listeners\RecurringExpense\RecurringExpenseUpdatedActivity;
 use App\Listeners\RecurringInvoice\CreateRecurringInvoiceActivity;
 use App\Listeners\RecurringInvoice\RecurringInvoiceArchivedActivity;
 use App\Listeners\RecurringInvoice\RecurringInvoiceDeletedActivity;
 use App\Listeners\RecurringInvoice\RecurringInvoiceRestoredActivity;
 use App\Listeners\RecurringInvoice\UpdateRecurringInvoiceActivity;
+use App\Listeners\RecurringQuote\CreateRecurringQuoteActivity;
+use App\Listeners\RecurringQuote\RecurringQuoteArchivedActivity;
+use App\Listeners\RecurringQuote\RecurringQuoteDeletedActivity;
+use App\Listeners\RecurringQuote\RecurringQuoteRestoredActivity;
+use App\Listeners\RecurringQuote\UpdateRecurringQuoteActivity;
 use App\Listeners\SendVerificationNotification;
 use App\Listeners\User\ArchivedUserActivity;
 use App\Listeners\User\CreatedUserActivity;
@@ -181,6 +202,36 @@ use App\Listeners\User\DeletedUserActivity;
 use App\Listeners\User\RestoredUserActivity;
 use App\Listeners\User\UpdateUserLastLogin;
 use App\Listeners\User\UpdatedUserActivity;
+use App\Models\Account;
+use App\Models\Client;
+use App\Models\Company;
+use App\Models\CompanyGateway;
+use App\Models\CompanyToken;
+use App\Models\Credit;
+use App\Models\Expense;
+use App\Models\Invoice;
+use App\Models\Payment;
+use App\Models\Product;
+use App\Models\Proposal;
+use App\Models\Quote;
+use App\Models\Subscription;
+use App\Models\Task;
+use App\Models\User;
+use App\Observers\AccountObserver;
+use App\Observers\ClientObserver;
+use App\Observers\CompanyGatewayObserver;
+use App\Observers\CompanyObserver;
+use App\Observers\CompanyTokenObserver;
+use App\Observers\CreditObserver;
+use App\Observers\ExpenseObserver;
+use App\Observers\InvoiceObserver;
+use App\Observers\PaymentObserver;
+use App\Observers\ProductObserver;
+use App\Observers\ProposalObserver;
+use App\Observers\QuoteObserver;
+use App\Observers\SubscriptionObserver;
+use App\Observers\TaskObserver;
+use App\Observers\UserObserver;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Mail\Events\MessageSent;
@@ -385,6 +436,7 @@ class EventServiceProvider extends ServiceProvider
         QuoteWasApproved::class => [
             ReachWorkflowSettings::class,
             QuoteApprovedActivity::class,
+            QuoteApprovedWebhook::class,
         ],
         QuoteWasCreated::class => [
             CreatedQuoteActivity::class,
@@ -409,6 +461,36 @@ class EventServiceProvider extends ServiceProvider
         ],
         QuoteWasRestored::class => [
             QuoteRestoredActivity::class,
+        ],
+        RecurringExpenseWasCreated::class => [
+            CreatedRecurringExpenseActivity::class,
+        ],
+        RecurringExpenseWasUpdated::class => [
+            RecurringExpenseUpdatedActivity::class,
+        ],
+        RecurringExpenseWasArchived::class => [
+            RecurringExpenseArchivedActivity::class,
+        ],
+        RecurringExpenseWasDeleted::class => [
+            RecurringExpenseDeletedActivity::class,
+        ],
+        RecurringExpenseWasRestored::class => [
+            RecurringExpenseRestoredActivity::class
+        ],
+        RecurringQuoteWasUpdated::class => [
+            UpdateRecurringQuoteActivity::class,
+        ],
+        RecurringQuoteWasCreated::class => [
+            CreateRecurringQuoteActivity::class,
+        ],
+        RecurringQuoteWasDeleted::class => [
+            RecurringQuoteDeletedActivity::class,
+        ],
+        RecurringQuoteWasArchived::class => [
+            RecurringQuoteArchivedActivity::class,
+        ],
+        RecurringQuoteWasRestored::class => [
+            RecurringQuoteRestoredActivity::class,
         ],
         RecurringInvoiceWasUpdated::class => [
             UpdateRecurringInvoiceActivity::class,
@@ -490,5 +572,21 @@ class EventServiceProvider extends ServiceProvider
     public function boot()
     {
         parent::boot();
+
+        Account::observe(AccountObserver::class);
+        Subscription::observe(SubscriptionObserver::class);
+        Client::observe(ClientObserver::class);
+        Company::observe(CompanyObserver::class);
+        CompanyGateway::observe(CompanyGatewayObserver::class);
+        CompanyToken::observe(CompanyTokenObserver::class);
+        Credit::observe(CreditObserver::class);
+        Expense::observe(ExpenseObserver::class);
+        Invoice::observe(InvoiceObserver::class);
+        Payment::observe(PaymentObserver::class);
+        Product::observe(ProductObserver::class);
+        Proposal::observe(ProposalObserver::class);
+        Quote::observe(QuoteObserver::class);
+        Task::observe(TaskObserver::class);
+        User::observe(UserObserver::class);
     }
 }

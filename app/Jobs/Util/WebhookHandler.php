@@ -13,6 +13,7 @@ namespace App\Jobs\Util;
 
 use App\Jobs\Util\SystemLogger;
 use App\Libraries\MultiDB;
+use App\Models\Client as ClientModel;
 use App\Models\SystemLog;
 use App\Models\Webhook;
 use App\Transformers\ArraySerializer;
@@ -42,18 +43,19 @@ class WebhookHandler implements ShouldQueue
 
     public $deleteWhenMissingModels = true;
 
-
+    private string $includes;
     /**
      * Create a new job instance.
      *
      * @param $event_id
      * @param $entity
      */
-    public function __construct($event_id, $entity, $company)
+    public function __construct($event_id, $entity, $company, $includes = '')
     {
         $this->event_id = $event_id;
         $this->entity = $entity;
         $this->company = $company;
+        $this->includes = $includes;
     }
 
     /**
@@ -89,6 +91,7 @@ class WebhookHandler implements ShouldQueue
         // generate JSON data
         $manager = new Manager();
         $manager->setSerializer(new ArraySerializer());
+        $manager->parseIncludes($this->includes);
 
         $class = sprintf('App\\Transformers\\%sTransformer', class_basename($this->entity));
 
@@ -116,11 +119,11 @@ class WebhookHandler implements ShouldQueue
             ]);
 
             SystemLogger::dispatch(
-                $response,
+                array_merge((array)$response,$data),
                 SystemLog::CATEGORY_WEBHOOK,
-                SystemLog::EVENT_WEBHOOK_RESPONSE,
+                SystemLog::EVENT_WEBHOOK_SUCCESS,
                 SystemLog::TYPE_WEBHOOK_RESPONSE,
-                $this->company->clients->first(),
+                $this->resolveClient(),
                 $this->company
             );
 
@@ -130,19 +133,29 @@ class WebhookHandler implements ShouldQueue
         }
         catch(\Exception $e){
 
-        nlog($e->getMessage());
+            nlog($e->getMessage());
 
                 SystemLogger::dispatch(
                 $e->getMessage(),
                 SystemLog::CATEGORY_WEBHOOK,
                 SystemLog::EVENT_WEBHOOK_RESPONSE,
                 SystemLog::TYPE_WEBHOOK_RESPONSE,
-                $this->company->clients->first(),
+                $this->resolveClient(),
                 $this->company,
             );
 
         }
 
+    }
+
+    private function resolveClient()
+    {
+        //make sure it isn't an instance of the Client Model
+        if((!$this->entity instanceof ClientModel) && $this->entity->client()->exists()){
+            return $this->entity->client;
+        }
+
+        return $this->company->clients()->first();
     }
 
     public function failed($exception)

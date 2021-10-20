@@ -397,7 +397,7 @@ class InvoiceController extends BaseController
 
         $invoice = $this->invoice_repo->save($request->all(), $invoice);
         
-        $invoice->service()->deletePdf();
+        $invoice->service()->triggeredActions($request)->deletePdf();
 
         event(new InvoiceWasUpdated($invoice, $invoice->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
 
@@ -629,7 +629,7 @@ class InvoiceController extends BaseController
     }
 
     private function performAction(Invoice $invoice, $action, $bulk = false)
-    {
+    {   
         /*If we are using bulk actions, we don't want to return anything */
         switch ($action) {
             case 'clone_to_invoice':
@@ -795,14 +795,24 @@ class InvoiceController extends BaseController
     public function downloadPdf($invitation_key)
     {
         $invitation = $this->invoice_repo->getInvitationByKey($invitation_key);
+
+        if(!$invitation)
+            return response()->json(["message" => "no record found"], 400);
+
         $contact = $invitation->contact;
         $invoice = $invitation->invoice;
 
         $file = $invoice->service()->getInvoicePdf($contact);
 
+        $headers = ['Content-Type' => 'application/pdf'];
+
+        if(request()->input('inline') == 'true')
+            $headers = array_merge($headers, ['Content-Disposition' => 'inline']);
+
         return response()->streamDownload(function () use($file) {
                 echo Storage::get($file);
-        },  basename($file), ['Content-Type' => 'application/pdf']);
+        },  basename($file), $headers);
+        
     }
 
     /**

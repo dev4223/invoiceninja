@@ -29,10 +29,12 @@ class CloneQuoteToInvoiceFactory
         unset($quote_array['id']);
         unset($quote_array['invitations']);
         unset($quote_array['terms']);
-        unset($quote_array['public_notes']);
+        // unset($quote_array['public_notes']);
         unset($quote_array['footer']);
         unset($quote_array['design_id']);
+        unset($quote_array['user']);
 
+        
         foreach ($quote_array as $key => $value) {
             $invoice->{$key} = $value;
         }
@@ -43,6 +45,8 @@ class CloneQuoteToInvoiceFactory
         $invoice->number = null;
         $invoice->date = now()->format('Y-m-d');
         $invoice->balance = 0;
+        $invoice->deleted_at = null;
+        
         return $invoice;
     }
 }

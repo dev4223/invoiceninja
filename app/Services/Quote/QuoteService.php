@@ -16,6 +16,7 @@ use App\Jobs\Util\UnlinkFile;
 use App\Models\Invoice;
 use App\Models\Quote;
 use App\Repositories\QuoteRepository;
+use App\Services\Quote\TriggeredActions;
 use App\Utils\Ninja;
 use App\Utils\Traits\MakesHash;
 
@@ -177,6 +178,13 @@ class QuoteService
         return $this;
     }
 
+    public function triggeredActions($request)
+    {
+        $this->quote = (new TriggeredActions($this->quote, $request))->run();
+
+        return $this;
+    }
+
     public function deletePdf()
     {
         $this->quote->invitations->each(function ($invitation){
@@ -194,7 +202,7 @@ class QuoteService
      */
     public function save() : ?Quote
     {
-        $this->quote->save();
+        $this->quote->saveQuietly();
 
         return $this->quote;
     }

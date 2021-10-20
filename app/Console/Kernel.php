@@ -12,6 +12,7 @@
 namespace App\Console;
 
 use App\Jobs\Cron\AutoBillCron;
+use App\Jobs\Cron\RecurringExpensesCron;
 use App\Jobs\Cron\RecurringInvoicesCron;
 use App\Jobs\Cron\SubscriptionCron;
 use App\Jobs\Ninja\AdjustEmailQuota;
@@ -22,6 +23,7 @@ use App\Jobs\Util\SchedulerCheck;
 use App\Jobs\Util\SendFailedEmails;
 use App\Jobs\Util\UpdateExchangeRates;
 use App\Jobs\Util\VersionCheck;
+use App\Models\Account;
 use App\Utils\Ninja;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
@@ -61,17 +63,29 @@ class Kernel extends ConsoleKernel
         $schedule->job(new SubscriptionCron)->daily()->withoutOverlapping();
 
         $schedule->job(new RecurringInvoicesCron)->hourly()->withoutOverlapping();
-        
+
+        $schedule->job(new RecurringExpensesCron)->dailyAt('00:10')->withoutOverlapping();
+
         $schedule->job(new AutoBillCron)->dailyAt('00:30')->withoutOverlapping();        
 
         $schedule->job(new SchedulerCheck)->daily()->withoutOverlapping();
 
+        if(Ninja::isSelfHost())
+        {
+
+            $schedule->call(function () {
+                Account::whereNotNull('id')->update(['is_scheduler_running' => true]);
+            })->everyFiveMinutes(); 
+            
+        }
+
         /* Run hosted specific jobs */
         if (Ninja::isHosted()) {
 
-            $schedule->job(new AdjustEmailQuota)->daily()->withoutOverlapping();
+            $schedule->job(new AdjustEmailQuota)->dailyAt('23:00')->withoutOverlapping();
             $schedule->job(new SendFailedEmails)->daily()->withoutOverlapping();
-            $schedule->command('ninja:check-data --database=db-ninja-02')->daily()->withoutOverlapping();
+            $schedule->command('ninja:check-data --database=db-ninja-02')->dailyAt('00:15')->withoutOverlapping();
+            $schedule->command('ninja:s3-cleanup')->dailyAt('23:15')->withoutOverlapping();
 
         }
 

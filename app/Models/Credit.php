@@ -120,7 +120,7 @@ class Credit extends BaseModel
 
     public function assigned_user()
     {
-        return $this->belongsTo(User::class, 'assigned_user_id', 'id');
+        return $this->belongsTo(User::class, 'assigned_user_id', 'id')->withTrashed();
     }
 
     public function history()
@@ -130,7 +130,7 @@ class Credit extends BaseModel
 
     public function activities()
     {
-        return $this->hasMany(Activity::class)->orderBy('id', 'DESC')->take(300);
+        return $this->hasMany(Activity::class)->orderBy('id', 'DESC')->take(50);
     }
 
     public function company()

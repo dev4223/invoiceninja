@@ -25,10 +25,13 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\App;
 
 class ReminderJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, MakesReminders, MakesDates;
+
+    public $tries = 1;
 
     public function __construct()
     {
@@ -48,6 +51,7 @@ class ReminderJob implements ShouldQueue
             //multiDB environment, need to
             foreach (MultiDB::$dbs as $db) {
                 MultiDB::setDB($db);
+                nlog("set db {$db}");
                 $this->processReminders();
             }
         }
@@ -65,6 +69,9 @@ class ReminderJob implements ShouldQueue
                  ->whereHas('client', function ($query) {
                      $query->where('is_deleted',0)
                            ->where('deleted_at', NULL);
+                 })
+                 ->whereHas('company', function ($query) {
+                     $query->where('is_disabled',0);
                  })
                  ->with('invitations')->cursor()->each(function ($invoice) {
 
@@ -145,6 +152,10 @@ class ReminderJob implements ShouldQueue
      */
     private function setLateFee($invoice, $amount, $percent) :Invoice
     {
+        App::forgetInstance('translator');
+        $t = app('translator');
+        $t->replace(Ninja::transformTranslations($invoice->client->getMergedSettings()));
+
         $temp_invoice_balance = $invoice->balance;
 
         if ($amount <= 0 && $percent <= 0) {
@@ -172,9 +183,16 @@ class ReminderJob implements ShouldQueue
         $invoice->line_items = $invoice_items;
 
         /**Refresh Invoice values*/
-        $invoice = $invoice->calc()->getInvoice();
+        $invoice->calc()->getInvoice()->save();
+        $invoice->fresh();
+        $invoice->service()->deletePdf();
+        
+        /* Refresh the client here to ensure the balance is fresh */
+        $client = $invoice->client;
+        $client = $client->fresh();
 
-        $invoice->client->service()->updateBalance($invoice->balance - $temp_invoice_balance)->save();
+        nlog("adjusting client balance and invoice balance by ". ($invoice->balance - $temp_invoice_balance));
+        $client->service()->updateBalance($invoice->balance - $temp_invoice_balance)->save();
         $invoice->ledger()->updateInvoiceBalance($invoice->balance - $temp_invoice_balance, "Late Fee Adjustment for invoice {$invoice->number}");
 
         return $invoice;

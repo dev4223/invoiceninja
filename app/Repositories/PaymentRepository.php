@@ -89,11 +89,11 @@ class PaymentRepository extends BaseRepository {
             if (array_key_exists('credits', $data) && is_array($data['credits']) && count($data['credits']) > 0) {
                 $_credit_totals = array_sum(array_column($data['credits'], 'amount'));
 
-                if ($data['amount'] == $_credit_totals) {
-                    $data['amount'] = 0;
-                } else {
+                // if ($data['amount'] == $_credit_totals) {
+                //     $data['amount'] = 0;
+                // } else {
                     $client->service()->updatePaidToDate($_credit_totals)->save();
-                }
+                // }
             }
 
         }
@@ -111,7 +111,7 @@ class PaymentRepository extends BaseRepository {
 
         /*Ensure payment number generated*/
         if (! $payment->number || strlen($payment->number) == 0) {
-            $payment->number = $payment->client->getNextPaymentNumber($payment->client);
+            $payment->number = $payment->client->getNextPaymentNumber($payment->client, $payment);
         }
 
         /*Set local total variables*/
@@ -162,18 +162,13 @@ class PaymentRepository extends BaseRepository {
 
 		if ( ! $is_existing_payment && ! $this->import_mode ) {
 
-            if (array_key_exists('email_receipt', $data) && $data['email_receipt'] == true) 
+            if (array_key_exists('email_receipt', $data) && $data['email_receipt'] == 'true') 
                 $payment->service()->sendEmail();
 			elseif(!array_key_exists('email_receipt', $data) && $payment->client->getSetting('client_manual_payment_notification'))
                 $payment->service()->sendEmail();
 
             event( new PaymentWasCreated( $payment, $payment->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null) ) );
 		}
-
-        nlog("payment amount = {$payment->amount}");
-        nlog("payment applied = {$payment->applied}");
-        nlog("invoice totals = {$invoice_totals}");
-        nlog("credit totals = {$credit_totals}");
 
         $payment->applied += ($invoice_totals - $credit_totals); //wont work because - check tests
         // $payment->applied += $invoice_totals; //wont work because - check tests

@@ -51,10 +51,14 @@ class QueryLogging
             $count = count($queries);
             $timeEnd = microtime(true);
             $time = $timeEnd - $timeStart;
+
+            // info("Query count = {$count}");
         
-            // if($count > 150)
-            //     nlog($queries);
-            
+             if($count > 175){
+                 nlog("Query count = {$count}");
+                 nlog($queries);
+             }
+                        
             $ip = '';
             
             if(request()->header('Cf-Connecting-Ip'))

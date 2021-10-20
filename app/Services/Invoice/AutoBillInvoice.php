@@ -14,6 +14,7 @@ namespace App\Services\Invoice;
 use App\DataMapper\InvoiceItem;
 use App\Events\Payment\PaymentWasCreated;
 use App\Factory\PaymentFactory;
+use App\Libraries\MultiDB;
 use App\Models\Credit;
 use App\Models\Invoice;
 use App\Models\Payment;
@@ -22,6 +23,7 @@ use App\Models\PaymentType;
 use App\Services\AbstractService;
 use App\Utils\Ninja;
 use Illuminate\Support\Str;
+use PDO;
 
 class AutoBillInvoice extends AbstractService
 {
@@ -31,15 +33,22 @@ class AutoBillInvoice extends AbstractService
 
     private $used_credit = [];
 
-    public function __construct(Invoice $invoice)
+    protected $db;
+
+    public function __construct(Invoice $invoice, $db)
     {
         $this->invoice = $invoice;
-
-        $this->client = $invoice->client;
+    
+        $this->db = $db;
     }
 
     public function run()
     {
+
+        MultiDB::setDb($this->db);
+
+        $this->client = $this->invoice->client;
+
         $is_partial = false;
 
         /* Is the invoice payable? */
@@ -51,16 +60,18 @@ class AutoBillInvoice extends AbstractService
 
         /* Mark the invoice as paid if there is no balance */
         if ((int)$this->invoice->balance == 0)
-            return $this->invoice->service()->markPaid()->save();
+            return $this->invoice->service()->markPaid()->workFlow()->save();
 
         //if the credits cover the payments, we stop here, build the payment with credits and exit early
         if ($this->client->getSetting('use_credits_payment') != 'off')
             $this->applyCreditPayment();
 
+        $amount = 0;
+
         /* Determine $amount */
         if ($this->invoice->partial > 0) {
             $is_partial = true;
-            $invoice_total = $this->invoice->amount;
+            $invoice_total = $this->invoice->balance;
             $amount = $this->invoice->partial;
         } elseif ($this->invoice->balance > 0) {
             $amount = $this->invoice->balance;
@@ -68,36 +79,56 @@ class AutoBillInvoice extends AbstractService
             return $this->invoice;
         }
 
-        info("balance remains to be paid!!");
+        info("Auto Bill - balance remains to be paid!! - {$amount}");
 
         /* Retrieve the Client Gateway Token */
         $gateway_token = $this->getGateway($amount);
 
         /* Bail out if no payment methods available */
-        if (! $gateway_token || ! $gateway_token->gateway->driver($this->client)->token_billing)
+        if (! $gateway_token || ! $gateway_token->gateway || ! $gateway_token->gateway->driver($this->client)->token_billing){
+            nlog("Bailing out - no suitable gateway token found.");
             return $this->invoice;
+        }
+
+        nlog("Gateway present - adding gateway fee");
 
         /* $gateway fee */
-        //$fee = $gateway_token->gateway->calcGatewayFee($amount, $gateway_token->gateway_type_id, $this->invoice->uses_inclusive_taxes);
         $this->invoice = $this->invoice->service()->addGatewayFee($gateway_token->gateway, $gateway_token->gateway_type_id, $amount)->save();
 
+        //change from $this->invoice->amount to $this->invoice->balance
         if($is_partial)
-            $fee = $this->invoice->amount - $invoice_total;
+            $fee = $this->invoice->balance - $invoice_total;
         else
-            $fee = $this->invoice->amount - $amount;
+            $fee = $this->invoice->balance - $amount;
+
+        if($fee > $amount)
+            $fee = 0;
 
         /* Build payment hash */
         $payment_hash = PaymentHash::create([
-            'hash' => Str::random(128),
-            'data' => ['invoices' => [['invoice_id' => $this->invoice->hashed_id, 'amount' => $amount]]],
+            'hash' => Str::random(64),
+            'data' => ['invoices' => [['invoice_id' => $this->invoice->hashed_id, 'amount' => $amount, 'invoice_number' => $this->invoice->number]]],
             'fee_total' => $fee,
             'fee_invoice_id' => $this->invoice->id,
         ]);
 
+        nlog("Payment hash created => {$payment_hash->id}");
+
+        $payment = false;
+
+        try{
         $payment = $gateway_token->gateway
                                  ->driver($this->client)
                                  ->setPaymentHash($payment_hash)
                                  ->tokenBilling($gateway_token, $payment_hash);
+         }
+         catch(\Exception $e){
+            nlog($e->getMessage());
+         }
+
+        if($payment){
+            info("Auto Bill payment captured for ".$this->invoice->number);
+        }
 
         return $this->invoice;
     }
@@ -144,6 +175,8 @@ class AutoBillInvoice extends AbstractService
 
         }
 
+        event('eloquent.created: App\Models\Payment', $payment);
+
         $payment->ledger()
                     ->updatePaymentBalance($amount * -1)
                     ->save();
@@ -158,6 +191,7 @@ class AutoBillInvoice extends AbstractService
                           ->updateInvoiceBalance($amount * -1, "Invoice {$this->invoice->number} payment using Credit {$current_credit->number}")
                           ->updateCreditBalance($amount * -1, "Credit {$current_credit->number} used to pay down Invoice {$this->invoice->number}")
                           ->save();
+
 
         event(new PaymentWasCreated($payment, $payment->company, Ninja::eventVars()));
 
@@ -268,30 +302,20 @@ class AutoBillInvoice extends AbstractService
      * @param  float              $amount The amount to charge
      * @return ClientGatewayToken         The client gateway token
      */
-    // private function
-    // {
-    //     $gateway_tokens = $this->client->gateway_tokens()->orderBy('is_default', 'DESC')->get();
-
-    //     foreach ($gateway_tokens as $gateway_token) {
-    //         if ($this->validGatewayLimits($gateway_token, $amount)) {
-    //             return $gateway_token;
-    //         }
-    //     }
-    // }
 
     public function getGateway($amount)
     {
 
         //get all client gateway tokens and set the is_default one to the first record
-        //$gateway_tokens = $this->client->gateway_tokens()->orderBy('is_default', 'DESC');
-        $gateway_tokens = $this->client->gateway_tokens;
+        $gateway_tokens = $this->client->gateway_tokens()->orderBy('is_default', 'DESC')->get();
+        // $gateway_tokens = $this->client->gateway_tokens;
 
         $filtered_gateways = $gateway_tokens->filter(function ($gateway_token) use($amount) {
 
             $company_gateway = $gateway_token->gateway;
 
             //check if fees and limits are set
-            if (isset($company_gateway->fees_and_limits) && property_exists($company_gateway->fees_and_limits, $gateway_token->gateway_type_id))
+            if (isset($company_gateway->fees_and_limits) && !is_array($company_gateway->fees_and_limits) && property_exists($company_gateway->fees_and_limits, $gateway_token->gateway_type_id))
             {
                 //if valid we keep this gateway_token
                 if ($this->invoice->client->validGatewayForAmount($company_gateway->fees_and_limits->{$gateway_token->gateway_type_id}, $amount))
@@ -335,9 +359,9 @@ class AutoBillInvoice extends AbstractService
         $items[] = $item;
 
         $this->invoice->line_items = $items;
-        $this->invoice->save();
+        $this->invoice->saveQuietly();
 
-        $this->invoice = $this->invoice->calc()->getInvoice()->save();
+        $this->invoice = $this->invoice->calc()->getInvoice()->saveQuietly();
 
         if ($starting_amount != $this->invoice->amount && $this->invoice->status_id != Invoice::STATUS_DRAFT) {
             $this->invoice->client->service()->updateBalance($this->invoice->amount - $starting_amount)->save();

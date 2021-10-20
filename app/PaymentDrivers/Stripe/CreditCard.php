@@ -14,7 +14,6 @@ namespace App\PaymentDrivers\Stripe;
 
 use App\Exceptions\PaymentFailed;
 use App\Http\Requests\ClientPortal\Payments\PaymentResponseRequest;
-use App\Jobs\Mail\PaymentFailureMailer;
 use App\Jobs\Util\SystemLogger;
 use App\Models\GatewayType;
 use App\Models\Payment;
@@ -63,7 +62,7 @@ class CreditCard
             'amount' => $this->stripe->convertToStripeAmount($data['total']['amount_with_fee'], $this->stripe->client->currency()->precision, $this->stripe->client->currency()),
             'currency' => $this->stripe->client->getCurrencyCode(),
             'customer' => $this->stripe->findOrCreateCustomer(),
-            'description' => ctrans('texts.invoices') . ': ' . collect($data['invoices'])->pluck('invoice_number'), // TODO: More meaningful description.
+            'description' => $this->stripe->decodeUnicodeString(ctrans('texts.invoices') . ': ' . collect($data['invoices'])->pluck('invoice_number')),
         ];
 
         $payment_intent_data['setup_future_usage'] = 'off_session';
@@ -72,6 +71,16 @@ class CreditCard
         $data['gateway'] = $this->stripe;
 
         return render('gateways.stripe.credit_card.pay', $data);
+    }
+
+    private function decodeUnicodeString($string)
+    {
+        return html_entity_decode($string, ENT_QUOTES, 'UTF-8');
+        // return iconv("UTF-8", "ISO-8859-1//TRANSLIT", $this->decode_encoded_utf8($string));
+    }
+
+    private function decode_encoded_utf8($string){
+        return preg_replace_callback('#\\\\u([0-9a-f]{4})#ism', function($matches) { return mb_convert_encoding(pack("H*", $matches[1]), "UTF-8", "UCS-2BE"); }, $string);
     }
 
     public function paymentResponse(PaymentResponseRequest $request)
@@ -108,7 +117,7 @@ class CreditCard
         return $this->processUnsuccessfulPayment($server_response);
     }
 
-    private function processSuccessfulPayment()
+    public function processSuccessfulPayment()
     {
         $stripe_method = $this->stripe->getStripePaymentMethod($this->stripe->payment_hash->data->server_response->payment_method);
 
@@ -148,16 +157,9 @@ class CreditCard
         return redirect()->route('client.payments.show', ['payment' => $this->stripe->encodePrimaryKey($payment->id)]);
     }
 
-    private function processUnsuccessfulPayment($server_response)
+    public function processUnsuccessfulPayment($server_response)
     {
-        PaymentFailureMailer::dispatch($this->stripe->client, $server_response->cancellation_reason, $this->stripe->client->company, $server_response->amount);
-
-        PaymentFailureMailer::dispatch(
-            $this->stripe->client,
-            $server_response,
-            $this->stripe->client->company,
-            $server_response->amount
-        );
+        $this->stripe->sendFailureMail($server_response->cancellation_reason);
 
         $message = [
             'server_response' => $server_response,

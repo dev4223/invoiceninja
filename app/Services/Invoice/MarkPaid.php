@@ -43,7 +43,7 @@ class MarkPaid extends AbstractService
         }
 
         /*Don't double pay*/
-        if ($this->invoice->statud_id == Invoice::STATUS_PAID) {
+        if ($this->invoice->status_id == Invoice::STATUS_PAID) {
             return $this->invoice;
         }
 
@@ -52,20 +52,28 @@ class MarkPaid extends AbstractService
 
         $payment->amount = $this->invoice->balance;
         $payment->applied = $this->invoice->balance;
-        $payment->number = $this->getNextPaymentNumber($this->invoice->client);
+        $payment->number = $this->getNextPaymentNumber($this->invoice->client, $payment);
         $payment->status_id = Payment::STATUS_COMPLETED;
         $payment->client_id = $this->invoice->client_id;
         $payment->transaction_reference = ctrans('texts.manual_entry');
         $payment->currency_id = $this->invoice->client->getSetting('currency_id');
         $payment->is_manual = true;
-        /* Create a payment relationship to the invoice entity */
-        $payment->save();
+        
+        $payment_type_id = $this->invoice->client->getSetting('payment_type_id');
+
+        if((int)$payment_type_id > 0)
+            $payment->type_id = (int)$payment_type_id;
+
+        $payment->saveQuietly();
 
         $this->setExchangeRate($payment);
 
+        /* Create a payment relationship to the invoice entity */
         $payment->invoices()->attach($this->invoice->id, [
             'amount' => $payment->amount,
         ]);
+
+        event('eloquent.created: App\Models\Payment', $payment);
 
         $this->invoice->next_send_date = null;
         
@@ -95,7 +103,7 @@ class MarkPaid extends AbstractService
             ->updatePaidToDate($payment->amount)
             ->save();
 
-        InvoiceWorkflowSettings::dispatchNow($this->invoice);
+        $this->invoice->service()->workFlow()->save();
 
         return $this->invoice;
     }

@@ -12,7 +12,7 @@
 namespace App\Services\Invoice;
 
 use App\Events\Invoice\InvoiceWasEmailed;
-use App\Jobs\Invoice\EmailEntity;
+use App\Jobs\Entity\EmailEntity;
 use App\Models\Invoice;
 use App\Services\AbstractService;
 use App\Utils\Ninja;
@@ -44,6 +44,10 @@ class TriggeredActions extends AbstractService
             $this->invoice = $this->invoice->service()->markPaid()->save();
         }
 
+        if ($this->request->has('amount_paid') && is_numeric($this->request->input('amount_paid')) ) {
+            $this->invoice = $this->invoice->service()->applyPaymentAmount($this->request->input('amount_paid'))->save();
+        }
+
         if ($this->request->has('send_email') && $this->request->input('send_email') == 'true') {
             $this->sendEmail();
         }
@@ -52,14 +56,14 @@ class TriggeredActions extends AbstractService
             $this->invoice = $this->invoice->service()->markSent()->save();
         }
 
+        
         return $this->invoice;
     }
 
     private function sendEmail()
     {
 
-        //$reminder_template = $this->invoice->calculateTemplate('invoice');
-        $reminder_template = 'payment';
+        $reminder_template = $this->invoice->calculateTemplate('invoice');
 
         $this->invoice->invitations->load('contact.client.country', 'invoice.client.country', 'invoice.company')->each(function ($invitation) use ($reminder_template) {
             EmailEntity::dispatch($invitation, $this->invoice->company, $reminder_template);

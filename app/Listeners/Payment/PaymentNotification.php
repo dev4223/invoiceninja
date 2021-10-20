@@ -80,7 +80,7 @@ class PaymentNotification implements ShouldQueue
     private function trackRevenue($event)
     {
         $payment = $event->payment;
-        $invoice = $payment->invoice;
+        $invoice = $payment->invoices()->exists() ? $payment->invoices->first() : false;
         $company = $payment->company;
 
         $analytics_id = $company->google_analytics_key;
@@ -88,7 +88,7 @@ class PaymentNotification implements ShouldQueue
         $client = $payment->client;
         $amount = $payment->amount;
 
-        if ($invoice) {
+        if ($invoice && $invoice->line_items) {
             $items = $invoice->line_items;
             $item = end($items)->product_key;
             $entity_number = $invoice->number;
@@ -100,7 +100,7 @@ class PaymentNotification implements ShouldQueue
         $currency_code = $client->getCurrencyCode();
 
         if (Ninja::isHosted()) {
-            $item .= ' [R]';
+            $item .= ' [R5]';
         }
 
         $base = "v=1&tid={$analytics_id}&cid={$client->id}&cu={$currency_code}&ti={$entity_number}";

@@ -16,7 +16,6 @@ namespace App\PaymentDrivers\Braintree;
 use App\Exceptions\PaymentFailed;
 use App\Http\Requests\ClientPortal\Payments\PaymentResponseRequest;
 use App\Http\Requests\Request;
-use App\Jobs\Mail\PaymentFailureMailer;
 use App\Jobs\Util\SystemLogger;
 use App\Models\GatewayType;
 use App\Models\Payment;
@@ -61,6 +60,13 @@ class CreditCard
         $data['gateway'] = $this->braintree;
         $data['client_token'] = $this->braintree->gateway->clientToken()->generate();
 
+        if ($this->braintree->company_gateway->getConfigField('merchantAccountId')) {
+            /** https://developer.paypal.com/braintree/docs/reference/request/client-token/generate#merchant_account_id */
+            $data['client_token'] = $this->braintree->gateway->clientToken()->generate([
+                'merchantAccountId' => $this->braintree->company_gateway->getConfigField('merchantAccountId')
+            ]); 
+        }
+
         return render('gateways.braintree.credit_card.pay', $data);
     }
 
@@ -88,14 +94,35 @@ class CreditCard
 
         $token = $this->getPaymentToken($request->all(), $customer->id);
 
-        $result = $this->braintree->gateway->transaction()->sale([
+        $data = [
             'amount' => $this->braintree->payment_hash->data->amount_with_fee,
             'paymentMethodToken' => $token,
             'deviceData' => $state['client-data'],
             'options' => [
                 'submitForSettlement' => true
             ],
-        ]);
+        ];
+
+        if ($this->braintree->company_gateway->getConfigField('merchantAccountId')) {
+            /** https://developer.paypal.com/braintree/docs/reference/request/transaction/sale/php#full-example */
+            $data['merchantAccountId'] = $this->braintree->company_gateway->getConfigField('merchantAccountId');
+        }
+
+        try {
+            $result = $this->braintree->gateway->transaction()->sale($data);
+        } catch(\Exception $e) {
+            if ($e instanceof \Braintree\Exception\Authorization) {
+
+                $this->braintree->sendFailureMail(ctrans('texts.generic_gateway_error'));
+
+                throw new PaymentFailed(ctrans('texts.generic_gateway_error'), $e->getCode());
+            }
+
+            $this->braintree->sendFailureMail($e->getMessage());
+
+            throw new PaymentFailed($e->getMessage(), $e->getCode());
+        }
+        
 
         if ($result->success) {
             $this->braintree->logSuccessfulGatewayResponse(['response' => $request->server_response, 'data' => $this->braintree->payment_hash], SystemLog::TYPE_BRAINTREE);
@@ -118,17 +145,30 @@ class CreditCard
             return $data['token'];
         }
 
-        $gateway_response = json_decode($data['gateway_response']);
+        $gateway_response = \json_decode($data['gateway_response']);
 
-        $payment_method = $this->braintree->gateway->paymentMethod()->create([
+        $data = [
             'customerId' => $customerId,
             'paymentMethodNonce' => $gateway_response->nonce,
             'options' => [
                 'verifyCard' => true,
             ],
-        ]);
+        ];
 
-        return $payment_method->paymentMethod->token;
+        if ($this->braintree->company_gateway->getConfigField('merchantAccountId')) {
+            /** https://developer.paypal.com/braintree/docs/reference/request/transaction/sale/php#full-example */
+            $data['options']['verificationMerchantAccountId'] = $this->braintree->company_gateway->getConfigField('merchantAccountId');
+        }
+        
+        $response = $this->braintree->gateway->paymentMethod()->create($data);
+
+        if ($response->success) {
+            return $response->paymentMethod->token;
+        }
+
+        $this->braintree->sendFailureMail($response->message);
+
+        throw new PaymentFailed($response->message);
     }
 
     private function processSuccessfulPayment($response)
@@ -161,14 +201,8 @@ class CreditCard
      */
     private function processUnsuccessfulPayment($response)
     {
-        PaymentFailureMailer::dispatch($this->braintree->client, $response->transaction->additionalProcessorResponse, $this->braintree->client->company, $this->braintree->payment_hash->data->amount_with_fee);
 
-        PaymentFailureMailer::dispatch(
-            $this->braintree->client,
-            $response,
-            $this->braintree->client->company,
-            $this->braintree->payment_hash->data->amount_with_fee,
-        );
+        $this->braintree->sendFailureMail($response->transaction->additionalProcessorResponse);
 
         $message = [
             'server_response' => $response,

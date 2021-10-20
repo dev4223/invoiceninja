@@ -38,6 +38,7 @@ use App\Utils\Traits\MakesHash;
 use App\Utils\Traits\SubscriptionHooker;
 use Carbon\Carbon;
 use GuzzleHttp\RequestOptions;
+use Illuminate\Contracts\Container\BindingResolutionException;
 
 class SubscriptionService
 {
@@ -692,6 +693,8 @@ class SubscriptionService
     public function convertInvoiceToRecurring($client_id) :RecurringInvoice
     {
 
+        $client = Client::find($client_id);
+
         $subscription_repo = new SubscriptionRepository();
 
         $recurring_invoice = RecurringInvoiceFactory::create($this->subscription->company_id, $this->subscription->user_id);
@@ -701,8 +704,21 @@ class SubscriptionService
         $recurring_invoice->frequency_id = $this->subscription->frequency_id ?: RecurringInvoice::FREQUENCY_MONTHLY;
         $recurring_invoice->date = now();
         $recurring_invoice->remaining_cycles = -1;
-
+        $recurring_invoice->auto_bill = $client->getSetting('auto_bill');
+        $recurring_invoice->auto_bill_enabled =  $this->setAutoBillFlag($recurring_invoice->auto_bill);
+        $recurring_invoice->due_date_days = 'terms';
+        
         return $recurring_invoice;
+    }
+
+    private function setAutoBillFlag($auto_bill)
+    {
+        if ($auto_bill == 'always' || $auto_bill == 'optout') {
+            return true;
+        }
+
+        return false;
+        
     }
 
     /**
@@ -777,7 +793,15 @@ class SubscriptionService
      */
     public function products()
     {
-        return Product::whereIn('id', $this->transformKeys(explode(",", $this->subscription->product_ids)))->get();
+        if(!$this->subscription->product_ids)
+            return collect();
+
+        $keys = $this->transformKeys(explode(",", $this->subscription->product_ids));
+
+        if(is_array($keys))
+            return Product::whereIn('id', $keys)->get();
+        else
+            return Product::where('id', $keys)->get();
     }
 
     /**
@@ -788,7 +812,18 @@ class SubscriptionService
      */
     public function recurring_products()
     {
-        return Product::whereIn('id', $this->transformKeys(explode(",", $this->subscription->recurring_product_ids)))->get();
+        if(!$this->subscription->recurring_product_ids)
+            return collect();
+
+        $keys = $this->transformKeys(explode(",", $this->subscription->recurring_product_ids));
+
+        if(is_array($keys)){
+            return Product::whereIn('id', $keys)->get();
+        }
+        else{
+            return Product::where('id', $keys)->get();
+        }
+
     }
 
     /**
@@ -799,10 +834,10 @@ class SubscriptionService
     public function getPlans()
     {
         return Subscription::query()
-            ->where('company_id', $this->subscription->company_id)
-            ->where('group_id', $this->subscription->group_id)
-            ->where('id', '!=', $this->subscription->id)
-            ->get();
+                            ->where('company_id', $this->subscription->company_id)
+                            ->where('group_id', $this->subscription->group_id)
+                            ->where('id', '!=', $this->subscription->id)
+                            ->get();
     }
 
     /**
@@ -931,7 +966,12 @@ class SubscriptionService
         return redirect($default_redirect);
     }
 
-    public function planPaid($invoice)
+    /**
+     * @param Invoice $invoice 
+     * @return true 
+     * @throws BindingResolutionException 
+     */
+    public function planPaid(Invoice $invoice)
     {
         $recurring_invoice_hashed_id = $invoice->recurring_invoice()->exists() ? $invoice->recurring_invoice->hashed_id : null;
 
@@ -940,12 +980,14 @@ class SubscriptionService
                 'subscription' => $this->subscription->hashed_id,
                 'recurring_invoice' => $recurring_invoice_hashed_id,
                 'client' => $invoice->client->hashed_id,
-                'contact' => $invoice->client->primary_contact()->first() ? $invoice->client->contacts->first() : false,
+                'contact' => $invoice->client->primary_contact()->first() ? $invoice->client->primary_contact()->first(): $invoice->client->contacts->first(),
                 'invoice' => $invoice->hashed_id,
             ];
 
         $response = $this->triggerWebhook($context);
 
+        nlog($response);
+        
         return true;
     }
 }

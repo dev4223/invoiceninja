@@ -70,13 +70,9 @@ class ActivityRepository extends BaseRepository
      */
     public function createBackup($entity, $activity)
     {
-        
-        if($entity instanceof User){
-            
-        }
-        else if ($entity->company->is_disabled) {
+        if ($entity instanceof User || $entity->company->is_disabled)
             return;
-        }
+
 
         $backup = new Backup();
 
@@ -85,6 +81,8 @@ class ActivityRepository extends BaseRepository
             || get_class($entity) == Credit::class 
             || get_class($entity) == RecurringInvoice::class
         ) {
+            
+            $entity->load('client');
             $contact = $entity->client->primary_contact()->first();
             $backup->html_backup = $this->generateHtml($entity);
             $backup->amount = $entity->amount;
@@ -92,14 +90,13 @@ class ActivityRepository extends BaseRepository
 
         $backup->activity_id = $activity->id;
         $backup->json_backup = '';
-        //$backup->json_backup = $entity->toJson();
         $backup->save();
     }
 
     public function getTokenId(array $event_vars)
     {
         if ($event_vars['token']) {
-            $company_token = CompanyToken::whereRaw('BINARY `token`= ?', [$event_vars['token']])->first();
+            $company_token = CompanyToken::where('token', $event_vars['token'])->first();
 
             if ($company_token) {
                 return $company_token->id;
@@ -121,14 +118,18 @@ class ActivityRepository extends BaseRepository
             $entity_design_id = 'credit_design_id';
         }
 
+        // $entity->load('client.company');
+
         $entity_design_id = $entity->design_id ? $entity->design_id : $this->decodePrimaryKey($entity->client->getSetting($entity_design_id));
 
         $design = Design::find($entity_design_id);
 
-        if(!$entity->invitations()->exists()){
+        if(!$entity->invitations()->exists() || !$design){
             nlog("No invitations for entity {$entity->id} - {$entity->number}");
             return;
         }
+
+        $entity->load('client.company', 'invitations');
 
         $html = new HtmlEngine($entity->invitations->first());
 
@@ -153,6 +154,7 @@ class ActivityRepository extends BaseRepository
                 'all_pages_header' => $entity->client->getSetting('all_pages_header'),
                 'all_pages_footer' => $entity->client->getSetting('all_pages_footer'),
             ],
+            'process_markdown' => $entity->client->company->markdown_enabled,
         ];
 
         $maker = new PdfMakerService($state);

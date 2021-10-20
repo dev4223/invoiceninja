@@ -81,7 +81,43 @@ mix.js("resources/js/app.js", "public/js")
     .js(
         "resources/js/clients/payment_methods/wepay-bank-account.js",
         "public/js/clients/payment_methods/wepay-bank-account.js"
-    );
+    )
+    .js(
+        "resources/js/clients/payments/paytrace-credit-card.js",
+        "public/js/clients/payments/paytrace-credit-card.js"
+    )
+    .js(
+        "resources/js/clients/payments/mollie-credit-card.js",
+        "public/js/clients/payments/mollie-credit-card.js"
+    )
+    .js(
+        "resources/js/clients/payments/eway-credit-card.js",
+        "public/js/clients/payments/eway-credit-card.js"
+    )
+    .js(
+        "resources/js/clients/payment_methods/braintree-ach.js",
+        "public/js/clients/payment_methods/braintree-ach.js"
+    )
+    .js(
+        "resources/js/clients/payments/square-credit-card.js",
+        "public/js/clients/payments/square-credit-card.js"
+    )
+    .js(
+        "resources/js/clients/statements/view.js",
+        "public/js/clients/statements/view.js",
+    )
+    .js(
+        "resources/js/clients/payments/razorpay-aio.js",
+        "public/js/clients/payments/razorpay-aio.js"
+    )
+    .js(
+        "resources/js/clients/payments/stripe-sepa.js",
+        "public/js/clients/payments/stripe-sepa.js"
+    )
+    .js(
+        "resources/js/clients/payment_methods/authorize-checkout-card.js",
+        "public/js/clients/payment_methods/authorize-checkout-card.js"
+    )
 
 mix.copyDirectory('node_modules/card-js/card-js.min.css', 'public/css/card-js.min.css');
 

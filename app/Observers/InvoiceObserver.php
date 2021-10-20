@@ -30,12 +30,13 @@ class InvoiceObserver
     public function created(Invoice $invoice)
     {
 
-        $subscriptions = Webhook::where('company_id', $invoice->company->id)
+        $subscriptions = Webhook::where('company_id', $invoice->company_id)
                             ->where('event_id', Webhook::EVENT_CREATE_INVOICE)
                             ->exists();
 
         if ($subscriptions) {
-            WebhookHandler::dispatch(Webhook::EVENT_CREATE_INVOICE, $invoice, $invoice->company);
+    
+            WebhookHandler::dispatch(Webhook::EVENT_CREATE_INVOICE, $invoice, $invoice->company, 'client');
         }
     }
 
@@ -47,12 +48,15 @@ class InvoiceObserver
      */
     public function updated(Invoice $invoice)
     {
-        $subscriptions = Webhook::where('company_id', $invoice->company->id)
+            
+        $subscriptions = Webhook::where('company_id', $invoice->company_id)
                             ->where('event_id', Webhook::EVENT_UPDATE_INVOICE)
                             ->exists();
 
         if ($subscriptions) {
-            WebhookHandler::dispatch(Webhook::EVENT_UPDATE_INVOICE, $invoice, $invoice->company);
+                
+            WebhookHandler::dispatch(Webhook::EVENT_UPDATE_INVOICE, $invoice, $invoice->company, 'client');
+        
         }
 
     }
@@ -65,12 +69,13 @@ class InvoiceObserver
      */
     public function deleted(Invoice $invoice)
     {
-        $subscriptions = Webhook::where('company_id', $invoice->company->id)
+        $subscriptions = Webhook::where('company_id', $invoice->company_id)
                             ->where('event_id', Webhook::EVENT_DELETE_INVOICE)
                             ->exists();
 
         if ($subscriptions) {
-            WebhookHandler::dispatch(Webhook::EVENT_DELETE_INVOICE, $invoice, $invoice->company);
+        
+            WebhookHandler::dispatch(Webhook::EVENT_DELETE_INVOICE, $invoice, $invoice->company, 'client');
         }
     }
 

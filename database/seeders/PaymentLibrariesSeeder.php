@@ -27,11 +27,11 @@ class PaymentLibrariesSeeder extends Seeder
 '],
             ['id' => 2, 'name' => 'CardSave', 'provider' => 'CardSave', 'key' => '46c5c1fed2c43acf4f379bae9c8b9f76', 'fields' => '{"merchantId":"","password":""}
 '],
-            ['id' => 3, 'name' => 'Eway Rapid', 'provider' => 'Eway_RapidShared', 'is_offsite' => true, 'key' => '944c20175bbe6b9972c05bcfe294c2c7', 'fields' => '{"apiKey":"","password":"","testMode":false}'],
+            ['id' => 3, 'name' => 'Eway Rapid', 'provider' => 'Eway', 'is_offsite' => true, 'key' => '944c20175bbe6b9972c05bcfe294c2c7', 'fields' => '{"apiKey":"","password":"","publicApiKey":"","testMode":false}'],
             ['id' => 4, 'name' => 'FirstData Connect', 'provider' => 'FirstData_Connect', 'key' => '4e0ed0d34552e6cb433506d1ac03a418', 'fields' => '{"storeId":"","sharedSecret":"","testMode":false}'],
             ['id' => 5, 'name' => 'Migs ThreeParty', 'provider' => 'Migs_ThreeParty', 'key' => '513cdc81444c87c4b07258bc2858d3fa', 'fields' => '{"merchantId":"","merchantAccessCode":"","secureHash":""}'],
             ['id' => 6, 'name' => 'Migs TwoParty', 'provider' => 'Migs_TwoParty', 'key' => '99c2a271b5088951334d1302e038c01a', 'fields' => '{"merchantId":"","merchantAccessCode":"","secureHash":""}'],
-            ['id' => 7, 'name' => 'Mollie', 'provider' => 'Mollie', 'is_offsite' => true, 'sort_order' => 8, 'key' => '1bd651fb213ca0c9d66ae3c336dc77e8', 'fields' => '{"apiKey":""}'],
+            ['id' => 7, 'name' => 'Mollie', 'provider' => 'Mollie', 'is_offsite' => true, 'sort_order' => 8, 'key' => '1bd651fb213ca0c9d66ae3c336dc77e8', 'fields' => '{"apiKey":"","profileId":"","testMode":false}'],
             ['id' => 8, 'name' => 'MultiSafepay', 'provider' => 'MultiSafepay', 'key' => 'c3dec814e14cbd7d86abd92ce6789f8c', 'fields' => '{"accountId":"","siteId":"","siteCode":"","testMode":false}'],
             ['id' => 9, 'name' => 'Netaxept', 'provider' => 'Netaxept', 'key' => '070dffc5ca94f4e66216e44028ebd52d', 'fields' => '{"merchantId":"","password":"","testMode":false}'],
             ['id' => 10, 'name' => 'NetBanx', 'provider' => 'NetBanx', 'key' => '334d419939c06bd99b4dfd8a49243f0f', 'fields' => '{"accountNumber":"","storeId":"","storePassword":"","testMode":false}'],
@@ -70,16 +70,18 @@ class PaymentLibrariesSeeder extends Seeder
             ['id' => 43, 'name' => 'Fasapay', 'provider' => 'Fasapay', 'key' => '1b2cef0e8c800204a29f33953aaf3360', 'fields' => ''],
             ['id' => 44, 'name' => 'Komoju', 'provider' => 'Komoju', 'key' => '7ea2d40ecb1eb69ef8c3d03e5019028a', 'fields' => '{"apiKey":"","accountId":"","paymentMethod":"credit_card","testMode":false,"locale":"en"}'],
             ['id' => 45, 'name' => 'Paysafecard', 'provider' => 'Paysafecard', 'key' => '70ab90cd6c5c1ab13208b3cef51c0894', 'fields' => '{"username":"","password":"","testMode":false}'],
-            ['id' => 46, 'name' => 'Paytrace', 'provider' => 'Paytrace_CreditCard', 'key' => 'bbd736b3254b0aabed6ad7fda1298c88', 'fields' => '{"username":"","password":"","testMode":false,"endpoint":"https:\/\/paytrace.com\/api\/default.pay"}'],
+            ['id' => 46, 'name' => 'Paytrace', 'provider' => 'Paytrace', 'key' => 'bbd736b3254b0aabed6ad7fda1298c88', 'fields' => '{"username":"","password":"","integratorId":"","testMode":false,"endpoint":"https:\/\/paytrace.com\/api\/default.pay"}'],
             ['id' => 47, 'name' => 'Secure Trading', 'provider' => 'SecureTrading', 'key' => '231cb401487b9f15babe04b1ac4f7a27', 'fields' => '{"siteReference":"","username":"","password":"","applyThreeDSecure":false,"accountType":"ECOM"}'],
             ['id' => 48, 'name' => 'SecPay', 'provider' => 'SecPay', 'key' => 'bad8699d581d9fa040e59c0bb721a76c', 'fields' => '{"mid":"","vpnPswd":"","remotePswd":"","usageType":"","confirmEmail":"","testStatus":"true","mailCustomer":"true","additionalOptions":""}'],
             ['id' => 49, 'name' => 'WePay', 'provider' => 'WePay', 'is_offsite' => false, 'sort_order' => 3, 'key' => '8fdeed552015b3c7b44ed6c8ebd9e992', 'fields' => '{"accountId":"","accessToken":"","type":"goods","testMode":false,"feePayer":"payee"}'],
-            ['id' => 50, 'name' => 'Braintree', 'provider' => 'Braintree', 'sort_order' => 3, 'key' => 'f7ec488676d310683fb51802d076d713', 'fields' => '{"merchantId":"","publicKey":"","privateKey":"","testMode":false}'],
+            ['id' => 50, 'name' => 'Braintree', 'provider' => 'Braintree', 'sort_order' => 3, 'key' => 'f7ec488676d310683fb51802d076d713', 'fields' => '{"merchantId":"","merchantAccountId":"","publicKey":"","privateKey":"","testMode":false}'],
             ['id' => 51, 'name' => 'FirstData Payeezy', 'provider' => 'FirstData_Payeezy', 'key' => '30334a52fb698046572c627ca10412e8', 'fields' => '{"gatewayId":"","password":"","keyId":"","hmac":"","testMode":false}'],
-            ['id' => 52, 'name' => 'GoCardless', 'provider' => 'GoCardlessV2\Redirect', 'sort_order' => 9, 'is_offsite' => true, 'key' => 'b9886f9257f0c6ee7c302f1c74475f6c', 'fields' => '{"accessToken":"","webhookSecret":"","testMode":true}'],
+            ['id' => 52, 'name' => 'GoCardless', 'provider' => 'GoCardless', 'sort_order' => 9, 'is_offsite' => true, 'key' => 'b9886f9257f0c6ee7c302f1c74475f6c', 'fields' => '{"accessToken":"","webhookSecret":"","testMode":true}'],
             ['id' => 53, 'name' => 'PagSeguro', 'provider' => 'PagSeguro', 'key' => 'ef498756b54db63c143af0ec433da803', 'fields' => '{"email":"","token":"","sandbox":false}'],
             ['id' => 54, 'name' => 'PAYMILL', 'provider' => 'Paymill', 'key' => 'ca52f618a39367a4c944098ebf977e1c', 'fields' => '{"apiKey":""}'],
             ['id' => 55, 'name' => 'Custom', 'provider' => 'Custom', 'is_offsite' => true, 'sort_order' => 21, 'key' => '54faab2ab6e3223dbe848b1686490baa', 'fields' => '{"name":"","text":""}'],
+            ['id' => 57, 'name' => 'Square', 'provider' => 'Square', 'is_offsite' => false, 'sort_order' => 21, 'key' => '65faab2ab6e3223dbe848b1686490baz', 'fields' => '{"accessToken":"","applicationId":"","locationId":"","testMode":false}'],
+            ['id' => 58, 'name' => 'Razorpay', 'provider' => 'Razorpay', 'is_offsite' => false, 'sort_order' => 21, 'key' => 'hxd6gwg3ekb9tb3v9lptgx1mqyg69zu9', 'fields' => '{"apiKey":"","apiSecret":""}'],
         ];
 
         foreach ($gateways as $gateway) {
@@ -96,7 +98,7 @@ class PaymentLibrariesSeeder extends Seeder
 
         Gateway::query()->update(['visible' => 0]);
 
-        Gateway::whereIn('id', [1,15,20,39,55,50])->update(['visible' => 1]);
+        Gateway::whereIn('id', [1,7,11,15,20,39,46,55,50,57,52,58])->update(['visible' => 1]);
 
         if (Ninja::isHosted()) {
             Gateway::whereIn('id', [20])->update(['visible' => 0]);

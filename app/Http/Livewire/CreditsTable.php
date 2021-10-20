@@ -39,11 +39,14 @@ class CreditsTable extends Component
             ->where('client_id', auth('contact')->user()->client->id)
             ->where('company_id', $this->company->id)
             ->where('status_id', '<>', Credit::STATUS_DRAFT)
+            ->where('is_deleted', 0)
             ->where(function ($query){
-                $query->whereDate('due_date', '<=', now())
-                      ->orWhereNull('due_date');
+                $query->whereDate('due_date', '>=', now())
+                      ->orWhereNull('due_date')
+                      ->orWhere('due_date', '=', '');
             })
             ->orderBy($this->sort_field, $this->sort_asc ? 'asc' : 'desc')
+            ->withTrashed()
             ->paginate($this->per_page);
 
         return render('components.livewire.credits-table', [

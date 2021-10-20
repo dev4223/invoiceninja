@@ -20,7 +20,9 @@ use App\Models\Expense;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Task;
+use App\Repositories\BaseRepository;
 use App\Services\Client\ClientService;
+use App\Services\Invoice\ApplyPaymentAmount;
 use App\Services\Invoice\UpdateReminder;
 use App\Utils\Ninja;
 use App\Utils\Traits\MakesHash;
@@ -45,7 +47,16 @@ class InvoiceService
      */
     public function markPaid()
     {
+        $this->removeUnpaidGatewayFees();
+
         $this->invoice = (new MarkPaid($this->invoice))->run();
+
+        return $this;
+    }
+
+    public function applyPaymentAmount($amount)
+    {
+        $this->invoice = (new ApplyPaymentAmount($this->invoice, $amount))->run();
 
         return $this;
     }
@@ -183,6 +194,8 @@ class InvoiceService
 
     public function handleCancellation()
     {
+        $this->removeUnpaidGatewayFees();
+
         $this->invoice = (new HandleCancellation($this->invoice))->run();
 
         return $this;
@@ -190,6 +203,8 @@ class InvoiceService
 
     public function markDeleted()
     {
+        $this->removeUnpaidGatewayFees();
+        
         $this->invoice = (new MarkInvoiceDeleted($this->invoice))->run();
 
         return $this;
@@ -204,6 +219,8 @@ class InvoiceService
 
     public function reverseCancellation()
     {
+        $this->removeUnpaidGatewayFees();
+
         $this->invoice = (new HandleCancellation($this->invoice))->reverse();
 
         return $this;
@@ -218,7 +235,7 @@ class InvoiceService
 
     public function autoBill()
     {
-        $this->invoice = (new AutoBillInvoice($this->invoice))->run();
+        $this->invoice = (new AutoBillInvoice($this->invoice, $this->invoice->company->db))->run();
 
         return $this;
     }
@@ -269,12 +286,14 @@ class InvoiceService
 
     public function updateStatus()
     {
-        if ((int)$this->invoice->balance == 0) {
-            
-            InvoiceWorkflowSettings::dispatchNow($this->invoice);
+        if($this->invoice->status_id == Invoice::STATUS_DRAFT)
+            return $this;
 
-            $this->setStatus(Invoice::STATUS_PAID);
-        }
+        // if ((int)$this->invoice->balance == 0) {
+            
+        //     $this->setStatus(Invoice::STATUS_PAID)->workFlow();
+
+        // }
 
         if ($this->invoice->balance > 0 && $this->invoice->balance < $this->invoice->amount) {
             $this->setStatus(Invoice::STATUS_PARTIAL);
@@ -303,6 +322,8 @@ class InvoiceService
 
     public function deletePdf()
     {
+        $this->invoice->load('invitations');
+
         $this->invoice->invitations->each(function ($invitation){
 
             Storage::disk(config('filesystems.default'))->delete($this->invoice->client->invoice_filepath($invitation) . $this->invoice->numberFormatter().'.pdf');
@@ -428,23 +449,39 @@ class InvoiceService
 
     public function fillDefaults()
     {
+        $this->invoice->load('client.company');
+        
         $settings = $this->invoice->client->getMergedSettings();
 
         if (! $this->invoice->design_id) 
             $this->invoice->design_id = $this->decodePrimaryKey($settings->invoice_design_id);
         
-        if (!isset($this->invoice->footer)) 
+        if (!isset($this->invoice->footer) || empty($this->invoice->footer)) 
             $this->invoice->footer = $settings->invoice_footer;
 
-        if (!isset($this->invoice->terms)) 
+        if (!isset($this->invoice->terms)  || empty($this->invoice->terms)) 
             $this->invoice->terms = $settings->invoice_terms;
 
-        if (!isset($this->invoice->public_notes)) 
+        if (!isset($this->invoice->public_notes)  || empty($this->invoice->public_notes)) 
             $this->invoice->public_notes = $this->invoice->client->public_notes;
         
         /* If client currency differs from the company default currency, then insert the client exchange rate on the model.*/
         if(!isset($this->invoice->exchange_rate) && $this->invoice->client->currency()->id != (int) $this->invoice->company->settings->currency_id)
             $this->invoice->exchange_rate = $this->invoice->client->currency()->exchange_rate;
+
+        return $this;
+    }
+
+    public function workFlow()
+    {
+
+        if ($this->invoice->status_id == Invoice::STATUS_PAID && $this->invoice->client->getSetting('auto_archive_invoice')) {
+            /* Throws: Payment amount xxx does not match invoice totals. */
+
+            $base_repository = new BaseRepository();
+            $base_repository->archive($this->invoice);
+            
+        }
 
         return $this;
     }
@@ -455,7 +492,7 @@ class InvoiceService
      */
     public function save() :?Invoice
     {
-        $this->invoice->save();
+        $this->invoice->saveQuietly();
 
         return $this->invoice;
     }

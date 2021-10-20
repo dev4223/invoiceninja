@@ -12,6 +12,7 @@
 
 namespace App\PaymentDrivers\Stripe;
 
+use App\Exceptions\StripeConnectFailure;
 use App\Factory\ClientContactFactory;
 use App\Factory\ClientFactory;
 use App\Factory\ClientGatewayTokenFactory;
@@ -22,6 +23,8 @@ use App\Models\Currency;
 use App\Models\GatewayType;
 use App\PaymentDrivers\StripePaymentDriver;
 use App\PaymentDrivers\Stripe\UpdatePaymentMethods;
+use App\Utils\Ninja;
+use App\Utils\Traits\GeneratesCounter;
 use App\Utils\Traits\MakesHash;
 use Stripe\Customer;
 use Stripe\PaymentMethod;
@@ -29,6 +32,7 @@ use Stripe\PaymentMethod;
 class ImportCustomers
 {
     use MakesHash;
+    use GeneratesCounter;
 
     /** @var StripePaymentDriver */
     public $stripe;
@@ -48,15 +52,15 @@ class ImportCustomers
 
         $this->update_payment_methods = new UpdatePaymentMethods($this->stripe);
 
+        if(Ninja::isHosted() && strlen($this->stripe->company_gateway->getConfigField('account_id')) < 1)
+            throw new StripeConnectFailure('Stripe Connect has not been configured');
+
         $customers = Customer::all([], $this->stripe->stripe_connect_auth);
 
         foreach($customers as $customer)
         {
             $this->addCustomer($customer);
         }   
-
-        /* Now call the update payment methods handler*/
-        // $this->stripe->updateAllPaymentMethods();
 
     }
 
@@ -70,14 +74,26 @@ class ImportCustomers
 
         nlog("search Stripe for {$customer->id}");
 
-        $existing_customer = $this->stripe
+        $existing_customer_token = $this->stripe
                                   ->company_gateway
                                   ->client_gateway_tokens()
                                   ->where('gateway_customer_reference', $customer->id)
-                                  ->exists();
+                                  ->first();
 
-        if($existing_customer){
-            nlog("Skipping - Customer exists: {$customer->email}");
+        if($existing_customer_token){
+            nlog("Skipping - Customer exists: {$customer->email} just updating payment methods");
+            $this->update_payment_methods->updateMethods($customer, $existing_customer_token->client);
+        }
+
+        if($customer->email && $this->stripe->company_gateway->company->client_contacts()->where('email', $customer->email)->exists()){
+            nlog("Customer exists: {$customer->email} just updating payment methods");
+
+            $this->stripe->company_gateway->company->client_contacts()->where('email', $customer->email)->each(function ($contact) use ($customer){
+
+                $this->update_payment_methods->updateMethods($customer, $contact->client);
+                
+            });
+            
             return;
         }
 
@@ -86,15 +102,15 @@ class ImportCustomers
         
         $client = ClientFactory::create($this->stripe->company_gateway->company_id, $this->stripe->company_gateway->user_id);
 
-        if(property_exists($customer, 'address'))
+        if($customer->address)
         {
-            $client->address1 = property_exists($customer->address, 'line1') ? $customer->address->line1 : '';
-            $client->address2 = property_exists($customer->address, 'line2') ? $customer->address->line2 : '';
-            $client->city = property_exists($customer->address, 'city') ? $customer->address->city : '';
-            $client->state = property_exists($customer->address, 'state') ? $customer->address->state : '';
-            $client->phone =  property_exists($customer->address, 'phone') ? $customer->phone : '';
+            $client->address1 = $customer->address->line1 ? $customer->address->line1 : '';
+            $client->address2 = $customer->address->line2 ? $customer->address->line2 : '';
+            $client->city = $customer->address->city ? $customer->address->city : '';
+            $client->state = $customer->address->state ? $customer->address->state : '';
+            $client->phone =  $customer->address->phone ? $customer->phone : '';
 
-            if(property_exists($customer->address, 'country')){
+            if($customer->address->country){
 
                 $country = Country::where('iso_3166_2', $customer->address->country)->first();
 
@@ -118,8 +134,12 @@ class ImportCustomers
 
         }
 
-        $client->name = property_exists($customer, 'name') ? $customer->name : $customer->email;
+        $client->name = $customer->name ? $customer->name : $customer->email;
 
+        if (!isset($client->number) || empty($client->number)) {
+            $client->number = $this->getNextClientNumber($client);
+        }
+        
         $client->save();
 
         $contact = ClientContactFactory::create($client->company_id, $client->user_id);
@@ -130,5 +150,69 @@ class ImportCustomers
         $contact->save();            
 
         $this->update_payment_methods->updateMethods($customer, $client);
+    }
+
+    public function importCustomer($customer_id)
+    {
+
+        $this->stripe->init();
+
+        $this->update_payment_methods = new UpdatePaymentMethods($this->stripe);
+
+        if(strlen($this->stripe->company_gateway->getConfigField('account_id')) < 1)
+                throw new StripeConnectFailure('Stripe Connect has not been configured');
+
+        $customer = Customer::retrieve($customer_id, $this->stripe->stripe_connect_auth);
+
+        if(!$customer)
+            return;
+
+        foreach($this->stripe->company_gateway->company->clients as $client)
+        {
+            if($client->present()->email() == $customer->email) {
+
+                $this->update_payment_methods->updateMethods($customer, $client);
+    
+            }
+        }
+
+    }
+
+    public function match()
+    {
+        $this->stripe->init();
+
+        $this->update_payment_methods = new UpdatePaymentMethods($this->stripe);
+
+        if(strlen($this->stripe->company_gateway->getConfigField('account_id')) < 1)
+                throw new StripeConnectFailure('Stripe Connect has not been configured');
+
+        foreach($this->stripe->company_gateway->company->clients as $client)
+        {
+
+            $searchResults = \Stripe\Customer::all([
+                        "email" => $client->present()->email(),
+                        "limit" => 2,
+                        "starting_after" => null
+            ],$this->stripe->stripe_connect_auth);
+
+            // nlog(count($searchResults));
+          
+            if(count($searchResults) == 1)
+            {
+
+            $cgt = ClientGatewayToken::where('gateway_customer_reference', $searchResults->data[0]->id)->where('company_id', $this->stripe->company_gateway->company->id)->exists();
+
+                if(!$cgt)
+                {
+                    nlog("customer ".$searchResults->data[0]->id. " does not exist.");
+
+                    $this->update_payment_methods->updateMethods($searchResults->data[0], $client);
+
+                }
+            }
+          
+        }
+
     }
 }

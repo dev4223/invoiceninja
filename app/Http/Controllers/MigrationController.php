@@ -24,7 +24,9 @@ use App\Models\CompanyToken;
 use App\Utils\Ninja;
 use Illuminate\Foundation\Bus\DispatchesJobs;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\App;
 
 class MigrationController extends BaseController
 {
@@ -230,10 +232,26 @@ class MigrationController extends BaseController
      * @return \Illuminate\Http\JsonResponse|void
      */
     public function startMigration(Request $request)
-    {
-        nlog("Starting Migration");
+    {   
 
-        $companies = json_decode($request->companies);
+        nlog("Starting Migration");
+        
+        if($request->companies){
+            //handle Laravel 5.5 UniHTTP
+            $companies = json_decode($request->companies,1);
+        }
+        else {
+            //handle Laravel 6 Guzzle
+            $companies = [];
+
+            foreach($request->all() as $input){
+
+                if($input instanceof UploadedFile)
+                    nlog('is file');
+                else
+                    $companies[] = json_decode($input,1);
+            }
+        }
 
         if (app()->environment() === 'local') {
             nlog($request->all());
@@ -249,19 +267,24 @@ class MigrationController extends BaseController
     } finally {
     // Controller logic here
 
-        foreach ($companies as $company) {
-            $is_valid = $request->file($company->company_index)->isValid();
+        foreach($companies as $company)
+        {
 
-            if (!$is_valid) {
+            if(!is_array($company))
                 continue;
-            }
+
+            $company = (array)$company;
 
             $user = auth()->user();
 
             $company_count = $user->account->companies()->count();
 
             // Look for possible existing company (based on company keys).
-            $existing_company = Company::whereRaw('BINARY `company_key` = ?', [$company->company_key])->first();
+            $existing_company = Company::whereRaw('BINARY `company_key` = ?', [$company['company_key']])->first();
+
+            App::forgetInstance('translator');
+            $t = app('translator');
+            $t->replace(Ninja::transformTranslations($user->account->companies()->first()->settings));
 
             if(!$existing_company && $company_count >=10) {
 
@@ -286,7 +309,7 @@ class MigrationController extends BaseController
 
             $checks = [
                 'existing_company' => $existing_company ? (bool)1 : false,
-                'force' => property_exists($company, 'force') ? (bool) $company->force : false,
+                'force' => array_key_exists('force', $company) ? (bool) $company['force'] : false,
             ];
 
             // If there's existing company and ** no ** force is provided - skip migration.
@@ -373,10 +396,10 @@ class MigrationController extends BaseController
                 ]);
             }
 
-            $migration_file = $request->file($company->company_index)
+            $migration_file = $request->file($company['company_index'])
                 ->storeAs(
                     'migrations',
-                    $request->file($company->company_index)->getClientOriginalName(),
+                    $request->file($company['company_index'])->getClientOriginalName(),
                     'public'
                 );
 
