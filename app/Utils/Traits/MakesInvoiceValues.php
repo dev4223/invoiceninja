@@ -270,6 +270,8 @@ trait MakesInvoiceValues
         if (! is_array($items)) {
             $data;
         }
+       
+        $locale_info = localeconv();
 
         foreach ($items as $key => $item) {
             if ($table_type == '$product' && $item->type_id != 1) {
@@ -292,22 +294,28 @@ trait MakesInvoiceValues
             $data[$key][$table_type.'.item'] = is_null(optional($item)->item) ? $item->product_key : $item->item;
             $data[$key][$table_type.'.service'] = is_null(optional($item)->service) ? $item->product_key : $item->service;
 
-            $data[$key][$table_type.'.notes'] = $this->processReservedKeywords($item->notes);
-            $data[$key][$table_type.'.description'] = $this->processReservedKeywords($item->notes);
-
-
+            $data[$key][$table_type.'.notes'] = Helpers::processReservedKeywords($item->notes, $this->client);
+            $data[$key][$table_type.'.description'] = Helpers::processReservedKeywords($item->notes, $this->client);
+    
             $data[$key][$table_type . ".{$_table_type}1"] = $helpers->formatCustomFieldValue($this->client->company->custom_fields, "{$_table_type}1", $item->custom_value1, $this->client);
             $data[$key][$table_type . ".{$_table_type}2"] = $helpers->formatCustomFieldValue($this->client->company->custom_fields, "{$_table_type}2", $item->custom_value2, $this->client);
             $data[$key][$table_type . ".{$_table_type}3"] = $helpers->formatCustomFieldValue($this->client->company->custom_fields, "{$_table_type}3", $item->custom_value3, $this->client);
             $data[$key][$table_type . ".{$_table_type}4"] = $helpers->formatCustomFieldValue($this->client->company->custom_fields, "{$_table_type}4", $item->custom_value4, $this->client);
 
-            $data[$key][$table_type.'.quantity'] = Number::formatValue($item->quantity, $this->client->currency());
-
+            //$data[$key][$table_type.'.quantity'] = Number::formatValue($item->quantity, $this->client->currency());
+            
+            //change quantity from localized number, to decimal format with no trailing zeroes 06/09/21
+            $data[$key][$table_type.'.quantity'] =  rtrim($item->quantity, $locale_info['decimal_point']);
             $data[$key][$table_type.'.unit_cost'] = Number::formatMoney($item->cost, $this->client);
             $data[$key][$table_type.'.cost'] = Number::formatMoney($item->cost, $this->client);
 
             $data[$key][$table_type.'.line_total'] = Number::formatMoney($item->line_total, $this->client);
 
+            if(property_exists($item, 'gross_line_total'))
+                $data[$key][$table_type.'.gross_line_total'] = Number::formatMoney($item->gross_line_total, $this->client);
+            else
+                $data[$key][$table_type.'.gross_line_total'] = 0;
+        
             if (isset($item->discount) && $item->discount > 0) {
                 if ($item->is_amount_discount) {
                     $data[$key][$table_type.'.discount'] = Number::formatMoney($item->discount, $this->client);
@@ -340,150 +348,6 @@ trait MakesInvoiceValues
         }
 
         return $data;
-    }
-
-    /**
-     * Process reserved words like :MONTH :YEAR :QUARTER
-     * as well as their operations.
-     *
-     * @param string $value
-     * @return string|null
-     */
-    private function processReservedKeywords(string $value): ?string
-    {
-        Carbon::setLocale($this->client->locale());
-
-        $replacements = [
-            'literal' => [
-                ':MONTH' => Carbon::createFromDate(now()->year, now()->month)->translatedFormat('F'),
-                ':YEAR' => now()->year,
-                ':QUARTER' => 'Q' . now()->quarter,
-            ],
-            'raw' => [
-                ':MONTH' => now()->month,
-                ':YEAR' => now()->year,
-                ':QUARTER' => now()->quarter,
-            ],
-            'ranges' => [
-              'MONTHYEAR' => Carbon::createFromDate(now()->year, now()->month),
-            ],
-            'ranges_raw' => [
-                'MONTH' => now()->month,
-                'YEAR' => now()->year,
-            ],
-        ];
-
-        // First case, with ranges.
-        preg_match_all('/\[(.*?)]/', $value, $ranges);
-
-        $matches = array_shift($ranges);
-
-        foreach ($matches as $match) {
-            if (!Str::contains($match, '|')) {
-                continue;
-            }
-
-            if (Str::contains($match, '|')) {
-                $parts = explode('|', $match); // [ '[MONTH', 'MONTH+2]' ]
-
-                $left = substr($parts[0], 1); // 'MONTH'
-                $right = substr($parts[1], 0, -1); // MONTH+2
-
-                // If left side is not part of replacements, skip.
-                if (!array_key_exists($left, $replacements['ranges'])) {
-                    continue;
-                }
-
-                $_left = Carbon::createFromDate(now()->year, now()->month)->translatedFormat('F Y');
-                $_right = '';
-
-                // If right side doesn't have any calculations, replace with raw ranges keyword.
-                if (!Str::contains($right, ['-', '+', '/', '*'])) {
-                    $_right = Carbon::createFromDate(now()->year, now()->month)->translatedFormat('F Y');
-                }
-
-                // If right side contains one of math operations, calculate.
-                if (Str::contains($right, ['+'])) {
-                    $operation = preg_match_all('/(?!^-)[+*\/-](\s?-)?/', $right, $_matches);
-
-                    $_operation = array_shift($_matches)[0]; // + -
-
-                    $_value = explode($_operation, $right); // [MONTHYEAR, 4]
-
-                    $_right = Carbon::createFromDate(now()->year, now()->month)->addMonths($_value[1])->translatedFormat('F Y');
-                }
-
-                $replacement = sprintf('%s to %s', $_left, $_right);
-
-                $value = preg_replace(
-                    sprintf('/%s/', preg_quote($match)), $replacement, $value, 1
-                );
-            }
-        }
-
-
-        // Second case with more common calculations.
-        preg_match_all('/:([^:\s]+)/', $value, $common);
-
-        $matches = array_shift($common);
-
-        foreach ($matches as $match) {
-            $matches = collect($replacements['literal'])->filter(function ($value, $key) use ($match) {
-                return Str::startsWith($match, $key);
-            });
-
-            if ($matches->count() === 0) {
-                continue;
-            }
-
-            if (!Str::contains($match, ['-', '+', '/', '*'])) {
-                $value = preg_replace(
-                    sprintf('/%s/', $matches->keys()->first()), $replacements['literal'][$matches->keys()->first()], $value, 1
-                );
-            }
-
-            if (Str::contains($match, ['-', '+', '/', '*'])) {
-                $operation = preg_match_all('/(?!^-)[+*\/-](\s?-)?/', $match, $_matches);
-
-                $_operation = array_shift($_matches)[0];
-
-                $_value = explode($_operation, $match); // [:MONTH, 4]
-
-                $raw = strtr($matches->keys()->first(), $replacements['raw']); // :MONTH => 1
-
-                $number = $res = preg_replace("/[^0-9]/", '', $_value[1]); // :MONTH+1. || :MONTH+2! => 1 || 2
-
-                $target = "/{$matches->keys()->first()}\\{$_operation}{$number}/"; // /:$KEYWORD\\$OPERATION$VALUE => /:MONTH\\+1
-
-                $output = (int) $raw + (int)$_value[1];
-
-                if ($operation == '+') {
-                    $output = (int) $raw + (int)$_value[1]; // 1 (:MONTH) + 4
-                }
-
-                if ($_operation == '-') {
-                    $output = (int)$raw - (int)$_value[1]; // 1 (:MONTH) - 4
-                }
-
-                if ($_operation == '/') {
-                    $output = (int)$raw / (int)$_value[1]; // 1 (:MONTH) / 4
-                }
-
-                if ($_operation == '*') {
-                    $output = (int)$raw * (int)$_value[1]; // 1 (:MONTH) * 4
-                }
-
-                if ($matches->keys()->first() == ':MONTH') {
-                    $output = \Carbon\Carbon::create()->month($output)->translatedFormat('F');
-                }
-
-                $value = preg_replace(
-                    $target, $output, $value, 1
-                );
-            }
-        }
-
-        return $value;
     }
 
     /**

@@ -71,7 +71,7 @@ class CompanySettings extends BaseSettings
     public $inclusive_taxes = false; //@implemented
     public $quote_footer = ''; //@implmented
 
-    public $translations; 
+    public $translations;
 
     public $counter_number_applied = 'when_saved'; // when_saved , when_sent //@implemented
     public $quote_number_applied = 'when_saved'; // when_saved , when_sent //@implemented
@@ -98,6 +98,12 @@ class CompanySettings extends BaseSettings
     public $expense_number_pattern = ''; //@implemented
     public $expense_number_counter = 1; //@implemented
 
+    public $recurring_expense_number_pattern = ''; 
+    public $recurring_expense_number_counter = 1; 
+
+    public $recurring_quote_number_pattern = ''; 
+    public $recurring_quote_number_counter = 1; 
+
     public $vendor_number_pattern = ''; //@implemented
     public $vendor_number_counter = 1; //@implemented
 
@@ -120,15 +126,13 @@ class CompanySettings extends BaseSettings
     public $auto_bill = 'off'; //off,always,optin,optout //@implemented
     public $auto_bill_date = 'on_due_date'; // on_due_date , on_send_date //@implemented
 
-    //public $design = 'views/pdf/design1.blade.php'; //@deprecated - never used
-
     public $invoice_terms = ''; //@implemented
     public $quote_terms = ''; //@implemented
     public $invoice_taxes = 0; // ? used in AP only?
-    // public $enabled_item_tax_rates = 0;
-    public $invoice_design_id = 'VolejRejNm'; //@implemented
-    public $quote_design_id = 'VolejRejNm'; //@implemented
-    public $credit_design_id = 'VolejRejNm'; //@implemented
+
+    public $invoice_design_id = 'Wpmbk5ezJn'; //@implemented
+    public $quote_design_id = 'Wpmbk5ezJn'; //@implemented
+    public $credit_design_id = 'Wpmbk5ezJn'; //@implemented
     public $invoice_footer = ''; //@implemented
     public $credit_footer = ''; //@implemented
     public $credit_terms = ''; //@implemented
@@ -140,7 +144,6 @@ class CompanySettings extends BaseSettings
     public $tax_name3 = ''; //@TODO where do we use this?
     public $tax_rate3 = 0; //@TODO where do we use this?
     public $payment_type_id = '0'; //@TODO where do we use this?
-    // public $invoice_fields = ''; //@TODO is this redundant, we store this in the custom_fields on the company?
 
     public $valid_until = ''; //@implemented
 
@@ -267,8 +270,10 @@ class CompanySettings extends BaseSettings
 
     public $use_credits_payment = 'off'; //always, option, off //@implemented
     public $hide_empty_columns_on_pdf = false;
+    public $email_from_name = '';
 
     public static $casts = [
+        'email_from_name'                    => 'string',
         'show_all_tasks_client_portal'       => 'string',
         'entity_send_time'                   => 'int',
         'shared_invoice_credit_counter'      => 'bool',
@@ -347,6 +352,10 @@ class CompanySettings extends BaseSettings
         'task_number_counter'                => 'int',
         'expense_number_pattern'             => 'string',
         'expense_number_counter'             => 'int',
+        'recurring_expense_number_pattern'   => 'string',
+        'recurring_expense_number_counter'   => 'int',
+        'recurring_quote_number_pattern'     => 'string',
+        'recurring_quote_number_counter'     => 'int',
         'vendor_number_pattern'              => 'string',
         'vendor_number_counter'              => 'int',
         'ticket_number_pattern'              => 'string',
@@ -594,7 +603,7 @@ class CompanySettings extends BaseSettings
      *
      * @return stdClass The stdClass of PDF variables
      */
-    private static function getEntityVariableDefaults() :stdClass
+    public static function getEntityVariableDefaults() :stdClass
     {
         $variables = [
             'client_details' => [
@@ -675,6 +684,19 @@ class CompanySettings extends BaseSettings
                 '$total',
                 '$paid_to_date',
                 '$outstanding',
+            ],
+            'statement_invoice_columns' => [
+                '$invoice.number',
+                '$invoice.date',
+                '$due_date',
+                '$total',
+                '$balance',
+            ],
+            'statement_payment_columns' => [
+                '$invoice.number',
+                '$payment.date',
+                '$method',
+                '$statement_amount',
             ],
         ];
 

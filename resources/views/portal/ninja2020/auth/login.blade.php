@@ -52,6 +52,9 @@
                                 <a class="text-xs text-gray-600 hover:text-gray-800 ease-in duration-100"
                                    href="{{ route('client.password.request') }}">{{ trans('texts.forgot_password') }}</a>
                             </div>
+                            @if(isset($company) && !is_null($company))
+                            <input type="hidden" name="company_key" value="{{$company->company_key}}">
+                            @endif
                             <input type="password" name="password" id="password"
                                    class="input"
                                    autofocus>
@@ -74,10 +77,10 @@
                         </div>
                     @endif
 
-                    @if(!is_null($company) && !empty($company->getSetting('website')))
+                    @if(!is_null($company) && !empty($company->present()->website()))
                         <div class="mt-5 text-center">
-                            <a class="button-link text-sm" href="{{ $company->getSetting('website') }}">
-                                {{ ctrans('texts.back_to', ['url' => parse_url($company->getSetting('website'))['host'] ?? $company->getSetting('website') ]) }}
+                            <a class="button-link text-sm" href="{{ $company->present()->website() }}">
+                                {{ ctrans('texts.back_to', ['url' => parse_url($company->present()->website())['host'] ?? $company->present()->website() ]) }}
                             </a>
                         </div>
                     @endif

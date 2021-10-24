@@ -30,6 +30,7 @@ use App\Providers\MailServiceProvider;
 use App\Utils\Ninja;
 use App\Utils\Traits\MakesHash;
 use Dacastro4\LaravelGmail\Facade\LaravelGmail;
+use GuzzleHttp\Exception\ClientException;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -40,6 +41,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Mail;
 use Turbo124\Beacon\Facades\LightLogs;
+use Illuminate\Support\Facades\Cache;
 
 /*Multi Mailer implemented*/
 
@@ -71,15 +73,15 @@ class NinjaMailerJob implements ShouldQueue
 
     public function handle()
     {
-        
-        if($this->preFlightChecksFail())
-            return;
 
         /*Set the correct database*/
         MultiDB::setDb($this->nmo->company->db);
 
         /* Serializing models from other jobs wipes the primary key */
         $this->company = Company::where('company_key', $this->nmo->company->company_key)->first();
+
+        if($this->preFlightChecksFail())
+            return;
 
         /* Set the email driver */
         $this->setMailDriver();
@@ -110,18 +112,38 @@ class NinjaMailerJob implements ShouldQueue
             LightLogs::create(new EmailSuccess($this->nmo->company->company_key))
                      ->batch();
 
+            /* Count the amount of emails sent across all the users accounts */
+            Cache::increment($this->company->account->key);
+
         } catch (\Exception $e) {
-
-            // if($e instanceof GuzzleHttp\Exception\ClientException){
-
-            // }
             
             nlog("error failed with {$e->getMessage()}");
 
-            if($this->nmo->entity)
-                $this->entityEmailFailed($e->getMessage());
+            $message = $e->getMessage();
 
-            if(Ninja::isHosted())
+            /**
+             * Post mark buries the proper message in a a guzzle response
+             * this merges a text string with a json object
+             * need to harvest the ->Message property using the following
+             */
+            if($e instanceof ClientException) { //postmark specific failure
+
+                $response = $e->getResponse();
+                $message_body = json_decode($response->getBody()->getContents());
+                
+                if(property_exists($message_body, 'Message')){
+                    $message = $message_body->Message;
+                    nlog($message);
+                }
+                
+            }
+
+            /* If the is an entity attached to the message send a failure mailer */
+            if($this->nmo->entity)
+                $this->entityEmailFailed($message);
+
+            /* Don't send postmark failures to Sentry */
+            if(Ninja::isHosted() && (!$e instanceof ClientException)) 
                 app('sentry')->captureException($e);
         }
     }
@@ -224,14 +246,26 @@ class NinjaMailerJob implements ShouldQueue
             return true;
 
         /* On the hosted platform we set default contacts a @example.com email address - we shouldn't send emails to these types of addresses */
-        if(Ninja::isHosted() && strpos($this->nmo->to_user->email, '@example.com') !== false)
+        if(Ninja::isHosted() && $this->nmo->to_user && strpos($this->nmo->to_user->email, '@example.com') !== false)
             return true;
 
+        /* GMail users are uncapped */
+        if(Ninja::isHosted() && $this->nmo->settings->email_sending_method == 'gmail')
+            return false;
+
+        /* On the hosted platform, if the user is over the email quotas, we do not send the email. */
+        if(Ninja::isHosted() && $this->company->account->emailQuotaExceeded())
+            return true;
+
+        if(!str_contains($this->nmo->to_user->email, "@"))
+            return true;
+        
         return false;
     }
 
     private function logMailError($errors, $recipient_object)
     {
+
         SystemLogger::dispatch(
             $errors,
             SystemLog::CATEGORY_MAIL,
@@ -240,18 +274,18 @@ class NinjaMailerJob implements ShouldQueue
             $recipient_object,
             $this->nmo->company
         );
-    }
 
-    public function failed($exception = null)
-    {
-        nlog('mailer job failed');
-        nlog($exception->getMessage());
-        
         $job_failure = new EmailFailure($this->nmo->company->company_key);
         $job_failure->string_metric5 = 'failed_email';
-        $job_failure->string_metric6 = substr($exception->getMessage(), 0, 150);
+        $job_failure->string_metric6 = substr($errors, 0, 150);
 
         LightLogs::create($job_failure)
                  ->batch();
     }
+
+    public function failed($exception = null)
+    {
+        
+    }
+
 }

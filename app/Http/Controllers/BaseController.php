@@ -84,6 +84,7 @@ class BaseController extends Controller
           'company.payments.documents',
           'company.payment_terms.company',
           'company.projects.documents',
+          'company.recurring_expenses',
           'company.recurring_invoices',
           'company.recurring_invoices.invitations.contact',
           'company.recurring_invoices.invitations.company',
@@ -106,12 +107,16 @@ class BaseController extends Controller
           'user.company_user',
           'token',
           'company.activities',
-          'company.documents',
-          'company.users.company_user',
           'company.tax_rates',
-          'company.groups',
+          'company.documents',
+          'company.company_gateways.gateway',
+          'company.users.company_user',
+          'company.task_statuses',
           'company.payment_terms',
+          'company.groups',
           'company.designs.company',
+          'company.expense_categories',
+          'company.subscriptions',
         ];
 
     public function __construct()
@@ -202,12 +207,16 @@ class BaseController extends Controller
         $transformer = new $this->entity_transformer($this->serializer);
         $updated_at = request()->has('updated_at') ? request()->input('updated_at') : 0;
 
+        if ($user->getCompany()->is_large && $updated_at == 0){
+          $updated_at = time();
+        }
+
         $updated_at = date('Y-m-d H:i:s', $updated_at);
 
         $query->with(
             [
             'company' => function ($query) use ($updated_at, $user) {
-                $query->whereNotNull('updated_at')->with('documents');
+                $query->whereNotNull('updated_at')->with('documents')->with('users');
             },
             'company.clients' => function ($query) use ($updated_at, $user) {
                 $query->where('clients.updated_at', '>=', $updated_at)->with('contacts.company', 'gateway_tokens', 'documents');
@@ -246,7 +255,7 @@ class BaseController extends Controller
                   $query->where('expenses.user_id', $user->id)->orWhere('expenses.assigned_user_id', $user->id);
             },
             'company.groups' => function ($query) use ($updated_at, $user) {
-                $query->where('updated_at', '>=', $updated_at);
+                $query->where('updated_at', '>=', $updated_at)->with('documents');
 
                 if(!$user->isAdmin())
                   $query->where('group_settings.user_id', $user->id);
@@ -294,10 +303,17 @@ class BaseController extends Controller
 
             },
             'company.recurring_invoices'=> function ($query) use ($updated_at, $user) {
-                $query->where('updated_at', '>=', $updated_at)->with('invitations', 'documents');
+                $query->where('updated_at', '>=', $updated_at)->with('invitations', 'documents', 'client.gateway_tokens', 'client.group_settings', 'client.company');
 
                 if(!$user->hasPermission('view_recurring_invoice'))
                   $query->where('recurring_invoices.user_id', $user->id)->orWhere('recurring_invoices.assigned_user_id', $user->id);
+
+            },
+            'company.recurring_expenses'=> function ($query) use ($updated_at, $user) {
+                $query->where('updated_at', '>=', $updated_at)->with('documents');
+
+                if(!$user->hasPermission('view_recurring_expense'))
+                  $query->where('recurring_expenses.user_id', $user->id)->orWhere('recurring_expenses.assigned_user_id', $user->id);
 
             },
             'company.tasks'=> function ($query) use ($updated_at, $user) {
@@ -307,8 +323,8 @@ class BaseController extends Controller
                   $query->where('tasks.user_id', $user->id)->orWhere('tasks.assigned_user_id', $user->id);
 
             },
-            'company.tax_rates' => function ($query) use ($updated_at, $user) {
-                $query->where('updated_at', '>=', $updated_at);
+            'company.tax_rates'=> function ($query) use ($updated_at, $user) {
+                $query->whereNotNull('updated_at');
             },
             'company.vendors'=> function ($query) use ($updated_at, $user) {
                 $query->where('updated_at', '>=', $updated_at)->with('contacts', 'documents');
@@ -321,7 +337,7 @@ class BaseController extends Controller
                 $query->where('updated_at', '>=', $updated_at);
             },
             'company.task_statuses'=> function ($query) use ($updated_at, $user) {
-                $query->where('updated_at', '>=', $updated_at);
+                $query->whereNotNull('updated_at');
             },
             'company.activities'=> function ($query) use($user) {
 
@@ -383,16 +399,16 @@ class BaseController extends Controller
             'company.documents'=> function ($query) use ($created_at, $user) {
                 $query->where('created_at', '>=', $created_at);
             },
-            'company.groups' => function ($query) use ($created_at, $user) {
-                $query->where('created_at', '>=', $created_at);
+            'company.groups'=> function ($query) use ($created_at, $user) {
+                $query->where('created_at', '>=', $created_at)->with('documents');
 
             },
             'company.payment_terms'=> function ($query) use ($created_at, $user) {
                 $query->where('created_at', '>=', $created_at);
 
             },
-            'company.tax_rates' => function ($query) use ($created_at, $user) {
-                $query->where('created_at', '>=', $created_at);
+            'company.tax_rates'=> function ($query) use ($created_at, $user) {
+                $query->whereNotNull('created_at');
 
             },
             'company.activities'=> function ($query) use($user) {
@@ -471,12 +487,6 @@ class BaseController extends Controller
                   $query->where('credits.user_id', $user->id)->orWhere('credits.assigned_user_id', $user->id);
 
             },
-            // 'company.designs'=> function ($query) use ($created_at, $user) {
-            //     $query->where('created_at', '>=', $created_at)->with('company');
-
-            //     if(!$user->isAdmin())
-            //       $query->where('designs.user_id', $user->id);
-            // },
             'company.documents'=> function ($query) use ($created_at, $user) {
                 $query->where('created_at', '>=', $created_at);
             },
@@ -487,7 +497,7 @@ class BaseController extends Controller
                   $query->where('expenses.user_id', $user->id)->orWhere('expenses.assigned_user_id', $user->id);
             },
             'company.groups' => function ($query) use ($created_at, $user) {
-                $query->where('created_at', '>=', $created_at);
+                $query->where('created_at', '>=', $created_at)->with('documents');
 
                 if(!$user->isAdmin())
                   $query->where('group_settings.user_id', $user->id);
@@ -533,7 +543,7 @@ class BaseController extends Controller
 
             },
             'company.recurring_invoices'=> function ($query) use ($created_at, $user) {
-                $query->where('created_at', '>=', $created_at)->with('invitations', 'documents');
+                $query->where('created_at', '>=', $created_at)->with('invitations', 'documents', 'client.gateway_tokens', 'client.group_settings', 'client.company');
 
                 if(!$user->hasPermission('view_recurring_invoice'))
                   $query->where('recurring_invoices.user_id', $user->id)->orWhere('recurring_invoices.assigned_user_id', $user->id);
@@ -728,13 +738,26 @@ class BaseController extends Controller
                 return redirect()->secure(request()->getRequestUri());
             }
 
+            /* Clean up URLs and remove query parameters from the URL*/
+            if(request()->has('login') && request()->input('login') == 'true')
+                return redirect('/')->with(['login' => "true"]);
+
             $data = [];
 
-            if (Ninja::isSelfHost()) {
-                $data['report_errors'] = $account->report_errors;
-            } else {
-                $data['report_errors'] = true;
-            }
+            //pass report errors bool to front end
+            $data['report_errors'] = Ninja::isSelfHost() ? $account->report_errors : true;
+
+            //pass referral code to front end
+            $data['rc'] = request()->has('rc') ? request()->input('rc') : '';
+            $data['build'] = request()->has('build') ? request()->input('build') : '';
+            $data['login'] = request()->has('login') ? request()->input('login') : "false";
+            
+            if(request()->session()->has('login'))
+                $data['login'] = "true";
+
+            $data['user_agent'] = request()->server('HTTP_USER_AGENT');
+
+            $data['path'] = $this->setBuild();
 
             $this->buildCache();
 
@@ -742,6 +765,37 @@ class BaseController extends Controller
         }
 
         return redirect('/setup');
+    }
+
+    private function setBuild()
+    {
+        $build = '';
+
+        if(request()->has('build')) {
+            $build = request()->input('build');
+        }
+        elseif(Ninja::isHosted()){
+            return 'main.dart.js';
+        }
+
+        switch ($build) {
+            case 'wasm':
+                return 'main.wasm.dart.js';
+            case 'foss':
+                return 'main.foss.dart.js';
+            case 'last':
+                return 'main.last.dart.js';
+            case 'next':
+                return 'main.next.dart.js';      
+            case 'profile':
+                return 'main.profile.dart.js';  
+            case 'html':             
+                return 'main.html.dart.js';                        
+            default:
+                return 'main.foss.dart.js';
+
+        }
+
     }
 
     public function checkFeature($feature)

@@ -13,7 +13,6 @@
 namespace App\PaymentDrivers\Authorize;
 
 use App\Exceptions\PaymentFailed;
-use App\Jobs\Mail\PaymentFailureMailer;
 use App\Jobs\Util\SystemLogger;
 use App\Models\ClientGatewayToken;
 use App\Models\GatewayType;
@@ -102,10 +101,10 @@ class AuthorizeCreditCard
 
         $data = (new ChargePaymentProfile($this->authorize))->chargeCustomerProfile($cgt->gateway_customer_reference, $cgt->token, $amount);
 
-        /*Refactor and push to BaseDriver*/
-        if ($data['response'] != null && $data['response']->getMessages()->getResultCode() == 'Ok') {
+       $response = $data['response'];
 
-            $response = $data['response'];
+        // if ($response != null && $response->getMessages()->getResultCode() == 'Ok') {
+        if ($response != null && $response->getMessages() != null) {
 
             $this->storePayment($payment_hash, $data);
 
@@ -115,7 +114,7 @@ class AuthorizeCreditCard
             ];
 
             $logger_message = [
-                'server_response' => $response->getTransactionResponse()->getTransId(),
+                'server_response' => $response->getTransId(),
                 'data' => $this->formatGatewayResponse($data, $vars),
             ];
 
@@ -130,11 +129,19 @@ class AuthorizeCreditCard
             ];
 
             $logger_message = [
-                'server_response' => $response->getTransactionResponse()->getTransId(),
+                'server_response' => $response->getTransId(),
                 'data' => $this->formatGatewayResponse($data, $vars),
             ];
 
-            PaymentFailureMailer::dispatch($this->authorize->client, $response->getTransactionResponse()->getTransId(), $this->authorize->client->company, $amount);
+            $code = "Error";
+            $description = "There was an error processing the payment";
+
+            if ($response->getErrors() != null) {
+                $code = $response->getErrors()[0]->getErrorCode();
+                $description = $response->getErrors()[0]->getErrorText();
+            }
+
+            $this->authorize->sendFailureMail($description);
 
             SystemLogger::dispatch($logger_message, SystemLog::CATEGORY_GATEWAY_RESPONSE, SystemLog::EVENT_GATEWAY_FAILURE, SystemLog::TYPE_AUTHORIZE, $this->authorize->client, $this->authorize->client->company);
 
@@ -147,8 +154,8 @@ class AuthorizeCreditCard
     {
         $response = $data['response'];
 
-        if ($response != null && $response->getMessages()->getResultCode() == 'Ok') {
-
+        // if ($response != null && $response->getMessages()->getResultCode() == 'Ok') {
+        if ($response != null && $response->getMessages() != null) {
             return $this->processSuccessfulResponse($data, $request);
         }
 
@@ -165,7 +172,7 @@ class AuthorizeCreditCard
         $payment_record['amount'] = $amount;
         $payment_record['payment_type'] = PaymentType::CREDIT_CARD_OTHER;
         $payment_record['gateway_type_id'] = GatewayType::CREDIT_CARD;
-        $payment_record['transaction_reference'] = $response->getTransactionResponse()->getTransId();
+        $payment_record['transaction_reference'] = $response->getTransId();
 
         $payment = $this->authorize->createPayment($payment_record);
 
@@ -183,7 +190,7 @@ class AuthorizeCreditCard
         ];
 
         $logger_message = [
-            'server_response' => $data['response']->getTransactionResponse()->getTransId(),
+            'server_response' => $data['response']->getTransId(),
             'data' => $this->formatGatewayResponse($data, $vars),
         ];
 
@@ -204,9 +211,39 @@ class AuthorizeCreditCard
         $response = $data['response'];
         $amount = array_key_exists('amount_with_fee', $data) ? $data['amount_with_fee'] : 0;
 
-        PaymentFailureMailer::dispatch($this->authorize->client, $response->getTransactionResponse()->getTransId(), $this->authorize->client->company, $data['amount_with_fee']);
+        $code = "Error";
+        $description = "There was an error processing the payment";
 
-        throw new \Exception(ctrans('texts.error_title'));
+        if ($response->getErrors() != null) {
+            $code = $response->getErrors()[0]->getErrorCode();
+            $description = $response->getErrors()[0]->getErrorText();
+        }
+
+        $this->authorize->sendFailureMail($description);
+
+        $payment_hash = PaymentHash::where('hash', $request->input('payment_hash'))->firstOrFail(); 
+
+        $vars = [
+            'invoices' => $payment_hash->invoices(),
+            'amount' => array_sum(array_column($payment_hash->invoices(), 'amount')) + $payment_hash->fee_total,
+        ];
+
+        $logger_message = [
+            'server_response' => $response->getErrors(),
+            'data' => $this->formatGatewayResponse($data, $vars),
+        ];
+
+        SystemLogger::dispatch(
+            $logger_message,
+            SystemLog::CATEGORY_GATEWAY_RESPONSE,
+            SystemLog::EVENT_GATEWAY_ERROR,
+            SystemLog::TYPE_AUTHORIZE,
+            $this->authorize->client,
+            $this->authorize->client->company,
+        );
+
+        throw new PaymentFailed($description, $code);
+
     }
 
     private function formatGatewayResponse($data, $vars)
@@ -216,15 +253,20 @@ class AuthorizeCreditCard
         $code = '';
         $description = '';
 
-        if($response->getTransactionResponse()->getMessages() !== null){
-            $code = $response->getTransactionResponse()->getMessages()[0]->getCode();
-            $description = $response->getTransactionResponse()->getMessages()[0]->getDescription();
+        if($response->getMessages() !== null){
+            $code = $response->getMessages()[0]->getCode();
+            $description = $response->getMessages()[0]->getDescription();
+        }
+
+        if ($response->getErrors() != null) {
+            $code = $response->getErrors()[0]->getErrorCode();
+            $description = $response->getErrors()[0]->getErrorText();
         }
 
         return [
-            'transaction_reference' => $response->getTransactionResponse()->getTransId(),
+            'transaction_reference' => $response->getTransId(),
             'amount' => $vars['amount'],
-            'auth_code' => $response->getTransactionResponse()->getAuthCode(),
+            'auth_code' => $response->getAuthCode(),
             'code' => $code,
             'description' => $description,
             'invoices' => $vars['invoices'],

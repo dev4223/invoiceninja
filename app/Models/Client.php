@@ -15,7 +15,11 @@ use App\DataMapper\ClientSettings;
 use App\DataMapper\CompanySettings;
 use App\DataMapper\FeesAndLimits;
 use App\Models\CompanyGateway;
+use App\Models\Expense;
 use App\Models\Presenters\ClientPresenter;
+use App\Models\Project;
+use App\Models\Quote;
+use App\Models\Task;
 use App\Services\Client\ClientService;
 use App\Utils\Traits\AppSetup;
 use App\Utils\Traits\GeneratesCounter;
@@ -71,7 +75,6 @@ class Client extends BaseModel implements HasLocalePreference
         'shipping_postal_code',
         'shipping_country_id',
         'settings',
-        'payment_terms',
         'vat_number',
         'id_number',
         'group_settings_id',
@@ -153,6 +156,16 @@ class Client extends BaseModel implements HasLocalePreference
         return $this->hasMany(ClientGatewayToken::class);
     }
 
+    public function expenses()
+    {
+        return $this->hasMany(Expense::class)->withTrashed();
+    }
+
+    public function projects()
+    {
+        return $this->hasMany(Project::class)->withTrashed();
+    }
+
     /**
      * Retrieves the specific payment token per
      * gateway - per payment method.
@@ -199,12 +212,12 @@ class Client extends BaseModel implements HasLocalePreference
 
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class)->withTrashed();
     }
 
     public function assigned_user()
     {
-        return $this->belongsTo(User::class, 'assigned_user_id', 'id');
+        return $this->belongsTo(User::class, 'assigned_user_id', 'id')->withTrashed();
     }
 
     public function country()
@@ -215,6 +228,16 @@ class Client extends BaseModel implements HasLocalePreference
     public function invoices()
     {
         return $this->hasMany(Invoice::class)->withTrashed();
+    }
+
+    public function quotes()
+    {
+        return $this->hasMany(Quote::class)->withTrashed();
+    }
+
+    public function tasks()
+    {
+        return $this->hasMany(Task::class)->withTrashed();
     }
 
     public function recurring_invoices()
@@ -335,6 +358,9 @@ class Client extends BaseModel implements HasLocalePreference
         if ($this->settings && property_exists($this->settings, $setting) && isset($this->settings->{$setting})) {
             /*need to catch empty string here*/
             if (is_string($this->settings->{$setting}) && (iconv_strlen($this->settings->{$setting}) >= 1)) {
+                return $this->settings->{$setting};
+            }
+            elseif(is_bool($this->settings->{$setting})){
                 return $this->settings->{$setting};
             }
         }
@@ -492,32 +518,32 @@ class Client extends BaseModel implements HasLocalePreference
 
         }
 
+        if ($this->currency()->code == 'EUR' && in_array(GatewayType::SEPA, array_column($pms, 'gateway_type_id'))) {
+            foreach ($pms as $pm) {
+                if ($pm['gateway_type_id'] == GatewayType::SEPA) {
+                    $cg = CompanyGateway::find($pm['company_gateway_id']);
+
+                    if ($cg && $cg->fees_and_limits->{GatewayType::SEPA}->is_enabled) {
+                        return $cg;
+                    }
+                }
+            }
+        }
+
+        if ($this->country->iso_3166_3 == 'GBR' && in_array(GatewayType::DIRECT_DEBIT, array_column($pms, 'gateway_type_id'))) {
+            foreach ($pms as $pm) {
+                if ($pm['gateway_type_id'] == GatewayType::DIRECT_DEBIT) {
+                    $cg = CompanyGateway::find($pm['company_gateway_id']);
+
+                    if ($cg && $cg->fees_and_limits->{GatewayType::DIRECT_DEBIT}->is_enabled) {
+                        return $cg;
+                    }
+                }
+            }
+        }
+
         return null;
-        // $company_gateways = $this->getSetting('company_gateway_ids');
 
-        // if (strlen($company_gateways) >= 1) {
-        //     $transformed_ids = $this->transformKeys(explode(',', $company_gateways));
-        //     $gateways = $this->company
-        //                      ->company_gateways
-        //                      ->whereIn('id', $transformed_ids)
-        //                      ->sortby(function ($model) use ($transformed_ids) {
-        //                          return array_search($model->id, $transformed_ids);
-        //                      });
-        // } else {
-        //     $gateways = $this->company->company_gateways;
-        // }
-
-        // foreach ($gateways as $gateway) {
-        //     if ($this->currency()->code == 'USD' && in_array(GatewayType::BANK_TRANSFER, $gateway->driver($this)->gatewayTypeEnabled(GatewayType::BANK_TRANSFER))) {
-        //         return $gateway;
-        //     }
-
-        //     if ($this->currency()->code == 'EUR' && in_array(GatewayType::SEPA, $gateway->driver($this)->gatewayTypeEnabled(GatewayType::SEPA))) {
-        //         return $gateway;
-        //     }
-        // }
-
-        // return null;
     }
 
     public function getBankTransferMethodType()
@@ -529,6 +555,10 @@ class Client extends BaseModel implements HasLocalePreference
 
         if ($this->currency()->code == 'EUR') {
             return GatewayType::SEPA;
+        }
+
+        if ($this->currency()->code == 'GBP') {
+            return GatewayType::DIRECT_DEBIT;
         }
     }
 
@@ -715,6 +745,12 @@ class Client extends BaseModel implements HasLocalePreference
         })->first()->locale;
     }
 
+    public function backup_path()
+    {
+        return $this->company->company_key.'/'.$this->client_hash.'/backups';
+    }
+
+
     public function invoice_filepath($invitation)
     {   
         $contact_key = $invitation->contact->contact_key;
@@ -774,7 +810,7 @@ class Client extends BaseModel implements HasLocalePreference
 
     public function payments()
     {
-        return $this->hasMany(Payment::class);
+        return $this->hasMany(Payment::class)->withTrashed();
     }
 
     public function timezone_offset()

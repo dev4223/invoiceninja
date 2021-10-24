@@ -69,28 +69,17 @@
                 </div>
             </div>
 
-            @if(auth('contact')->user())
-                <a href="{{ route('client.invoices.index') }}" class="block mt-16 inline-flex items-center space-x-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                         class="feather feather-arrow-left">
-                        <line x1="19" y1="12" x2="5" y2="12"></line>
-                        <polyline points="12 19 5 12 12 5"></polyline>
-                    </svg>
-
-                    <span>{{ ctrans('texts.client_portal') }}</span>
-                </a>
-            @endif
-
             @if($subscription->service()->getPlans()->count() > 1)
                 <div class="flex flex-col mt-10">
                     <p class="mb-4 uppercase leading-4 tracking-wide inline-flex items-center rounded-full text-xs font-medium">
                         {{ ctrans('texts.you_might_be_interested_in_following') }}:
                     </p>
 
-                    <div class="mt-4 space-x-2">
+                    <div class="mt-4">
                         @foreach($subscription->service()->getPlans() as $_subscription)
-                            <a class="border mt-4 bg-white rounded py-2 px-4 hover:bg-gray-100 text-sm" target="_blank" href="{{ route('client.subscription.purchase', $_subscription->hashed_id) }}">{{ $_subscription->name }}</a>
+                            <button class="mt-8 mr-2">
+                                <a class="border mt-4 bg-white rounded py-2 px-4 hover:bg-gray-100 text-sm" target="_blank" href="{{ route('client.subscription.purchase', $_subscription->hashed_id) }}">{{ $_subscription->name }}</a>
+                            </button>
                         @endforeach
                     </div>
                 </div>
@@ -101,7 +90,7 @@
     <div class="col-span-12 xl:col-span-4 bg-white flex flex-col items-center lg:h-screen">
         <div class="w-full p-10 md:p-24 xl:mt-32 md:max-w-3xl">
             <div class="col-span-12 w-full xl:col-span-9">
-                <h2 class="text-2xl font-bold tracking-wide">{{ $heading_text ?? ctrans('texts.login') }}</h2>
+                <h2 class="text-2xl font-bold tracking-wide">{{ $heading_text ?? ctrans('texts.checkout') }}</h2>
                 @if (session()->has('message'))
                     @component('portal.ninja2020.components.message')
                         {{ session('message') }}

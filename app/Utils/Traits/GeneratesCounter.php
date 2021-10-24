@@ -19,7 +19,9 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Project;
 use App\Models\Quote;
+use App\Models\RecurringExpense;
 use App\Models\RecurringInvoice;
+use App\Models\RecurringQuote;
 use App\Models\Task;
 use App\Models\Timezone;
 use App\Models\Vendor;
@@ -135,6 +137,12 @@ trait GeneratesCounter
             case RecurringInvoice::class:
                 return 'recurring_invoice_number_counter';
                 break;
+            case RecurringQuote::class:
+                return 'recurring_quote_number_counter';
+                break;
+            case RecurringExpense::class:
+                return 'recurring_expense_number_counter';
+                break;
             case Payment::class:
                 return 'payment_number_counter';
                 break;
@@ -164,7 +172,9 @@ trait GeneratesCounter
      */
     public function getNextInvoiceNumber(Client $client, ?Invoice $invoice, $is_recurring = false) :string
     {
-        return $this->getNextEntityNumber(Invoice::class, $client, $is_recurring);
+        $entity_number = $this->getNextEntityNumber(Invoice::class, $client, $is_recurring);
+
+        return $this->replaceUserVars($invoice, $entity_number);
     }
 
     /**
@@ -174,9 +184,12 @@ trait GeneratesCounter
      *
      * @return     string              The next credit number.
      */
-    public function getNextCreditNumber(Client $client) :string
+    public function getNextCreditNumber(Client $client, ?Credit $credit) :string
     {
-        return $this->getNextEntityNumber(Credit::class, $client);
+        $entity_number = $this->getNextEntityNumber(Credit::class, $client);
+
+        return $this->replaceUserVars($credit, $entity_number);
+
     }
 
     /**
@@ -186,14 +199,28 @@ trait GeneratesCounter
      *
      * @return     string              The next credit number.
      */
-    public function getNextQuoteNumber(Client $client)
+    public function getNextQuoteNumber(Client $client, ?Quote $quote)
     {
-        return $this->getNextEntityNumber(Quote::class, $client);
+        $entity_number = $this->getNextEntityNumber(Quote::class, $client);
+
+        return $this->replaceUserVars($quote, $entity_number);
+
     }
 
-    public function getNextRecurringInvoiceNumber(Client $client)
+    public function getNextRecurringInvoiceNumber(Client $client, $recurring_invoice)
     {
-        return $this->getNextEntityNumber(RecurringInvoice::class, $client);
+        $entity_number = $this->getNextEntityNumber(RecurringInvoice::class, $client);
+
+        return $this->replaceUserVars($recurring_invoice, $entity_number);
+
+    }
+
+    public function getNextRecurringQuoteNumber(Client $client, $recurring_quote)
+    {
+        $entity_number = $this->getNextEntityNumber(RecurringQuote::class, $client);
+
+        return $this->replaceUserVars($recurring_quote, $entity_number);
+
     }
 
     /**
@@ -203,9 +230,12 @@ trait GeneratesCounter
      *
      * @return     string              The next payment number.
      */
-    public function getNextPaymentNumber(Client $client) :string
+    public function getNextPaymentNumber(Client $client, ?Payment $payment) :string
     {
-        return $this->getNextEntityNumber(Payment::class, $client);
+        $entity_number = $this->getNextEntityNumber(Payment::class, $client);
+
+        return $this->replaceUserVars($payment, $entity_number);
+
     }
 
     /**
@@ -228,7 +258,10 @@ trait GeneratesCounter
 
         $this->incrementCounter($setting_entity, 'client_number_counter');
 
-        return $client_number;
+        $entity_number = $client_number;
+
+        return $this->replaceUserVars($client, $entity_number);
+
     }
 
 
@@ -249,7 +282,10 @@ trait GeneratesCounter
 
         $this->incrementCounter($vendor->company, 'vendor_number_counter');
 
-        return $vendor_number;
+        $entity_number = $vendor_number;
+
+        return $this->replaceUserVars($vendor, $entity_number);
+
     }
 
     /**
@@ -268,7 +304,10 @@ trait GeneratesCounter
 
         $this->incrementCounter($project->company, 'project_number_counter');
 
-        return $project_number;
+        $entity_number = $project_number;
+
+        return $this->replaceUserVars($project, $entity_number);
+
     }
 
 
@@ -289,7 +328,10 @@ trait GeneratesCounter
 
         $this->incrementCounter($task->company, 'task_number_counter');
 
-        return $task_number;
+        $entity_number = $task_number;
+
+        return $this->replaceUserVars($task, $entity_number);
+
     }
 
     /**
@@ -309,8 +351,44 @@ trait GeneratesCounter
 
         $this->incrementCounter($expense->company, 'expense_number_counter');
 
-        return $expense_number;
+        $entity_number = $expense_number;
+
+        return $this->replaceUserVars($expense, $entity_number);
+
     }
+
+    /**
+     * Gets the next expense number.
+     *
+     * @param   RecurringExpense       $expense    The expense
+     * @return  string                 The next expense number.
+     */
+    public function getNextRecurringExpenseNumber(RecurringExpense $expense) :string
+    {
+        $this->resetCompanyCounters($expense->company);
+
+        // - 18/09/21 need to set this property if it doesn't exist. //todo refactor this for other properties
+        if(!property_exists($expense->company->settings, 'recurring_expense_number_counter')){
+            $settings = $expense->company->settings;
+            $settings->recurring_expense_number_counter = 1;
+            $settings->recurring_expense_number_pattern = '';
+            $expense->company->settings = $settings;
+            $expense->company->save();
+        }
+
+        $counter = $expense->company->settings->recurring_expense_number_counter;
+        $setting_entity = $expense->company->settings->recurring_expense_number_counter;
+
+        $expense_number = $this->checkEntityNumber(RecurringExpense::class, $expense, $counter, $expense->company->settings->counter_padding, $expense->company->settings->recurring_expense_number_pattern);
+
+        $this->incrementCounter($expense->company, 'recurring_expense_number_counter');
+
+        $entity_number = $expense_number;
+
+        return $this->replaceUserVars($expense, $entity_number);
+
+    }
+
 
     /**
      * Determines if it has shared counter.
@@ -551,6 +629,7 @@ trait GeneratesCounter
         $settings->project_number_counter = 1;
         $settings->task_number_counter = 1;
         $settings->expense_number_counter = 1;
+        $settings->recurring_expense_number_counter =1;
 
         $company->settings = $settings;
         $company->save();
@@ -670,5 +749,30 @@ trait GeneratesCounter
         }
 
         return str_replace($search, $replace, $pattern);
+    }
+
+    private function replaceUserVars($entity, $pattern)
+    {
+
+        if(!$entity)
+            return $pattern;
+
+        $search = [];
+        $replace = [];
+
+        $search[] = '{$user_custom1}';
+        $replace[] = $entity->user->custom_value1;
+
+        $search[] = '{$user_custom2}';
+        $replace[] = $entity->user->custom_value2;
+
+        $search[] = '{$user_custom3}';
+        $replace[] = $entity->user->custom_value3;
+
+        $search[] = '{$user_custom4}';
+        $replace[] = $entity->user->custom_value4;
+
+        return str_replace($search, $replace, $pattern);
+
     }
 }

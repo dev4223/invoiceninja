@@ -13,7 +13,6 @@
 namespace App\PaymentDrivers\PayFast;
 
 use App\Exceptions\PaymentFailed;
-use App\Jobs\Mail\PaymentFailureMailer;
 use App\Jobs\Util\SystemLogger;
 use App\Models\ClientGatewayToken;
 use App\Models\GatewayType;
@@ -32,44 +31,10 @@ class Token
 
     public $payfast;
 
-    //https://api.payfast.co.za/subscriptions/dc0521d3-55fe-269b-fa00-b647310d760f/adhoc 
-
     public function __construct(PayFastPaymentDriver $payfast)
     {
         $this->payfast = $payfast;
     }
-
-	// Attributes
-	// merchant-id
-	// integer, 8 char | REQUIRED
-	// Header, the Merchant ID as given by the PayFast system.
-	// version
-	// string | REQUIRED
-	// Header, the PayFast API version (i.e. v1).
-	// timestamp
-	// ISO-8601 date and time | REQUIRED
-	// Header, the current timestamp (YYYY-MM-DDTHH:MM:SS[+HH:MM]).
-	// signature
-	// string | REQUIRED
-	// Header, MD5 hash of the alphabetised submitted header and body variables, as well as the passphrase. Characters must be in lower case.
-	// amount
-	// integer | REQUIRED
-	// Body, the amount which the buyer must pay, in cents (ZAR), no decimals.
-	// item_name
-	// string, 100 char | REQUIRED
-	// Body, the name of the item being charged for.
-	// item_description
-	// string, 255 char | OPTIONAL
-	// Body, the description of the item being charged for.
-	// itn
-	// boolean | OPTIONAL
-	// Body, specify whether an ITN must be sent for the tokenization payment (true by default).
-	// m_payment_id
-	// string, 100 char | OPTIONAL
-	// Body, unique payment ID on the merchant’s system.
-	// cc_cvv
-	// numeric | OPTIONAL
-
 
     public function tokenBilling(ClientGatewayToken $cgt, PaymentHash $payment_hash)
     {
@@ -79,68 +44,61 @@ class Token
 
 		$header =[
             'merchant-id' => $this->payfast->company_gateway->getConfigField('merchantId'),
-            'timestamp' => now()->format('c'),
             'version' => 'v1',
+            'timestamp' => now()->format('c'),
 		];
-
-        nlog($header);
 
         $body = [
             'amount' => $amount,
             'item_name' => 'purchase',
             'item_description' => ctrans('texts.invoices') . ': ' . collect($payment_hash->invoices())->pluck('invoice_number'),
             'm_payment_id' => $payment_hash->hash,
-            'passphrase' => $this->payfast->company_gateway->getConfigField('passphrase'),
         ];        
-
-        $header['signature'] = $this->genSig(array_merge($header, $body));
+        
+        $header['signature'] = $this->payfast->generateTokenSignature(array_merge($body, $header));
 
         nlog($header['signature']);
-        nlog($header['timestamp']);
-        nlog($this->payfast->company_gateway->getConfigField('merchantId'));
-        
+
         $result = $this->send($header, $body, $cgt->token);
 
-        nlog($result);
-        
-        // /*Refactor and push to BaseDriver*/
-        // if ($data['response'] != null && $data['response']->getMessages()->getResultCode() == 'Ok') {
+    }
 
-        //     $response = $data['response'];
+    protected function generate_parameter_string( $api_data, $sort_data_before_merge = true, $skip_empty_values = true ) {
 
-        //     $this->storePayment($payment_hash, $data);
+        // if sorting is required the passphrase should be added in before sort.
+        if ( ! empty( $this->payfast->company_gateway->getConfigField('passphrase') ) && $sort_data_before_merge ) 
+            $api_data['passphrase'] = $this->payfast->company_gateway->getConfigField('passphrase');
 
-        //     $vars = [
-        //         'invoices' => $payment_hash->invoices(),
-        //         'amount' => $amount,
-        //     ];
+        if ( $sort_data_before_merge ) {
+            ksort( $api_data );
+        }
 
-        //     $logger_message = [
-        //         'server_response' => $response->getTransactionResponse()->getTransId(),
-        //         'data' => $this->formatGatewayResponse($data, $vars),
-        //     ];
+        // concatenate the array key value pairs.
+        $parameter_string = '';
+        foreach ( $api_data as $key => $val ) {
 
-        //     SystemLogger::dispatch($logger_message, SystemLog::CATEGORY_GATEWAY_RESPONSE, SystemLog::EVENT_GATEWAY_SUCCESS, SystemLog::TYPE_AUTHORIZE, $this->authorize->client, $this->authorize->client->company);
+            if ( $skip_empty_values && empty( $val ) ) {
+                continue;
+            }
 
-        //     return true;
-        // } else {
+            if ( 'signature' !== $key ) {
+                $val = urlencode( $val );
+                $parameter_string .= "$key=$val&";
+            }
+        }
+        // when not sorting passphrase should be added to the end before md5
+        if ( $sort_data_before_merge ) {
+            $parameter_string = rtrim( $parameter_string, '&' );
+        } elseif ( ! empty( $this->pass_phrase ) ) {
+            $parameter_string .= 'passphrase=' . urlencode( $this->payfast->company_gateway->getConfigField('passphrase') );
+        } else {
+            $parameter_string = rtrim( $parameter_string, '&' );
+        }
 
-        //     $vars = [
-        //         'invoices' => $payment_hash->invoices(),
-        //         'amount' => $amount,
-        //     ];
+        nlog($parameter_string);
 
-        //     $logger_message = [
-        //         'server_response' => $response->getTransactionResponse()->getTransId(),
-        //         'data' => $this->formatGatewayResponse($data, $vars),
-        //     ];
+        return $parameter_string;
 
-        //     PaymentFailureMailer::dispatch($this->authorize->client, $response->getTransactionResponse()->getTransId(), $this->authorize->client->company, $amount);
-
-        //     SystemLogger::dispatch($logger_message, SystemLog::CATEGORY_GATEWAY_RESPONSE, SystemLog::EVENT_GATEWAY_FAILURE, SystemLog::TYPE_AUTHORIZE, $this->authorize->client, $this->authorize->client->company);
-
-        //     return false;
-        // }
     }
 
     private function genSig($data)
@@ -155,6 +113,8 @@ class Token
                 $fields[$key] = $data[$key];
             }
         }
+
+        nlog(http_build_query($fields));
 
         return md5(http_build_query($fields));
     }

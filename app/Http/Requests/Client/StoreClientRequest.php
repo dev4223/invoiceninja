@@ -54,6 +54,7 @@ class StoreClientRequest extends Request
         /* Ensure we have a client name, and that all emails are unique*/
         //$rules['name'] = 'required|min:1';
         $rules['settings'] = new ValidClientGroupSettingsRule();
+        $rules['contacts'] = 'array';
         $rules['contacts.*.email'] = 'bail|nullable|distinct|sometimes|email';
         $rules['contacts.*.password'] = [
                                         'nullable',
@@ -72,7 +73,6 @@ class StoreClientRequest extends Request
 
         $rules['number'] = ['nullable',Rule::unique('clients')->where('company_id', auth()->user()->company()->id)];
         $rules['id_number'] = ['nullable',Rule::unique('clients')->where('company_id', auth()->user()->company()->id)];
-
 
         return $rules;
     }

@@ -24,10 +24,12 @@ use App\Models\Company;
 use App\Models\CompanyToken;
 use App\Models\Country;
 use App\Models\Credit;
+use App\Models\Document;
 use App\Models\Expense;
 use App\Models\Product;
 use App\Models\Project;
 use App\Models\Quote;
+use App\Models\RecurringInvoice;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Vendor;
@@ -76,6 +78,9 @@ class CreateTestData extends Command
      */
     public function handle()
     {
+        if(config('ninja.is_docker'))
+            return;
+        
         $this->info(date('r').' Running CreateTestData...');
         $this->count = $this->argument('count');
 
@@ -229,6 +234,7 @@ class CreateTestData extends Command
                 'user_id' => $user->id,
                 'company_id' => $company->id,
             ]);
+
 
         $this->count = $this->count * 10;
 
@@ -387,6 +393,14 @@ class CreateTestData extends Command
                 'company_id' => $company->id,
             ]);
 
+
+        Document::factory()->count(50)->create([
+                'user_id' => $user->id,
+                'company_id' => $company->id,
+                'documentable_type' => Client::class,
+                'documentable_id' => $client->id
+            ]);
+
         ClientContact::factory()->create([
                     'user_id' => $user->id,
                     'client_id' => $client->id,
@@ -428,6 +442,13 @@ class CreateTestData extends Command
                 'company_id' => $client->company->id,
             ]);
 
+        Document::factory()->count(50)->create([
+                'user_id' => $client->user->id,
+                'company_id' => $client->company_id,
+                'documentable_type' => Vendor::class,
+                'documentable_id' => $vendor->id
+            ]);
+
         VendorContact::factory()->create([
                 'user_id' => $client->user->id,
                 'vendor_id' => $vendor->id,
@@ -449,6 +470,14 @@ class CreateTestData extends Command
                 'user_id' => $client->user->id,
                 'company_id' => $client->company->id,
             ]);
+
+
+        Document::factory()->count(5)->create([
+                'user_id' => $client->user->id,
+                'company_id' => $client->company_id,
+                'documentable_type' => Task::class,
+                'documentable_id' => $vendor->id
+            ]);
     }
 
     private function createProject($client)
@@ -456,6 +485,13 @@ class CreateTestData extends Command
         $vendor = Project::factory()->create([
                 'user_id' => $client->user->id,
                 'company_id' => $client->company->id,
+            ]);
+
+            Document::factory()->count(5)->create([
+                'user_id' => $client->user->id,
+                'company_id' => $client->company_id,
+                'documentable_type' => Project::class,
+                'documentable_id' => $vendor->id
             ]);
     }
 
@@ -500,11 +536,23 @@ class CreateTestData extends Command
         $invoice->save();
         $invoice->service()->createInvitations()->markSent();
 
-        $this->invoice_repo->markSent($invoice);
+        if (rand(0, 1)) {
+            $this->invoice_repo->markSent($invoice);
+        }
 
         if (rand(0, 1)) {
             $invoice = $invoice->service()->markPaid()->save();
         }
+
+            Document::factory()->count(5)->create([
+                'user_id' => $invoice->user->id,
+                'company_id' => $invoice->company_id,
+                'documentable_type' => Invoice::class,
+                'documentable_id' => $invoice->id
+            ]);
+
+        RecurringInvoice::factory()->create(['user_id' => $invoice->user->id, 'company_id' => $invoice->company->id, 'client_id' => $invoice->client_id]);
+
 
         event(new InvoiceWasCreated($invoice, $invoice->company, Ninja::eventVars()));
     }

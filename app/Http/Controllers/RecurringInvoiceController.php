@@ -31,7 +31,6 @@ use App\Utils\Ninja;
 use App\Utils\Traits\MakesHash;
 use App\Utils\Traits\SavesDocuments;
 use Carbon\Carbon;
-use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 
@@ -209,7 +208,11 @@ class RecurringInvoiceController extends BaseController
 
         $offset = $recurring_invoice->client->timezone_offset();
         $recurring_invoice->next_send_date = Carbon::parse($recurring_invoice->next_send_date)->startOfDay()->addSeconds($offset);
-        $recurring_invoice->save();
+        $recurring_invoice->saveQuietly();
+
+        $recurring_invoice->service()
+                          ->triggeredActions($request)
+                          ->save();
 
         return $this->itemResponse($recurring_invoice);
     }

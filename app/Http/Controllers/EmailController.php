@@ -114,9 +114,9 @@ class EmailController extends BaseController
     public function send(SendEmailRequest $request)
     {
         $entity = $request->input('entity');
-        $entity_obj = $entity::find($request->input('entity_id'));
-        $subject = $request->input('subject');
-        $body = $request->input('body');
+        $entity_obj = $entity::withTrashed()->with('invitations')->find($request->input('entity_id'));
+        $subject = $request->has('subject') ? $request->input('subject') : '';
+        $body = $request->has('body') ? $request->input('body') : '';
         $entity_string = strtolower(class_basename($entity_obj));
         $template = str_replace("email_template_", "", $request->input('template'));
 
@@ -127,12 +127,11 @@ class EmailController extends BaseController
 
         $entity_obj->invitations->each(function ($invitation) use ($data, $entity_string, $entity_obj, $template) {
 
-            if ($invitation->contact->send_email && $invitation->contact->email) {
+            if (!$invitation->contact->trashed() && $invitation->contact->email) {
                 
                 $entity_obj->service()->markSent()->save();
 
                 EmailEntity::dispatch($invitation->fresh(), $invitation->company, $template, $data);
-                             // ->delay(now()->addSeconds(45));
                 
             }
 

@@ -13,9 +13,11 @@
 namespace App\PaymentDrivers\WePay;
 
 use App\Exceptions\PaymentFailed;
+use App\Jobs\Util\SystemLogger;
 use App\Models\ClientGatewayToken;
 use App\Models\GatewayType;
 use App\Models\Payment;
+use App\Models\SystemLog;
 use App\PaymentDrivers\WePayPaymentDriver;
 use App\PaymentDrivers\WePay\WePayCommon;
 use App\Utils\Traits\MakesHash;
@@ -60,12 +62,33 @@ class ACH
           'method' => '1',
          */
 
-        $response = $this->wepay_payment_driver->wepay->request('payment_bank/persist', [
-            'client_id'          => config('ninja.wepay.client_id'),
-            'client_secret'      => config('ninja.wepay.client_secret'),
-            'payment_bank_id'     => (int)$data['bank_account_id'],
-        ]);
+        try{
+            $response = $this->wepay_payment_driver->wepay->request('payment_bank/persist', [
+                'client_id'          => config('ninja.wepay.client_id'),
+                'client_secret'      => config('ninja.wepay.client_secret'),
+                'payment_bank_id'     => (int)$data['bank_account_id'],
+            ]);
+        }
+        catch(\Exception $e){
 
+            $this->wepay_payment_driver->sendFailureMail($e->getMessage());
+
+            $message = [
+                'server_response' => $e->getMessage(),
+                'data' => $this->wepay_payment_driver->payment_hash->data,
+            ];
+
+            SystemLogger::dispatch(
+                $e->getMessage(),
+                SystemLog::CATEGORY_GATEWAY_RESPONSE,
+                SystemLog::EVENT_GATEWAY_FAILURE,
+                SystemLog::TYPE_WEPAY,
+                $this->wepay_payment_driver->client,
+                $this->wepay_payment_driver->client->company,
+            );
+
+            throw new PaymentFailed($e->getMessage(), 400);
+        }
         // display the response
         // nlog($response);
         
@@ -202,26 +225,31 @@ class ACH
 
         $app_fee = (config('ninja.wepay.fee_ach_multiplier') * $this->wepay_payment_driver->payment_hash->data->amount_with_fee) + config('ninja.wepay.fee_fixed');
 
-        $response = $this->wepay_payment_driver->wepay->request('checkout/create', array(
-            // 'callback_uri'        => route('payment_webhook', ['company_key' => $this->wepay_payment_driver->company_gateway->company->company_key, 'company_gateway_id' => $this->wepay_payment_driver->company_gateway->hashed_id]),
-            'unique_id'           => Str::random(40),
-            'account_id'          => $this->wepay_payment_driver->company_gateway->getConfigField('accountId'),
-            'amount'              => $this->wepay_payment_driver->payment_hash->data->amount_with_fee,
-            'currency'            => $this->wepay_payment_driver->client->getCurrencyCode(),
-            'short_description'   => 'Goods and Services',
-            'type'                => 'goods',
-            'fee'                 => [
-                'fee_payer' => config('ninja.wepay.fee_payer'),
-                'app_fee' => $app_fee,
-            ],
-            'payment_method'      => array(
-                'type'            => 'payment_bank',
-                'payment_bank'     => array(
-                    'id'          => $token->token
+        try{
+            $response = $this->wepay_payment_driver->wepay->request('checkout/create', array(
+                // 'callback_uri'        => route('payment_webhook', ['company_key' => $this->wepay_payment_driver->company_gateway->company->company_key, 'company_gateway_id' => $this->wepay_payment_driver->company_gateway->hashed_id]),
+                'unique_id'           => Str::random(40),
+                'account_id'          => $this->wepay_payment_driver->company_gateway->getConfigField('accountId'),
+                'amount'              => $this->wepay_payment_driver->payment_hash->data->amount_with_fee,
+                'currency'            => $this->wepay_payment_driver->client->getCurrencyCode(),
+                'short_description'   => 'Goods and Services',
+                'type'                => 'goods',
+                'fee'                 => [
+                    'fee_payer' => config('ninja.wepay.fee_payer'),
+                    'app_fee' => $app_fee,
+                ],
+                'payment_method'      => array(
+                    'type'            => 'payment_bank',
+                    'payment_bank'     => array(
+                        'id'          => $token->token
+                    )
                 )
-            )
-        ));
-
+            ));
+        }
+        catch(\Exception $e){
+            throw new PaymentFailed($e->getMessage(), 500);
+        }
+        
                 /* Merge all data and store in the payment hash*/
         $state = [
             'server_response' => $response,
@@ -271,4 +299,68 @@ class ACH
         $this->wepay_payment_driver->storeGatewayToken($data);
 
     }     
+
+
+    public function tokenBilling($token, $payment_hash)
+    {
+        
+        $token_meta = $token->meta;
+
+        if(!property_exists($token_meta, 'state') || $token_meta->state != "authorized")
+            return redirect()->route('client.payment_methods.verification', ['payment_method' => $token->hashed_id, 'method' => GatewayType::BANK_TRANSFER]);
+
+        $amount = array_sum(array_column($this->wepay_payment_driver->payment_hash->invoices(), 'amount')) + $this->wepay_payment_driver->payment_hash->fee_total;
+
+        $app_fee = (config('ninja.wepay.fee_cc_multiplier') * $amount) + config('ninja.wepay.fee_fixed');
+
+        $response = $this->wepay_payment_driver->wepay->request('checkout/create', array(
+            'unique_id'           => Str::random(40),
+            'account_id'          => $this->wepay_payment_driver->company_gateway->getConfigField('accountId'),
+            'amount'              => $amount,
+            'currency'            => $this->wepay_payment_driver->client->getCurrencyCode(),
+            'short_description'   => 'Goods and Services',
+            'type'                => 'goods',
+            'fee'                 => [
+                'fee_payer' => config('ninja.wepay.fee_payer'),
+                'app_fee' => $app_fee,
+            ],
+            'payment_method'      => array(
+                'type'            => 'payment_bank',
+                'payment_bank'     => array(
+                    'id'          => $token->token
+                )
+            )
+        ));
+
+                /* Merge all data and store in the payment hash*/
+        $state = [
+            'server_response' => $response,
+            'payment_hash' => $this->wepay_payment_driver->payment_hash,
+        ];
+
+        $this->wepay_payment_driver->payment_hash->data = array_merge((array) $this->wepay_payment_driver->payment_hash->data, $state); 
+        $this->wepay_payment_driver->payment_hash->save();
+
+        if(in_array($response->state, ['authorized', 'captured'])){
+            //success
+            nlog("success");
+            $payment_status = $response->state == 'authorized' ? Payment::STATUS_COMPLETED : Payment::STATUS_PENDING;
+
+            return $this->processSuccessfulPayment($response, $payment_status, GatewayType::BANK_TRANSFER, true);
+        }
+
+        if(in_array($response->state, ['released', 'cancelled', 'failed', 'expired'])){
+            //some type of failure
+            nlog("failure");
+
+            $payment_status = $response->state == 'cancelled' ? Payment::STATUS_CANCELLED : Payment::STATUS_FAILED;
+
+            $this->processUnSuccessfulPayment($response, $payment_status);
+        }
+
+    }
+
+
+
+
 }

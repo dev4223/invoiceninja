@@ -11,8 +11,11 @@
 namespace Tests\Unit;
 
 use App\Factory\InvoiceInvitationFactory;
+use App\Models\CompanyToken;
+use App\Utils\Traits\MakesHash;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Validation\ValidationException;
 use Tests\MockAccountData;
 use Tests\TestCase;
 
@@ -20,7 +23,8 @@ class InvitationTest extends TestCase
 {
     use MockAccountData;
     use DatabaseTransactions;
-
+    use MakesHash;
+    
     public function setUp() :void
     {
         parent::setUp();
@@ -30,6 +34,9 @@ class InvitationTest extends TestCase
         $this->withoutMiddleware(
             ThrottleRequests::class
         );
+
+        $this->withoutExceptionHandling();
+
     }
 
     public function testInvitationSanity()
@@ -54,9 +61,10 @@ class InvitationTest extends TestCase
         try {
 
         $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
             'X-API-TOKEN' => $this->token,
         ])->put('/api/v1/invoices/'.$this->encodePrimaryKey($this->invoice->id), $this->invoice->toArray());
-        } catch (\Exception $e) {
+        } catch (ValidationException $e) {
 
             nlog($e->getMessage());
         }
@@ -73,6 +81,7 @@ class InvitationTest extends TestCase
 
         $new_invite = InvoiceInvitationFactory::create($this->invoice->company_id, $this->invoice->user_id);
         $new_invite->client_contact_id = $contact->hashed_id;
+        $new_invite->key = $this->createDbHash(config('database.default'));
 
         $invitations = $this->invoice->invitations()->get();
 

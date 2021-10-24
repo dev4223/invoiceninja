@@ -14,7 +14,6 @@ namespace App\PaymentDrivers\WePay;
 
 use App\Exceptions\PaymentFailed;
 use App\Http\Requests\ClientPortal\Payments\PaymentResponseRequest;
-use App\Jobs\Mail\PaymentFailureMailer;
 use App\Jobs\Util\SystemLogger;
 use App\Models\GatewayType;
 use App\Models\Payment;
@@ -60,12 +59,18 @@ use WePayCommon;
           'method' => '1',
          */
 
-		$response = $this->wepay_payment_driver->wepay->request('credit_card/authorize', array(
-		    'client_id'          => config('ninja.wepay.client_id'),
-		    'client_secret'      => config('ninja.wepay.client_secret'),
-		    'credit_card_id'     => (int)$data['credit_card_id'],
-		));
+        try {
+            
+    		$response = $this->wepay_payment_driver->wepay->request('credit_card/authorize', array(
+    		    'client_id'          => config('ninja.wepay.client_id'),
+    		    'client_secret'      => config('ninja.wepay.client_secret'),
+    		    'credit_card_id'     => (int)$data['credit_card_id'],
+    		));
 
+        }
+        catch(\Exception $e){
+            return $this->wepay_payment_driver->processInternallyFailedPayment($this->wepay_payment_driver, $e);
+        }
 		// display the response
         // nlog($response);
         
@@ -116,11 +121,16 @@ use WePayCommon;
         {
             nlog("authorize the card first!");
 
-            $response = $this->wepay_payment_driver->wepay->request('credit_card/authorize', array(
-                'client_id'          => config('ninja.wepay.client_id'),
-                'client_secret'      => config('ninja.wepay.client_secret'),
-                'credit_card_id'     => (int)$request->input('credit_card_id'),
-            ));
+            try {
+                $response = $this->wepay_payment_driver->wepay->request('credit_card/authorize', array(
+                    'client_id'          => config('ninja.wepay.client_id'),
+                    'client_secret'      => config('ninja.wepay.client_secret'),
+                    'credit_card_id'     => (int)$request->input('credit_card_id'),
+                ));
+            }
+            catch(\Exception $e){
+                return $this->wepay_payment_driver->processInternallyFailedPayment($this->wepay_payment_driver, $e);
+            }
 
             $credit_card_id = (int)$response->credit_card_id;
 
@@ -142,24 +152,48 @@ use WePayCommon;
 
         $app_fee = (config('ninja.wepay.fee_cc_multiplier') * $this->wepay_payment_driver->payment_hash->data->amount_with_fee) + config('ninja.wepay.fee_fixed');
         // charge the credit card
-        $response = $this->wepay_payment_driver->wepay->request('checkout/create', array(
-            'unique_id'           => Str::random(40),
-            'account_id'          => $this->wepay_payment_driver->company_gateway->getConfigField('accountId'),
-            'amount'              => $this->wepay_payment_driver->payment_hash->data->amount_with_fee,
-            'currency'            => $this->wepay_payment_driver->client->getCurrencyCode(),
-            'short_description'   => 'Goods and services',
-            'type'                => 'goods',
-            'fee'                 => [
-                'fee_payer' => config('ninja.wepay.fee_payer'),
-                'app_fee' => $app_fee,
-            ],
-            'payment_method'      => array(
-                'type'            => 'credit_card',
-                'credit_card'     => array(
-                    'id'          => $credit_card_id
+
+        try {
+            $response = $this->wepay_payment_driver->wepay->request('checkout/create', array(
+                'unique_id'           => Str::random(40),
+                'account_id'          => $this->wepay_payment_driver->company_gateway->getConfigField('accountId'),
+                'amount'              => $this->wepay_payment_driver->payment_hash->data->amount_with_fee,
+                'currency'            => $this->wepay_payment_driver->client->getCurrencyCode(),
+                'short_description'   => 'Goods and services',
+                'type'                => 'goods',
+                'fee'                 => [
+                    'fee_payer' => config('ninja.wepay.fee_payer'),
+                    'app_fee' => $app_fee,
+                ],
+                'payment_method'      => array(
+                    'type'            => 'credit_card',
+                    'credit_card'     => array(
+                        'id'          => $credit_card_id
+                    )
                 )
-            )
-        ));
+            ));
+        }
+        catch(\Exception $e){
+
+            $this->wepay_payment_driver->sendFailureMail($e->getMessage());
+
+            $message = [
+                'server_response' => $e->getMessage(),
+                'data' => $this->wepay_payment_driver->payment_hash->data,
+            ];
+
+            SystemLogger::dispatch(
+                $e->getMessage(),
+                SystemLog::CATEGORY_GATEWAY_RESPONSE,
+                SystemLog::EVENT_GATEWAY_FAILURE,
+                SystemLog::TYPE_WEPAY,
+                $this->wepay_payment_driver->client,
+                $this->wepay_payment_driver->client->company,
+            );
+
+            throw new PaymentFailed($e->getMessage(), 500);
+
+        }
 
         /* Merge all data and store in the payment hash*/
         $state = [
@@ -261,7 +295,8 @@ https://developer.wepay.com/api/api-calls/checkout
 
     private function storePaymentMethod($response, $payment_method_id)
     {
-nlog("storing card");
+        nlog("storing card");
+
         $payment_meta = new \stdClass;
         $payment_meta->exp_month = (string) $response->expiration_month;
         $payment_meta->exp_year = (string) $response->expiration_year;
@@ -280,6 +315,61 @@ nlog("storing card");
     } 
 
 
+
+    public function tokenBilling($cgt, $payment_hash)
+    {
+
+        $amount = array_sum(array_column($this->wepay_payment_driver->payment_hash->invoices(), 'amount')) + $this->wepay_payment_driver->payment_hash->fee_total;
+
+
+        $app_fee = (config('ninja.wepay.fee_cc_multiplier') * $amount) + config('ninja.wepay.fee_fixed');
+        // charge the credit card
+        $response = $this->wepay_payment_driver->wepay->request('checkout/create', array(
+            'unique_id'           => Str::random(40),
+            'account_id'          => $this->wepay_payment_driver->company_gateway->getConfigField('accountId'),
+            'amount'              => $amount,
+            'currency'            => $this->wepay_payment_driver->client->getCurrencyCode(),
+            'short_description'   => 'Goods and services',
+            'type'                => 'goods',
+            'fee'                 => [
+                'fee_payer' => config('ninja.wepay.fee_payer'),
+                'app_fee' => $app_fee,
+            ],
+            'payment_method'      => array(
+                'type'            => 'credit_card',
+                'credit_card'     => array(
+                    'id'          => $cgt->token
+                )
+            )
+        ));
+
+        /* Merge all data and store in the payment hash*/
+        $state = [
+            'server_response' => $response,
+            'payment_hash' => $payment_hash,
+        ];
+
+        $this->wepay_payment_driver->payment_hash->data = array_merge((array) $this->wepay_payment_driver->payment_hash->data, $state); 
+        $this->wepay_payment_driver->payment_hash->save();
+
+
+        if(in_array($response->state, ['authorized', 'captured'])){
+            //success
+            nlog("success");
+            $payment_status = $response->state == 'authorized' ? Payment::STATUS_COMPLETED : Payment::STATUS_PENDING;
+
+            return $this->processSuccessfulPayment($response, $payment_status, GatewayType::CREDIT_CARD, true);
+        }
+
+        if(in_array($response->state, ['released', 'cancelled', 'failed', 'expired'])){
+            //some type of failure
+            nlog("failure");
+
+            $payment_status = $response->state == 'cancelled' ? Payment::STATUS_CANCELLED : Payment::STATUS_FAILED;
+
+            $this->processUnSuccessfulPayment($response, $payment_status);
+        }
+    }
 
 }
 

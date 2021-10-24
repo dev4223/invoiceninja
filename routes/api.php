@@ -43,12 +43,15 @@ Route::group(['middleware' => ['api_db', 'token_auth', 'locale'], 'prefix' => 'a
     Route::post('connected_account', 'ConnectedAccountController@index');
     Route::post('connected_account/gmail', 'ConnectedAccountController@handleGmailOauth');
 
-    Route::resource('client_statement', 'ClientStatementController@statement'); // name = (client_statement. index / create / show / update / destroy / edit
+    Route::post('client_statement', 'ClientStatementController@statement')->name('client.statement');
 
     Route::post('companies/purge/{company}', 'MigrationController@purgeCompany')->middleware('password_protected');
     Route::post('companies/purge_save_settings/{company}', 'MigrationController@purgeCompanySaveSettings')->middleware('password_protected');
+    
     Route::resource('companies', 'CompanyController'); // name = (companies. index / create / show / update / destroy / edit
+    
     Route::put('companies/{company}/upload', 'CompanyController@upload');
+    Route::post('companies/{company}/default', 'CompanyController@default');
 
     Route::get('company_ledger', 'CompanyLedgerController@index')->name('company_ledger.index');
 
@@ -64,7 +67,7 @@ Route::group(['middleware' => ['api_db', 'token_auth', 'locale'], 'prefix' => 'a
 
     Route::resource('designs', 'DesignController'); // name = (payments. index / create / show / update / destroy / edit
     Route::post('designs/bulk', 'DesignController@bulk')->name('designs.bulk');
-
+    Route::post('designs/set/default', 'DesignController@default')->name('designs.default');
 
     Route::resource('documents', 'DocumentController'); // name = (documents. index / create / show / update / destroy / edit
     Route::get('documents/{document}/download', 'DocumentController@download')->name('documents.download');
@@ -83,6 +86,7 @@ Route::group(['middleware' => ['api_db', 'token_auth', 'locale'], 'prefix' => 'a
 
     Route::resource('group_settings', 'GroupSettingController');
     Route::post('group_settings/bulk', 'GroupSettingController@bulk');
+    Route::put('group_settings/{group_setting}/upload', 'GroupSettingController@upload')->name('group_settings.upload');
 
     Route::post('import', 'ImportController@import')->name('import.import');
     Route::post('import_json', 'ImportJsonController@import')->name('import.import_json');
@@ -129,12 +133,17 @@ Route::group(['middleware' => ['api_db', 'token_auth', 'locale'], 'prefix' => 'a
     Route::post('quotes/bulk', 'QuoteController@bulk')->name('quotes.bulk');
     Route::put('quotes/{quote}/upload', 'QuoteController@upload');
 
+    Route::resource('recurring_expenses', 'RecurringExpenseController');
+    Route::post('recurring_expenses/bulk', 'RecurringExpenseController@bulk')->name('recurring_expenses.bulk');
+    Route::put('recurring_expenses/{recurring_expense}/upload', 'RecurringExpenseController@upload');
+
+
     Route::resource('recurring_invoices', 'RecurringInvoiceController'); // name = (recurring_invoices. index / create / show / update / destroy / edit
     Route::post('recurring_invoices/bulk', 'RecurringInvoiceController@bulk')->name('recurring_invoices.bulk');
     Route::put('recurring_invoices/{recurring_invoice}/upload', 'RecurringInvoiceController@upload');
     Route::resource('recurring_quotes', 'RecurringQuoteController'); // name = (recurring_invoices. index / create / show / update / destroy / edit
-
     Route::post('recurring_quotes/bulk', 'RecurringQuoteController@bulk')->name('recurring_quotes.bulk');
+    Route::put('recurring_quotes/{recurring_quote}/upload', 'RecurringQuoteController@upload');
 
     Route::post('refresh', 'Auth\LoginController@refresh');
 
@@ -159,8 +168,8 @@ Route::group(['middleware' => ['api_db', 'token_auth', 'locale'], 'prefix' => 'a
 
     Route::post('templates', 'TemplateController@show')->name('templates.show');
 
-    Route::resource('tokens', 'TokenController')->middleware('password_protected'); // name = (tokens. index / create / show / update / destroy / edit
-    Route::post('tokens/bulk', 'TokenController@bulk')->name('tokens.bulk')->middleware('password_protected');
+    Route::resource('tokens', 'TokenController'); // name = (tokens. index / create / show / update / destroy / edit
+    Route::post('tokens/bulk', 'TokenController@bulk')->name('tokens.bulk');
 
     Route::get('settings/enable_two_factor', 'TwoFactorController@setupTwoFactor');
     Route::post('settings/enable_two_factor', 'TwoFactorController@enableTwoFactor');
@@ -190,8 +199,12 @@ Route::group(['middleware' => ['api_db', 'token_auth', 'locale'], 'prefix' => 'a
     Route::post('stripe/update_payment_methods', 'StripeController@update')->middleware('password_protected')->name('stripe.update');
     Route::post('stripe/import_customers', 'StripeController@import')->middleware('password_protected')->name('stripe.import');
 
+    Route::post('stripe/verify', 'StripeController@verify')->middleware('password_protected')->name('stripe.verify');
+    Route::post('stripe/disconnect/{company_gateway_id}', 'StripeController@disconnect')->middleware('password_protected')->name('stripe.disconnect');
+
     Route::resource('subscriptions', 'SubscriptionController');
     Route::post('subscriptions/bulk', 'SubscriptionController@bulk')->name('subscriptions.bulk');
+    Route::get('statics', 'StaticController');
 
 });
 
@@ -203,7 +216,7 @@ Route::match(['get', 'post'], 'payment_notification_webhook/{company_key}/{compa
     ->middleware(['guest'])
     ->name('payment_notification_webhook');
 
-Route::post('api/v1/postmark_webhook', 'PostMarkController@webhook');
+Route::post('api/v1/postmark_webhook', 'PostMarkController@webhook')->middleware(['throttle:5000,1']);
 Route::get('token_hash_router', 'OneTimeTokenController@router');
 Route::get('webcron', 'WebCronController@index');
 Route::post('api/v1/get_migration_account', 'HostedMigrationController@getAccount')->middleware('guest');

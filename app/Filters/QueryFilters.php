@@ -12,6 +12,7 @@
 namespace App\Filters;
 
 //use Illuminate\Database\Query\Builder;
+use App\Utils\Traits\MakesHash;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -20,6 +21,8 @@ use Illuminate\Http\Request;
  */
 abstract class QueryFilters
 {
+    use MakesHash;
+    
     /**
      * active status.
      */
@@ -172,9 +175,23 @@ abstract class QueryFilters
 
     public function is_deleted($value)
     {
+        if($value == 'true')
+            return $this->builder->where('is_deleted', $value)->withTrashed();
 
         return $this->builder->where('is_deleted', $value);
 
+    }
+
+    public function client_id(string $client_id = '') :Builder
+    {
+        if (strlen($client_id) == 0) {
+            return $this->builder;
+        }
+
+        $this->builder->where('client_id', $this->decodePrimaryKey($client_id));
+
+        return $this->builder;
+        
     }
 
     public function filter_deleted_clients($value)
@@ -191,5 +208,18 @@ abstract class QueryFilters
         }
 
         return $this->builder;
+    }
+
+    public function with_trashed($value)
+    {
+
+        if($value == 'true'){
+
+            $this->builder->withTrashed();
+
+        }
+
+        return $this->builder;
+
     }
 }

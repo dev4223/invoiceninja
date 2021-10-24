@@ -28,6 +28,8 @@ class InvoiceItemSum
 
     private $line_total;
 
+    private $gross_line_total;
+
     private $currency;
 
     private $total_taxes;
@@ -37,6 +39,8 @@ class InvoiceItemSum
     private $line_items;
 
     private $sub_total;
+
+    private $gross_sub_total;
 
     private $total_discount;
 
@@ -83,6 +87,8 @@ class InvoiceItemSum
     {
         $this->sub_total += $this->getLineTotal();
 
+        $this->gross_sub_total += $this->getGrossLineTotal();
+
         $this->line_items[] = $this->item;
 
         return $this;
@@ -92,6 +98,7 @@ class InvoiceItemSum
     private function sumLineItem()
     {   //todo need to support quantities less than the precision amount
         // $this->setLineTotal($this->formatValue($this->item->cost, $this->currency->precision) * $this->formatValue($this->item->quantity, $this->currency->precision));
+        
         $this->setLineTotal($this->item->cost * $this->item->quantity);
 
         return $this;
@@ -102,7 +109,15 @@ class InvoiceItemSum
         if ($this->invoice->is_amount_discount) {
             $this->setLineTotal($this->getLineTotal() - $this->formatValue($this->item->discount, $this->currency->precision));
         } else {
-            $this->setLineTotal($this->getLineTotal() - $this->formatValue(round($this->item->line_total * ($this->item->discount / 100), 2), $this->currency->precision));
+
+            /*Test 16-08-2021*/
+            $discount = ($this->item->line_total * ($this->item->discount / 100));
+            $this->setLineTotal($this->formatValue(($this->getLineTotal() - $discount), $this->currency->precision));
+            /*Test 16-08-2021*/
+
+            //replaces the following
+
+            // $this->setLineTotal($this->getLineTotal() - $this->formatValue(round($this->item->line_total * ($this->item->discount / 100), 2), $this->currency->precision));
         }
 
         $this->item->is_amount_discount = $this->invoice->is_amount_discount;
@@ -113,9 +128,6 @@ class InvoiceItemSum
     private function calcTaxes()
     {
         $item_tax = 0;
-
-        // nlog(print_r($this->item,1));
-        // nlog(print_r($this->invoice,1));
 
         $amount = $this->item->line_total - ($this->item->line_total * ($this->invoice->discount / 100));
         $item_tax_rate1_total = $this->calcAmountLineTax($this->item->tax_rate1, $amount);
@@ -138,9 +150,10 @@ class InvoiceItemSum
 
         if($item_tax_rate3_total != 0)     
             $this->groupTax($this->item->tax_name3, $this->item->tax_rate3, $item_tax_rate3_total);
-        
 
         $this->setTotalTaxes($this->formatValue($item_tax, $this->currency->precision));
+
+        $this->item->gross_line_total = $this->getLineTotal() + $item_tax;
 
         return $this;
     }
@@ -180,6 +193,11 @@ class InvoiceItemSum
         return $this->item->line_total;
     }
 
+    public function getGrossLineTotal()
+    {
+        return $this->item->gross_line_total;
+    }
+
     public function getLineItems()
     {
         return $this->line_items;
@@ -200,6 +218,11 @@ class InvoiceItemSum
     public function getSubTotal()
     {
         return $this->sub_total;
+    }
+
+    public function getGrossSubTotal()
+    {
+        return $this->gross_sub_total;
     }
 
     public function setSubTotal($value)
@@ -257,6 +280,7 @@ class InvoiceItemSum
             if ($item_tax_rate3_total != 0) {
                 $this->groupTax($this->item->tax_name3, $this->item->tax_rate3, $item_tax_rate3_total);
             }
+
         }
 
         $this->setTotalTaxes($item_tax);

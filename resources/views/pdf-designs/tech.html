@@ -51,10 +51,15 @@
         flex-direction: row;
         justify-content: space-between;
         align-items: center;
+        height: 120px;
     }
 
-    .company-logo {
-        max-width: 65%;
+    .company-logo-wrapper {
+        padding-bottom: 60px;
+    }
+
+    .company-logo-wrapper {
+        height: 5rem;
     }
 
     .header-invoice-number {
@@ -121,18 +126,14 @@
 
     .body-wrapper {}
 
-    #product-table,
-    #delivery-note-table,
-    #task-table {
+    [data-ref="table"] {
         min-width: 100%;
         table-layout: fixed;
         overflow-wrap: break-word;
         margin-top: 3rem;
     }
 
-    #product-table > thead > tr > th,
-    #delivery-note-table > thead > tr > th,
-    #task-table > thead > tr > th {
+    [data-ref="table"] > thead > tr > th {
         text-transform: uppercase;
         font-weight: normal;
         padding: 1rem;
@@ -141,28 +142,20 @@
         font-size: 1.1rem;
     }
 
-    #product-table > thead > tr > th:last-child,
-    #delivery-note-table > thead > tr > th:last-child,
-    #task-table > thead > tr > th:last-child {
+    [data-ref="table"] > thead > tr > th:last-child {
         text-align: right;
     }
 
-    #product-table > tbody > tr > td,
-    #delivery-note-table > tbody > tr > td,
-    #task-table > tbody > tr > td {
+    [data-ref="table"] > tbody > tr > td {
         border-bottom: 1px solid #e6e6e6;
         padding: 1rem;
     }
 
-    #product-table > tbody > tr > td:first-child,
-    #delivery-note-table > tbody > tr > td:first-child,
-    #task-table > tbody > tr > td:first-child {
+    [data-ref="table"] > tbody > tr > td:first-child {
         color: var(--primary-color);
     }
 
-    #product-table > tbody > tr > td:last-child,
-    #delivery-note-table > tbody > tr > td:last-child,
-    #task-table > tbody > tr > td:last-child {
+    [data-ref="table"]  > tbody > tr > td:last-child {
         text-align: right;
     }
 
@@ -190,7 +183,7 @@
     }
 
     #table-totals>.totals-table-right-side>*> :nth-child(1) {
-        text-align: left;
+        text-align: "$dir_text_align";
         padding: 7px;
     }
 
@@ -228,12 +221,43 @@
     }
 
     /** Markdown-specific styles. **/
-    #product-table h3,
-    #task-table h3,
-    #delivery-note-table h3 {
+    [data-ref="table"] h3 {
         font-size: 1rem;
         margin-bottom: 0;
     }
+
+    [data-ref*=".line_total-td"] {
+        white-space: nowrap;
+    }
+
+    /** Useful snippets, uncomment to enable. **/
+
+    /** Hide company logo **/
+    /* .company-logo { display: none } */
+
+    /* Hide company details */
+    /* #company-details > * { display: none } */
+
+    /* Hide company address */
+    /* #company-address > * { display: none } */
+
+    /* Hide public notes */
+    /* [data-ref="total_table-public_notes"] { display: none } */
+
+    /* Hide terms label */
+    /* [data-ref="total_table-terms-label"] { display: none } */
+
+    /* Hide totals table */
+    /* #table-totals { display: none } */
+
+    /* Hide totals table left side */
+    /* #table-totals div:first-child > * { display: none !important } */
+
+    /* Hide totals table right side */
+    /* .totals-table-right-side { display: none } */
+
+    /** For more info, please check our docs: https://invoiceninja.github.io **/
+    /** To find out selectors on your own: https://invoiceninja.github.io/docs/custom-fields/#snippets **/
 </style>
 
 <div id="header"></div>
@@ -246,18 +270,20 @@
         </div>
 
         <div class="logo-and-partial-entity-info">
-            <img class="company-logo" src="$company.logo"
+            <div class="company-logo-wrapper">
+                <img class="company-logo" src="$company.logo"
                  alt="$company.name logo">
+            </div>
             <div class="top-right-side-section">
-                <section>
+                <div dir="$dir">
                     <span class="header-payment-due-label">$payment_due_label:</span>
                     <span>$payment_due</span>
-                </section>
+                </div>
 
-                <section>
+                <div dir="$dir">
                     <span class="header-amount-due-label">$amount_due_label:</span>
                     <span class="header-amount-due-value">$amount_due</span>
-                </section>
+                </div>
             </div>
         </div>
     </div>
@@ -279,11 +305,20 @@
     </div>
 
     <div class="body-wrapper">
-        <table id="product-table" cellspacing="0"></table>
+        <table id="product-table" cellspacing="0" data-ref="table"></table>
 
-        <table id="task-table" cellspacing="0"></table>
+        <table id="task-table" cellspacing="0" data-ref="table"></table>
 
-        <table id="delivery-note-table" cellspacing="0"></table>
+        <table id="delivery-note-table" cellspacing="0" data-ref="table"></table>
+
+        <table id="statement-invoice-table" cellspacing="0" data-ref="table"></table>
+        <div id="statement-invoice-table-totals" data-ref="statement-totals"></div>
+
+        <table id="statement-payment-table" cellspacing="0" data-ref="table"></table>
+        <div id="statement-payment-table-totals" data-ref="statement-totals"></div>
+
+        <table id="statement-aging-table" cellspacing="0" data-ref="table"></table>
+        <div id="statement-aging-table-totals" data-ref="statement-totals"></div>
 
         <div id="table-totals" cellspacing="0"></div>
     </div>
@@ -295,7 +330,12 @@
     <script>
         // Clear up space a bit, if [product-table, tasks-table, delivery-note-table] isn't present.
         document.addEventListener('DOMContentLoaded', () => {
-            ['product-table', 'task-table', 'delivery-note-table'].forEach((tableIdentifier) => {
+            let tables = [
+                'product-table', 'task-table', 'delivery-note-table',
+                'statement-invoice-table', 'statement-payment-table', 'statement-aging-table-totals',
+            ];
+
+            tables.forEach((tableIdentifier) => {
                 document.getElementById(tableIdentifier).childElementCount === 0
                     ? document.getElementById(tableIdentifier).style.display = 'none'
                     : '';

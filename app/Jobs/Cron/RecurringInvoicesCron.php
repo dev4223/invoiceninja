@@ -46,11 +46,15 @@ class RecurringInvoicesCron
             $recurring_invoices = RecurringInvoice::where('next_send_date', '<=', now()->toDateTimeString())
                                                         ->whereNotNull('next_send_date')
                                                         ->whereNull('deleted_at')
+                                                        ->where('is_deleted', false)
                                                         ->where('status_id', RecurringInvoice::STATUS_ACTIVE)
                                                         ->where('remaining_cycles', '!=', '0')
                                                         ->whereHas('client', function ($query) {
                                                              $query->where('is_deleted',0)
                                                                    ->where('deleted_at', NULL);
+                                                        })
+                                                        ->whereHas('company', function ($query) {
+                                                             $query->where('is_disabled',0);
                                                         })
                                                         ->with('company')
                                                         ->cursor();
@@ -58,11 +62,18 @@ class RecurringInvoicesCron
             nlog(now()->format('Y-m-d') . ' Sending Recurring Invoices. Count = '.$recurring_invoices->count());
 
             $recurring_invoices->each(function ($recurring_invoice, $key) {
+                
                 nlog("Current date = " . now()->format("Y-m-d") . " Recurring date = " .$recurring_invoice->next_send_date);
 
-                if (!$recurring_invoice->company->is_disabled) {
+                nlog("Trying to send {$recurring_invoice->number}");
+                
+                try{
                     SendRecurring::dispatchNow($recurring_invoice, $recurring_invoice->company->db);
                 }
+                catch(\Exception $e){
+                    nlog("Unable to sending recurring invoice {$recurring_invoice->id}");
+                }
+                
             });
         } else {
             //multiDB environment, need to
@@ -72,23 +83,33 @@ class RecurringInvoicesCron
                 $recurring_invoices = RecurringInvoice::where('next_send_date', '<=', now()->toDateTimeString())
                                                         ->whereNotNull('next_send_date')
                                                         ->whereNull('deleted_at')
+                                                        ->where('is_deleted', false)
                                                         ->where('status_id', RecurringInvoice::STATUS_ACTIVE)
                                                         ->where('remaining_cycles', '!=', '0')
                                                         ->whereHas('client', function ($query) {
                                                              $query->where('is_deleted',0)
                                                                    ->where('deleted_at', NULL);
                                                         })
+                                                        ->whereHas('company', function ($query) {
+                                                             $query->where('is_disabled',0);
+                                                        })
                                                         ->with('company')
                                                         ->cursor();
 
-                nlog(now()->format('Y-m-d') . ' Sending Recurring Invoices. Count = '.$recurring_invoices->count().' On Database # '.$db);
+                nlog(now()->format('Y-m-d') . ' Sending Recurring Invoices. Count = '.$recurring_invoices->count());
 
                 $recurring_invoices->each(function ($recurring_invoice, $key) {
                     nlog("Current date = " . now()->format("Y-m-d") . " Recurring date = " .$recurring_invoice->next_send_date ." Recurring #id = ". $recurring_invoice->id);
 
-                    if (!$recurring_invoice->company->is_disabled) {
-                        SendRecurring::dispatchNow($recurring_invoice, $recurring_invoice->company->db);
-                    }
+                        nlog("Trying to send {$recurring_invoice->number}");
+                    
+                        try{
+                            SendRecurring::dispatchNow($recurring_invoice, $recurring_invoice->company->db);
+                        }
+                        catch(\Exception $e){
+                            nlog("Unable to sending recurring invoice {$recurring_invoice->id}");
+                        }
+                    
                 });
             }
         }

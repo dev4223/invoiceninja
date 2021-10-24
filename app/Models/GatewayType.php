@@ -11,6 +11,8 @@
 
 namespace App\Models;
 
+use function Symfony\Component\String\s;
+
 class GatewayType extends StaticModel
 {
     public $timestamps = false;
@@ -25,7 +27,17 @@ class GatewayType extends StaticModel
     const APPLE_PAY = 8;
     const SEPA = 9;
     const CREDIT = 10;
-    
+    const KBC = 11;
+    const BANCONTACT = 12;
+    const IDEAL = 13;
+    const HOSTED_PAGE = 14; // For gateways that contain multiple methods.
+    const GIROPAY = 15;
+    const PRZELEWY24 = 16;
+    const EPS = 17;
+    const DIRECT_DEBIT = 18;
+    const ACSS = 19;
+    const BECS = 20;
+
     public function gateway()
     {
         return $this->belongsTo(Gateway::class);
@@ -41,32 +53,42 @@ class GatewayType extends StaticModel
         switch ($type) {
             case self::CREDIT_CARD:
                 return ctrans('texts.credit_card');
-                break;
             case self::BANK_TRANSFER:
                 return ctrans('texts.bank_transfer');
-                break;
             case self::PAYPAL:
                 return ctrans('texts.paypal');
-                break;
             case self::CRYPTO:
                 return ctrans('texts.crypto');
-                break;
             case self::CUSTOM:
                 return ctrans('texts.custom');
-                break;
             case self::ALIPAY:
                 return ctrans('texts.alipay');
-                break;
             case self::SOFORT:
                 return ctrans('texts.sofort');
-                break;
             case self::APPLE_PAY:
                 return ctrans('texts.apple_pay');
-                break;
             case self::SEPA:
                 return ctrans('texts.sepa');
-                break;
-                        
+            case self::KBC:
+                return ctrans('texts.kbc_cbc');
+            case self::BANCONTACT:
+                return ctrans('texts.bancontact');
+            case self::IDEAL:
+                return ctrans('texts.ideal');
+            case self::HOSTED_PAGE:
+                return ctrans('texts.aio_checkout');
+            case self::PRZELEWY24:
+                return ctrans('texts.przelewy24');
+            case self::GIROPAY:
+                return ctrans('texts.giropay');
+            case self::EPS:
+                return ctrans('texts.eps');
+            case self::BECS:
+                return ctrans('tets.becs');
+            case self::ACSS:
+                return ctrans('texts.acss');
+            case self::DIRECT_DEBIT:
+                return ctrans('texts.payment_type_direct_debit');
             default:
                 return 'Undefined.';
                 break;

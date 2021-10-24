@@ -83,9 +83,8 @@ class UpdateInvoicePayment
                 ->updatePaidToDate($paid_amount)
                 ->updateStatus()
                 ->deletePdf()
+                ->workFlow()
                 ->save();
-
-            InvoiceWorkflowSettings::dispatchNow($invoice);
 
             event(new InvoiceWasUpdated($invoice, $invoice->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
         });

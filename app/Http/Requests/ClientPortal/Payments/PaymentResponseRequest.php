@@ -37,6 +37,11 @@ class PaymentResponseRequest extends FormRequest
         return PaymentHash::whereRaw('BINARY `hash`= ?', [$input['payment_hash']])->first();
     }
 
+    public function shouldStoreToken(): bool
+    {
+        return (bool) $this->store_card;
+    }
+
     public function prepareForValidation()
     {
         if ($this->has('store_card')) {
@@ -50,5 +55,10 @@ class PaymentResponseRequest extends FormRequest
                 'pay_with_token' => ($this->pay_with_token === "true" || $this->pay_with_token === true) ? true : false,
             ]);
         }
+    }
+
+    public function shouldUseToken(): bool
+    {
+        return (bool) $this->token;
     }
 }

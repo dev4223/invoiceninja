@@ -11,6 +11,7 @@
 
 namespace Tests;
 
+use App\DataMapper\ClientRegistrationFields;
 use App\DataMapper\ClientSettings;
 use App\DataMapper\CompanySettings;
 use App\Factory\CompanyUserFactory;
@@ -36,7 +37,9 @@ use App\Models\Product;
 use App\Models\Project;
 use App\Models\Quote;
 use App\Models\QuoteInvitation;
+use App\Models\RecurringExpense;
 use App\Models\RecurringInvoice;
+use App\Models\RecurringQuote;
 use App\Models\Task;
 use App\Models\TaskStatus;
 use App\Models\User;
@@ -82,6 +85,16 @@ trait MockAccountData
      * @var
      */
     public $token;
+
+    /**
+     * @var
+     */
+    public $recurring_expense;
+
+    /**
+     * @var
+     */
+    public $recurring_quote;
 
     /**
      * @var
@@ -156,11 +169,12 @@ trait MockAccountData
             }
         }
 
-
         $this->account = Account::factory()->create();
         $this->company = Company::factory()->create([
                             'account_id' => $this->account->id,
                         ]);
+
+        $this->company->client_registration_fields = ClientRegistrationFields::generate();
 
         Storage::makeDirectory($this->company->company_key.'/documents', 0755, true);
         Storage::makeDirectory($this->company->company_key.'/images', 0755, true);
@@ -209,6 +223,7 @@ trait MockAccountData
         $this->cu = CompanyUserFactory::create($user->id, $this->company->id, $this->account->id);
         $this->cu->is_owner = true;
         $this->cu->is_admin = true;
+        $this->cu->is_locked = false;
         $this->cu->save();
 
         $this->token = \Illuminate\Support\Str::random(64);
@@ -284,6 +299,20 @@ trait MockAccountData
         $this->expense = Expense::factory()->create([
             'user_id' => $user_id,
             'company_id' => $this->company->id,
+        ]);
+
+
+        $this->recurring_expense = RecurringExpense::factory()->create([
+            'user_id' => $user_id,
+            'company_id' => $this->company->id,
+            'frequency_id' => 5,
+            'remaining_cycles' => 5,
+        ]);
+
+        $this->recurring_quote = RecurringQuote::factory()->create([
+            'user_id' => $user_id,
+            'company_id' => $this->company->id,
+            'client_id' => $this->client->id,
         ]);
 
         $this->task = Task::factory()->create([
@@ -371,7 +400,7 @@ trait MockAccountData
         $this->quote = $this->quote_calc->getQuote();
 
         $this->quote->status_id = Quote::STATUS_SENT;
-        $this->quote->number = $this->getNextQuoteNumber($this->client);
+        $this->quote->number = $this->getNextQuoteNumber($this->client, $this->quote);
 
         //$this->quote->service()->createInvitations()->markSent();
 
@@ -422,7 +451,7 @@ trait MockAccountData
 
         $this->client->service()->adjustCreditBalance($this->credit->balance)->save();
         $this->credit->ledger()->updateCreditBalance($this->credit->balance)->save();
-        $this->credit->number = $this->getNextCreditNumber($this->client);
+        $this->credit->number = $this->getNextCreditNumber($this->client, $this->credit);
 
 
         CreditInvitation::factory()->create([
@@ -461,6 +490,7 @@ trait MockAccountData
 
             if (! $invitation && $contact->send_email) {
                 $ii = InvoiceInvitationFactory::create($this->invoice->company_id, $this->invoice->user_id);
+                $ii->key = $this->createDbHash(config('database.default'));
                 $ii->invoice_id = $this->invoice->id;
                 $ii->client_contact_id = $contact->id;
                 $ii->save();

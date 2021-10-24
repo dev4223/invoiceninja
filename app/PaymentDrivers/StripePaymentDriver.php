@@ -13,6 +13,7 @@
 namespace App\PaymentDrivers;
 
 use App\Exceptions\PaymentFailed;
+use App\Exceptions\StripeConnectFailure;
 use App\Factory\PaymentFactory;
 use App\Http\Requests\Payments\PaymentWebhookRequest;
 use App\Http\Requests\Request;
@@ -21,13 +22,24 @@ use App\Models\ClientGatewayToken;
 use App\Models\GatewayType;
 use App\Models\Payment;
 use App\Models\PaymentHash;
+use App\Models\PaymentType;
 use App\Models\SystemLog;
 use App\PaymentDrivers\Stripe\ACH;
 use App\PaymentDrivers\Stripe\Alipay;
+use App\PaymentDrivers\Stripe\ApplePay;
 use App\PaymentDrivers\Stripe\Charge;
+use App\PaymentDrivers\Stripe\Connect\Verify;
 use App\PaymentDrivers\Stripe\CreditCard;
 use App\PaymentDrivers\Stripe\ImportCustomers;
 use App\PaymentDrivers\Stripe\SOFORT;
+use App\PaymentDrivers\Stripe\SEPA;
+use App\PaymentDrivers\Stripe\PRZELEWY24;
+use App\PaymentDrivers\Stripe\GIROPAY;
+use App\PaymentDrivers\Stripe\iDeal;
+use App\PaymentDrivers\Stripe\EPS;
+use App\PaymentDrivers\Stripe\Bancontact;
+use App\PaymentDrivers\Stripe\BECS;
+use App\PaymentDrivers\Stripe\ACSS;
 use App\PaymentDrivers\Stripe\UpdatePaymentMethods;
 use App\PaymentDrivers\Stripe\Utilities;
 use App\Utils\Traits\MakesHash;
@@ -70,8 +82,15 @@ class StripePaymentDriver extends BaseDriver
         GatewayType::BANK_TRANSFER => ACH::class,
         GatewayType::ALIPAY => Alipay::class,
         GatewayType::SOFORT => SOFORT::class,
-        GatewayType::APPLE_PAY => 1, // TODO
-        GatewayType::SEPA => 1, // TODO
+        GatewayType::APPLE_PAY => ApplePay::class,
+        GatewayType::SEPA => SEPA::class,
+        GatewayType::PRZELEWY24 => PRZELEWY24::class,
+        GatewayType::GIROPAY => GIROPAY::class,
+        GatewayType::IDEAL => iDeal::class,
+        GatewayType::EPS => EPS::class,
+        GatewayType::BANCONTACT => Bancontact::class,
+        GatewayType::BECS => BECS::class,
+        GatewayType::ACSS => ACSS::class,
     ];
 
     const SYSTEM_LOG_TYPE = SystemLog::TYPE_STRIPE;
@@ -80,13 +99,16 @@ class StripePaymentDriver extends BaseDriver
      * Initializes the Stripe API.
      * @return void
      */
-    public function init(): void
+    public function init()
     {
         if($this->stripe_connect)
         {
             Stripe::setApiKey(config('ninja.ninja_stripe_key'));
 
-            $this->stripe_connect_auth = ["stripe_account" => $this->company_gateway->getConfigField('account_id')];
+            if(strlen($this->company_gateway->getConfigField('account_id')) > 1)
+                $this->stripe_connect_auth = ["stripe_account" => $this->company_gateway->getConfigField('account_id')];
+            else
+                throw new StripeConnectFailure('Stripe Connect has not been configured');
         }
         else
         {
@@ -97,6 +119,8 @@ class StripePaymentDriver extends BaseDriver
             Stripe::setApiKey($this->company_gateway->getConfigField('apiKey'));
 
         }
+
+        return $this;
     }
 
     public function setPaymentMethod($payment_method_id)
@@ -116,7 +140,7 @@ class StripePaymentDriver extends BaseDriver
         $types = [
             // GatewayType::CRYPTO,
             GatewayType::CREDIT_CARD
-        ];        
+        ];
 
         if ($this->client
             && isset($this->client->country)
@@ -137,6 +161,63 @@ class StripePaymentDriver extends BaseDriver
             $types[] = GatewayType::ALIPAY;
         }
 
+        if ($this->client
+            && $this->client->currency()
+            && ($this->client->currency()->code == 'EUR')
+            && isset($this->client->country)
+            && in_array($this->client->country->iso_3166_3, ['AUS', 'DNK', 'DEU', 'ITA', 'LUX', 'NOR', 'SVN', 'GBR', 'EST', 'GRC', 'JPN', 'PRT', 'ESP', 'USA', 'BEL', 'FIN'])) { // TODO: More has to be added https://stripe.com/docs/payments/sepa-debit
+            $types[] = GatewayType::SEPA;
+        }
+
+        if ($this->client
+            && isset($this->client->country)
+            && in_array($this->client->country->iso_3166_3, ['POL'])){
+            $types[] = GatewayType::PRZELEWY24;
+        }
+
+        if($this->client
+            && $this->client->currency()
+            && ($this->client->currency()->code == 'EUR')
+            && isset($this->client->country)
+            && in_array($this->client->country->iso_3166_3, ["DEU"])){
+            $types[] = GatewayType::GIROPAY;
+        }
+
+        if ($this->client
+            && $this->client->currency()
+            && ($this->client->currency()->code == 'EUR')
+            && isset($this->client->country)
+            && in_array($this->client->country->iso_3166_3, ["NLD"]))
+            $types[] = GatewayType::IDEAL;
+
+        if ($this->client
+            && $this->client->currency()
+            && ($this->client->currency()->code == 'EUR')
+            && isset($this->client->country)
+            && in_array($this->client->country->iso_3166_3, ["AUT"]))
+            $types[] = GatewayType::EPS;
+
+        if ($this->client
+            && $this->client->currency()
+            && ($this->client->currency()->code == 'EUR')
+            && isset($this->client->country)
+            && in_array($this->client->country->iso_3166_3, ["BEL"]))
+            $types[] = GatewayType::BANCONTACT;
+
+        if ($this->client
+            && $this->client->currency()
+            && ($this->client->currency()->code == 'AUD')
+            && isset($this->client->country)
+            && in_array($this->client->country->iso_3166_3, ["AUS", "DEU"]))
+            $types[] = GatewayType::BECS;
+
+        if ($this->client
+            && $this->client->currency()
+            && in_array($this->client->currency()->code, ['CAD', 'USD'])
+            && isset($this->client->country)
+            && in_array($this->client->country->iso_3166_3, ["CAN", "USA"]))
+            $types[] = GatewayType::ACSS;
+
         return $types;
     }
 
@@ -155,12 +236,27 @@ class StripePaymentDriver extends BaseDriver
             case GatewayType::SEPA:
                 return 'gateways.stripe.sepa';
                 break;
+            case GatewayType::PRZELEWY24:
+                return 'gateways.stripe.przelewy24';
+                break;
             case GatewayType::CRYPTO:
             case GatewayType::ALIPAY:
             case GatewayType::APPLE_PAY:
                 return 'gateways.stripe.other';
                 break;
-
+            case GatewayType::GIROPAY:
+                return 'gateways.stripe.giropay';
+                break;
+            case GatewayType::IDEAL:
+                return 'gateways.stripe.ideal';
+            case GatewayType::EPS:
+                return 'gateways.stripe.eps';
+            case GatewayType::BANCONTACT:
+                return 'gateways.stripe.bancontact';
+            case GatewayType::BECS:
+                return 'gateways.stripe.becs';
+            case GatewayType::ACSS:
+                return 'gateways.stripe.acss';
             default:
                 break;
         }
@@ -195,8 +291,9 @@ class StripePaymentDriver extends BaseDriver
             $fields[] = ['name' => 'client_country_id', 'label' => ctrans('texts.country'), 'type' => 'text', 'validation' => 'required'];
         }
 
-        if($this->company_gateway->require_postal_code)
+        if($this->company_gateway->require_postal_code) {
             $fields[] = ['name' => 'client_postal_code', 'label' => ctrans('texts.postal_code'), 'type' => 'text', 'validation' => 'required'];
+        }
 
         if ($this->company_gateway->require_shipping_address) {
             $fields[] = ['name' => 'client_shipping_address_line_1', 'label' => ctrans('texts.shipping_address1'), 'type' => 'text', 'validation' => 'required'];
@@ -304,21 +401,39 @@ class StripePaymentDriver extends BaseDriver
 
         $this->init();
 
-        $client_gateway_token = ClientGatewayToken::whereClientId($this->client->id)->whereCompanyGatewayId($this->company_gateway->id)->first();
+        $client_gateway_token = ClientGatewayToken::whereClientId($this->client->id)
+                                                  ->whereCompanyGatewayId($this->company_gateway->id)
+                                                  ->first();
 
+        //Search by customer reference
         if ($client_gateway_token && $client_gateway_token->gateway_customer_reference) {
+
             $customer = Customer::retrieve($client_gateway_token->gateway_customer_reference, $this->stripe_connect_auth);
-        } else {
 
-            $data['name'] = $this->client->present()->name();
-            $data['phone'] = $this->client->present()->phone();
-            
-            if (filter_var($this->client->present()->email(), FILTER_VALIDATE_EMAIL)) {
-                $data['email'] = $this->client->present()->email();
-            }
+            if($customer)
+                return $customer;
 
-            $customer = Customer::create($data, $this->stripe_connect_auth);
         }
+
+        //Search by email
+        $searchResults = \Stripe\Customer::all([
+                    "email" => $this->client->present()->email(),
+                    "limit" => 2,
+                    "starting_after" => null
+        ],$this->stripe_connect_auth);
+
+        if(count($searchResults) == 1)
+            return $searchResults->data[0];
+
+        //Else create a new record
+        $data['name'] = $this->client->present()->name();
+        $data['phone'] = $this->client->present()->phone();
+
+        if (filter_var($this->client->present()->email(), FILTER_VALIDATE_EMAIL)) {
+            $data['email'] = $this->client->present()->email();
+        }
+
+        $customer = Customer::create($data, $this->stripe_connect_auth);
 
         if (!$customer) {
             throw new Exception('Unable to create gateway customer');
@@ -337,9 +452,14 @@ class StripePaymentDriver extends BaseDriver
         $response = null;
 
         try {
-            $response = $this->stripe
-                ->refunds
-                ->create(['charge' => $payment->transaction_reference, 'amount' => $this->convertToStripeAmount($amount, $this->client->currency()->precision, $this->client->currency())], $meta);
+            // $response = $this->stripe
+            //     ->refunds
+            //     ->create(['charge' => $payment->transaction_reference, 'amount' => $this->convertToStripeAmount($amount, $this->client->currency()->precision, $this->client->currency())], $meta);
+
+            $response = \Stripe\Refund::create([
+                'charge' => $payment->transaction_reference,
+                'amount' => $this->convertToStripeAmount($amount, $this->client->currency()->precision, $this->client->currency())
+            ], $meta);
 
             if ($response->status == $response::STATUS_SUCCEEDED) {
                 SystemLogger::dispatch(['server_response' => $response, 'data' => request()->all(),], SystemLog::CATEGORY_GATEWAY_RESPONSE, SystemLog::EVENT_GATEWAY_SUCCESS, SystemLog::TYPE_STRIPE, $this->client, $this->client->company);
@@ -387,21 +507,49 @@ class StripePaymentDriver extends BaseDriver
         return $this->payment_method->processVerification($request, $payment_method);
     }
 
-    public function processWebhookRequest(PaymentWebhookRequest $request, Payment $payment)
+    public function processWebhookRequest(PaymentWebhookRequest $request)
     {
-        if ($request->type == 'source.chargeable') {
-            $payment->status_id = Payment::STATUS_COMPLETED;
-            $payment->save();
+        // Allow app to catch up with webhook request.
+        sleep(2);
+
+        if ($request->type === 'charge.succeeded' || $request->type === 'payment_intent.succeeded') {
+
+            foreach ($request->data as $transaction) {
+                $payment = Payment::query()
+                        ->where('transaction_reference', $transaction['id'])
+                        ->where('company_id', $request->getCompany()->id)
+                        ->first();
+
+                if ($payment) {
+                    $payment->status_id = Payment::STATUS_COMPLETED;
+                    $payment->save();
+                }
+            }
+        } elseif ($request->type === 'source.chargeable') {
+            $this->init();
+
+            foreach ($request->data as $transaction) {
+                $charge = \Stripe\Charge::create([
+                    'amount' => $request->data['object']['amount'],
+                    'currency' => $request->data['object']['currency'],
+                    'source' => $request->data['object']['id'],
+                ], $this->stripe_connect_auth);
+
+                if ($charge->captured) {
+                    $payment = Payment::query()
+                        ->where('transaction_reference', $transaction['id'])
+                        ->where('company_id', $request->getCompany()->id)
+                        ->first();
+
+                    if ($payment) {
+                        $payment->status_id = Payment::STATUS_COMPLETED;
+                        $payment->save();
+                    }
+                }
+            }
         }
 
-        if ($request->type == 'charge.succeeded') {
-            $payment->status_id = Payment::STATUS_COMPLETED;
-            $payment->save();
-        }
-
-        // charge.failed, charge.refunded
-
-        return response([], 200);
+        return response()->json([], 200);
     }
 
     public function tokenBilling(ClientGatewayToken $cgt, PaymentHash $payment_hash)
@@ -505,6 +653,11 @@ class StripePaymentDriver extends BaseDriver
         return Account::all();
     }
 
+    public function setClientFromCustomer($customer)
+    {
+        $this->client = ClientGatewayToken::where('gateway_customer_reference', $customer)->client;
+    }
+
     /**
      * Pull all client payment methods and update
      * the respective tokens in the system.
@@ -529,5 +682,60 @@ class StripePaymentDriver extends BaseDriver
         return (new ImportCustomers($this))->run();
         //match clients based on the gateway_customer_reference column
 
+    }
+
+    public function importMatchedClients()
+    {
+        return (new ImportCustomers($this))->match();
+    }
+
+    public function importCustomer($customer_id)
+    {
+        return (new ImportCustomers($this))->importCustomer($customer_id);
+    }
+
+    public function verifyConnect()
+    {
+        return (new Verify($this))->run();
+    }
+
+    public function disconnect()
+    {
+        if(!$this->stripe_connect)
+            return true;
+
+        if(!strlen($this->company_gateway->getConfigField('account_id')) > 1 )
+            throw new StripeConnectFailure('Stripe Connect has not been configured');
+
+        Stripe::setApiKey(config('ninja.ninja_stripe_key'));
+
+        try {
+
+            \Stripe\OAuth::deauthorize([
+              'client_id' => config('ninja.ninja_stripe_client_id'),
+              'stripe_user_id' => $this->company_gateway->getConfigField('account_id'),
+            ]);
+
+            $config = $this->company_gateway->getConfig();
+            $config->account_id = "";
+            $this->company_gateway->setConfig($config);
+            $this->company_gateway->save();
+
+        }
+        catch(\Exception $e){
+            throw new StripeConnectFailure('Unable to disconnect Stripe Connect');
+        }
+
+        return response()->json(['message' => 'success'], 200);
+    }
+
+    public function decodeUnicodeString($string)
+    {
+        return html_entity_decode($string, ENT_QUOTES, 'UTF-8');
+        // return iconv("UTF-8", "ISO-8859-1//TRANSLIT", $this->decode_encoded_utf8($string));
+    }
+
+    public function decode_encoded_utf8($string){
+        return preg_replace_callback('#\\\\u([0-9a-f]{4})#ism', function($matches) { return mb_convert_encoding(pack("H*", $matches[1]), "UTF-8", "UCS-2BE"); }, $string);
     }
 }

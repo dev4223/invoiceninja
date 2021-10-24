@@ -31,42 +31,8 @@ class RecurringInvoiceTransformer extends EntityTransformer
     ];
 
     protected $availableIncludes = [
-        'invitations',
-        'documents',
         'activities',
-        'history',
-    //    'client',
     ];
-
-    /*
-        public function includeInvoiceItems(Invoice $invoice)
-        {
-            $transformer = new InvoiceItemTransformer($this->serializer);
-
-            return $this->includeCollection($invoice->invoice_items, $transformer, ENTITY_INVOICE_ITEM);
-        }
-
-        public function includeInvitations(Invoice $invoice)
-        {
-            $transformer = new InvitationTransformer($this->account, $this->serializer);
-
-            return $this->includeCollection($invoice->invitations, $transformer, ENTITY_INVITATION);
-        }
-
-        public function includePayments(Invoice $invoice)
-        {
-            $transformer = new PaymentTransformer($this->account, $this->serializer, $invoice);
-
-            return $this->includeCollection($invoice->payments, $transformer, ENTITY_PAYMENT);
-        }
-
-        public function includeClient(Invoice $invoice)
-        {
-            $transformer = new ClientTransformer($this->account, $this->serializer);
-
-            return $this->includeItem($invoice->client, $transformer, ENTITY_CLIENT);
-        }
-    */
    
     public function includeHistory(RecurringInvoice $invoice)
     {
@@ -98,7 +64,8 @@ class RecurringInvoiceTransformer extends EntityTransformer
     
     public function transform(RecurringInvoice $invoice)
     {
-        return [
+        
+        $data = [
             'id' => $this->encodePrimaryKey($invoice->id),
             'user_id' => $this->encodePrimaryKey($invoice->user_id),
             'project_id' => $this->encodePrimaryKey($invoice->project_id),
@@ -154,12 +121,19 @@ class RecurringInvoiceTransformer extends EntityTransformer
             'entity_type' => 'recurringInvoice',
             'frequency_id' => (string) $invoice->frequency_id,
             'remaining_cycles' => (int) $invoice->remaining_cycles,
-            'recurring_dates' => (array) $invoice->recurringDates(),
+            'recurring_dates' => [],
             'auto_bill' => (string) $invoice->auto_bill,
             'auto_bill_enabled' => (bool) $invoice->auto_bill_enabled,
             'due_date_days' => (string) $invoice->due_date_days ?: '',
             'paid_to_date' => (float) $invoice->paid_to_date,
             'subscription_id' => (string)$this->encodePrimaryKey($invoice->subscription_id),
+            'recurring_dates' => (array) [],        
         ];
+
+        
+        if(request()->has('show_dates') && request()->query('show_dates') == 'true')
+            $data['recurring_dates'] = (array) $invoice->recurringDates();
+
+             return $data;
     }
 }

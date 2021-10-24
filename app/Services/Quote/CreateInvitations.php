@@ -15,10 +15,13 @@ use App\Factory\ClientContactFactory;
 use App\Factory\QuoteInvitationFactory;
 use App\Models\Quote;
 use App\Models\QuoteInvitation;
+use App\Utils\Traits\MakesHash;
 use Illuminate\Support\Str;
 
 class CreateInvitations
 {
+    use MakesHash;
+    
     public $quote;
 
     public function __construct(Quote $quote)
@@ -47,6 +50,7 @@ class CreateInvitations
 
             if (! $invitation && $contact->send_email) {
                 $ii = QuoteInvitationFactory::create($this->quote->company_id, $this->quote->user_id);
+                $ii->key = $this->createDbHash(config('database.default'));
                 $ii->quote_id = $this->quote->id;
                 $ii->client_contact_id = $contact->id;
                 $ii->save();
@@ -60,7 +64,7 @@ class CreateInvitations
 
     private function createBlankContact()
     {
-        $new_contact = ClientContacstFactory::create($this->quote->company_id, $this->quote->user_id);
+        $new_contact = ClientContactFactory::create($this->quote->company_id, $this->quote->user_id);
         $new_contact->client_id = $this->quote->client_id;
         $new_contact->contact_key = Str::random(40);
         $new_contact->is_primary = true;

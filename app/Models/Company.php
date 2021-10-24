@@ -50,6 +50,7 @@ class Company extends BaseModel
     protected $presenter = CompanyPresenter::class;
 
     protected $fillable = [
+        'markdown_enabled',
         'calculate_expense_tax_by_amount',
         'invoice_expense_documents',
         'invoice_task_documents',
@@ -93,6 +94,9 @@ class Company extends BaseModel
         'invoice_task_datelog',
         'default_password_timeout',
         'show_task_end_date',
+        'use_comma_as_decimal_place',
+        'report_include_drafts',
+        'client_registration_fields',
     ];
 
     protected $hidden = [
@@ -108,6 +112,7 @@ class Company extends BaseModel
         'updated_at' => 'timestamp',
         'created_at' => 'timestamp',
         'deleted_at' => 'timestamp',
+        'client_registration_fields' => 'array',
     ];
 
     protected $with = [
@@ -225,7 +230,7 @@ class Company extends BaseModel
 
     public function activities()
     {
-        return $this->hasMany(Activity::class)->orderBy('id', 'DESC')->take(300);
+        return $this->hasMany(Activity::class)->orderBy('id', 'DESC')->take(50);
     }
 
     /**
@@ -260,6 +265,14 @@ class Company extends BaseModel
     /**
      * @return HasMany
      */
+    public function recurring_expenses()
+    {
+        return $this->hasMany(RecurringExpense::class)->withTrashed();
+    }
+
+    /**
+     * @return HasMany
+     */
     public function quotes()
     {
         return $this->hasMany(Quote::class)->withTrashed();
@@ -278,7 +291,7 @@ class Company extends BaseModel
      */
     public function company_gateways()
     {
-        return $this->hasMany(CompanyGateway::class);
+        return $this->hasMany(CompanyGateway::class)->withTrashed();
     }
 
     /**
@@ -286,7 +299,7 @@ class Company extends BaseModel
      */
     public function tax_rates()
     {
-        return $this->hasMany(TaxRate::class);
+        return $this->hasMany(TaxRate::class)->withTrashed();
     }
 
     /**
@@ -294,7 +307,7 @@ class Company extends BaseModel
      */
     public function products()
     {
-        return $this->hasMany(Product::class);
+        return $this->hasMany(Product::class)->withTrashed();
     }
 
     /**
@@ -308,7 +321,7 @@ class Company extends BaseModel
 
     public function group_settings()
     {
-        return $this->hasMany(GroupSetting::class);
+        return $this->hasMany(GroupSetting::class)->withTrashed();
     }
 
     public function timezone()
@@ -474,7 +487,7 @@ class Company extends BaseModel
     {
         if (Ninja::isHosted()) {
 
-            if($this->portal_mode == 'domain')
+            if($this->portal_mode == 'domain' && strlen($this->portal_domain) > 3)
                 return $this->portal_domain;
 
             return "https://{$this->subdomain}." . config('ninja.app_domain');

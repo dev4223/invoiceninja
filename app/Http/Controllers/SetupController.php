@@ -16,9 +16,11 @@ use App\Http\Requests\Setup\CheckDatabaseRequest;
 use App\Http\Requests\Setup\CheckMailRequest;
 use App\Http\Requests\Setup\StoreSetupRequest;
 use App\Jobs\Account\CreateAccount;
+use App\Jobs\Util\SchedulerCheck;
 use App\Jobs\Util\VersionCheck;
 use App\Models\Account;
 use App\Utils\CurlUtils;
+use App\Utils\HostedPDF\NinjaPdf;
 use App\Utils\Ninja;
 use App\Utils\SystemHealth;
 use App\Utils\Traits\AppSetup;
@@ -72,55 +74,69 @@ class SetupController extends Controller
             return response('Oops, something went wrong. Check your logs.'); /* We should never reach this block, but just in case. */
         }
 
-        try {
-            $db = SystemHealth::dbCheck($request);
+        // try {
+        //     $db = SystemHealth::dbCheck($request);
 
-            if ($db['success'] == false) {
-                throw new Exception($db['message']);
-            }
-        } catch (Exception $e) {
-            return response([
-                'message' => 'Oops, connection to database was not successful.',
-                'error' => $e->getMessage(),
-            ]);
-        }
+        //     if ($db['success'] == false) {
+        //         throw new Exception($db['message']);
+        //     }
+        // } catch (Exception $e) {
+        //     return response([
+        //         'message' => 'Oops, connection to database was not successful.',
+        //         'error' => $e->getMessage(),
+        //     ]);
+        // }
 
-        try {
-            if ($request->mail_driver != 'log') {
-                $smtp = SystemHealth::testMailServer($request);
+        // try {
+        //     if ($request->mail_driver != 'log') {
+        //         $smtp = SystemHealth::testMailServer($request);
 
-                if ($smtp['success'] == false) {
-                    throw new Exception($smtp['message']);
-                }
-            }
-        } catch (Exception $e) {
-            return response([
-                'message' => 'Oops, connection to mail server was not successful.',
-                'error' => $e->getMessage(),
-            ]);
-        }
+        //         if ($smtp['success'] == false) {
+        //             throw new Exception($smtp['message']);
+        //         }
+        //     }
+        // } catch (Exception $e) {
+        //     return response([
+        //         'message' => 'Oops, connection to mail server was not successful.',
+        //         'error' => $e->getMessage(),
+        //     ]);
+        // }
 
         $mail_driver = $request->input('mail_driver');
 
+        $url = $request->input('url');
+        $db_host = $request->input('db_host');
+        $db_port = $request->input('db_port');
+        $db_database = $request->input('db_database');
+        $db_username = $request->input('db_username');
+        $db_password = $request->input('db_password');
+        $mail_port = $request->input('mail_port');
+        $encryption = $request->input('encryption');
+        $mail_host = $request->input('mail_host');
+        $mail_username = $request->input('mail_username');
+        $mail_name = $request->input('mail_name');
+        $mail_address = $request->input('mail_address');
+        $mail_password = $request->input('mail_password');
+
         $env_values = [
-            'APP_URL' => $request->input('url'),
+            'APP_URL' => $url,
             'REQUIRE_HTTPS' => $request->input('https') ? 'true' : 'false',
             'APP_DEBUG' => 'false',
 
-            'DB_HOST' => $request->input('db_host'),
-            'DB_PORT' => $request->input('db_port'),
-            'DB_DATABASE' => $request->input('db_database'),
-            'DB_USERNAME' => $request->input('db_username'),
-            'DB_PASSWORD' => $request->input('db_password'),
+            'DB_HOST' => $db_host,
+            'DB_PORT' => $db_port,
+            'DB_DATABASE' => $db_database,
+            'DB_USERNAME' => $db_username,
+            'DB_PASSWORD' => $db_password,
 
             'MAIL_MAILER' => $mail_driver,
-            'MAIL_PORT' => $request->input('mail_port'),
-            'MAIL_ENCRYPTION' => $request->input('encryption'),
-            'MAIL_HOST' => $request->input('mail_host'),
-            'MAIL_USERNAME' => $request->input('mail_username'),
-            'MAIL_FROM_NAME' => $request->input('mail_name'),
-            'MAIL_FROM_ADDRESS' => $request->input('mail_address'),
-            'MAIL_PASSWORD' => $request->input('mail_password'),
+            'MAIL_PORT' => $mail_port,
+            'MAIL_ENCRYPTION' => $encryption,
+            'MAIL_HOST' => $mail_host,
+            'MAIL_USERNAME' => $mail_username,
+            'MAIL_FROM_NAME' => $mail_name,
+            'MAIL_FROM_ADDRESS' => $mail_address,
+            'MAIL_PASSWORD' => $mail_password,
 
             'NINJA_ENVIRONMENT' => 'selfhost',
             'DB_CONNECTION' => 'mysql',
@@ -149,7 +165,8 @@ class SetupController extends Controller
 
             /* Make sure no stale connections are cached */
             DB::purge('db-ninja-01');
-            
+            //DB::reconnect('db-ninja-01');
+
             /* Run migrations */
             if (!config('ninja.disable_auto_update')) {
                 Artisan::call('optimize');
@@ -229,7 +246,7 @@ class SetupController extends Controller
     public function checkPdf(Request $request)
     {
         try {
-            if (config('ninja.phantomjs_pdf_generation')) {
+            if (config('ninja.pdf_generator') == 'phantom') {
                 return $this->testPhantom();
             }
 
@@ -262,7 +279,7 @@ class SetupController extends Controller
     private function testPhantom()
     {
         try {
-            $key = config('ninja.phantomjs_pdf_generation');
+            $key = config('ninja.phantomjs_key');
             $url = 'https://www.invoiceninja.org/';
 
             $phantom_url = "https://phantomjscloud.com/api/browser/v2/{$key}/?request=%7Burl:%22{$url}%22,renderType:%22pdf%22%7D";
@@ -279,10 +296,7 @@ class SetupController extends Controller
 
     public function update()
     {
-        // if(Ninja::isHosted())
-        //     return redirect('/');
-    
-        // if( Ninja::isNinja() || !request()->has('secret') || (request()->input('secret') != config('ninja.update_secret')) )
+
         if(!request()->has('secret') || (request()->input('secret') != config('ninja.update_secret')) )
             return redirect('/');
 
@@ -311,6 +325,8 @@ class SetupController extends Controller
 
         $this->buildCache(true);
 
+        SchedulerCheck::dispatchNow();
+        
         return redirect('/');
 
     }

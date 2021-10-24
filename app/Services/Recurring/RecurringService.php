@@ -49,16 +49,13 @@ class RecurringService
 
     public function start()
     {
-        //make sure next_send_date is either now or in the future else return.
-        // if(Carbon::parse($this->recurring_entity->next_send_date)->lt(now()))
-        // 	return $this;
 
         if ($this->recurring_entity->remaining_cycles == 0) {
             return $this;
         }
 
-        $this->createInvitations()->setStatus(RecurringInvoice::STATUS_ACTIVE);
-
+        $this->setStatus(RecurringInvoice::STATUS_ACTIVE);
+        
         return $this;
     }
 
@@ -98,9 +95,29 @@ class RecurringService
         return $this;
     }
     
+    public function triggeredActions($request)
+    {
+
+        if ($request->has('start') && $request->input('start') == 'true') {
+            $this->start();
+        }
+
+        if ($request->has('stop') && $request->input('stop') == 'true') {
+            $this->stop();
+        }
+        
+        return $this;
+    }
+
+    public function fillDefaults()
+    {
+
+        return $this;
+    }
+    
     public function save()
     {
-        $this->recurring_entity->save();
+        $this->recurring_entity->saveQuietly();
 
         return $this->recurring_entity;
     }

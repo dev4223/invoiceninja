@@ -41,6 +41,10 @@ class ContactKeyLogin
 
         if ($request->segment(2) && $request->segment(2) == 'magic_link' && $request->segment(3)) {
             $payload = Cache::get($request->segment(3));
+
+            if(!$payload)
+                abort(403, 'Link expired.');
+
             $contact_email = $payload['email'];
             
             if($client_contact = ClientContact::where('email', $contact_email)->where('company_id', $payload['company_id'])->first()){
@@ -58,24 +62,36 @@ class ContactKeyLogin
             }
         }
         elseif ($request->segment(3) && config('ninja.db.multi_db_enabled')) {
-            if (MultiDB::findAndSetDbByContactKey($request->segment(3))) {
 
+            if (MultiDB::findAndSetDbByContactKey($request->segment(3))) {
+            
             if($client_contact = ClientContact::where('contact_key', $request->segment(3))->first()){
+            
                 if(empty($client_contact->email))
                     $client_contact->email = Str::random(6) . "@example.com"; $client_contact->save();
 
-                Auth::guard('contact')->login($client_contact, true);
+                auth()->guard('contact')->login($client_contact, true);
+
+                if ($request->query('next')) {
+                    return redirect()->to($request->query('next'));
+                }
+
                 return redirect()->to('client/dashboard');
              }
 
             }
         } elseif ($request->segment(2) && $request->segment(2) == 'key_login' && $request->segment(3)) {
             if ($client_contact = ClientContact::where('contact_key', $request->segment(3))->first()) {
-  
-                  if(empty($client_contact->email))
+                if(empty($client_contact->email)) {
                     $client_contact->email = Str::random(6) . "@example.com"; $client_contact->save();
+                }
     
                 auth()->guard('contact')->login($client_contact, true);
+
+                if ($request->query('next')) {
+                    return redirect($request->query('next'));
+                }
+
                 return redirect()->to('client/dashboard');
             }
         } elseif ($request->has('client_hash') && config('ninja.db.multi_db_enabled')) {
@@ -105,7 +121,6 @@ class ContactKeyLogin
                 return redirect()->to('client/dashboard');
             }
         }
-
 
         return $next($request);
     }

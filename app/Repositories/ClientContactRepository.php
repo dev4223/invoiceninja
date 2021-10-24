@@ -56,8 +56,10 @@ class ClientContactRepository extends BaseRepository
 
             if (! $update_contact) {
                 $update_contact = ClientContactFactory::create($client->company_id, $client->user_id);
-                $update_contact->client_id = $client->id;
             }
+            
+            //10-09-2021 - enforce the client->id and remove client_id from fillables
+            $update_contact->client_id = $client->id;
 
             /* We need to set NULL email addresses to blank strings to pass authentication*/
             if(array_key_exists('email', $contact) && is_null($contact['email']))
@@ -67,16 +69,21 @@ class ClientContactRepository extends BaseRepository
 
             if (array_key_exists('password', $contact) && strlen($contact['password']) > 1) {
                 $update_contact->password = Hash::make($contact['password']);
+
+                $client->company->client_contacts()->where('email', $update_contact->email)->update(['password' => $update_contact->password]);
             }
+
+            if(array_key_exists('email', $contact))
+                $update_contact->email = trim($contact['email']);
 
             $update_contact->save();
         });
 
         //need to reload here to shake off stale contacts
-        $client->load('contacts');
+        $client->fresh();
 
         //always made sure we have one blank contact to maintain state
-        if ($client->contacts->count() == 0) {
+        if ($client->contacts()->count() == 0) {
             $new_contact = ClientContactFactory::create($client->company_id, $client->user_id);
             $new_contact->client_id = $client->id;
             $new_contact->contact_key = Str::random(40);
@@ -85,5 +92,7 @@ class ClientContactRepository extends BaseRepository
             $new_contact->email = ' ';
             $new_contact->save();
         }
+
+        $client = null;
     }
 }

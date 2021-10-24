@@ -118,16 +118,22 @@ class PaymentMethodController extends Controller
      */
     public function destroy(ClientGatewayToken $payment_method)
     {
-        // $gateway = $this->getClientGateway();
 
-        $payment_method->gateway
-            ->driver(auth()->user()->client)
-            ->setPaymentMethod(request()->query('method'))
-            ->detach($payment_method);
+        if($payment_method->gateway()->exists()){
+
+            $payment_method->gateway
+                ->driver(auth()->user()->client)
+                ->setPaymentMethod(request()->query('method'))
+                ->detach($payment_method);
+
+        }
 
         try {
+
             event(new MethodDeleted($payment_method, auth('contact')->user()->company, Ninja::eventVars(auth('contact')->user()->id)));
+            
             $payment_method->delete();
+
         } catch (Exception $e) {
 
             nlog($e->getMessage());
@@ -143,11 +149,11 @@ class PaymentMethodController extends Controller
     private function getClientGateway()
     {
         if (request()->query('method') == GatewayType::CREDIT_CARD) {
-            return $gateway = auth()->user()->client->getCreditCardGateway();
+            return auth()->user()->client->getCreditCardGateway();
         }
 
-        if (request()->query('method') == GatewayType::BANK_TRANSFER) {
-            return $gateway = auth()->user()->client->getBankTransferGateway();
+        if (in_array(request()->query('method'), [GatewayType::BANK_TRANSFER, GatewayType::DIRECT_DEBIT, GatewayType::SEPA])) {
+            return auth()->user()->client->getBankTransferGateway();
         }
 
         abort(404, 'Gateway not found.');

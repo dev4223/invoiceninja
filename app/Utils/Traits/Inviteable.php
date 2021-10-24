@@ -43,12 +43,24 @@ trait Inviteable
         return $status;
     }
 
+    public function getPaymentLink()
+    {
+        if(Ninja::isHosted()){
+            $domain = $this->company->domain();
+        }
+        else
+            $domain = config('ninja.app_url');
+
+        return $domain.'/client/pay/'.$this->key;
+    }
+
     public function getLink() :string
     {
         $entity_type = Str::snake(class_basename($this->entityType()));
 
-        if(Ninja::isHosted())
-            $domain = isset($this->company->portal_domain) ? $this->company->portal_domain : $this->company->domain();
+        if(Ninja::isHosted()){
+            $domain = $this->company->domain();
+        }
         else
             $domain = config('ninja.app_url');
 
@@ -74,7 +86,7 @@ trait Inviteable
     {
 
         if(Ninja::isHosted())
-            $domain = isset($this->company->portal_domain) ? $this->company->portal_domain : $this->company->domain();
+            $domain = $this->company->domain();
         else
             $domain = config('ninja.app_url');
 

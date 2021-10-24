@@ -6,6 +6,8 @@
     <meta name="return-url" content="{{ $return_url }}">
     <meta name="amount" content="{{ $stripe_amount }}">
     <meta name="country" content="{{ $country }}">
+    <meta name="customer" content="{{ $customer }}">
+    <meta name="pi-client-secret" content="{{ $pi_client_secret }}">
 @endsection
 
 @section('gateway_content')
@@ -16,7 +18,6 @@
     @component('portal.ninja2020.components.general.card-element', ['title' => ctrans('texts.payment_type')])
         {{ ctrans('texts.sofort') }} ({{ ctrans('texts.bank_transfer') }})
     @endcomponent
-
     @include('portal.ninja2020.gateways.includes.pay_now')
 @endsection
 
