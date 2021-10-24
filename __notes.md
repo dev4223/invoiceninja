@@ -2,7 +2,12 @@
 
 https://invoiceninja.github.io/docs/self-host-updating/
 
-git pull
+git pull origin v5-stable-hk
+
+(composer install --no-dev -o)
+
+php artisan ninja:post-update
+
 php artisan migrate
 php artisan optimize
 php artisan queue:restart
