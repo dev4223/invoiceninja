@@ -90,6 +90,7 @@ class Invoice extends BaseModel
         'subscription_id',
         'auto_bill_enabled',
         'uses_inclusive_taxes',
+        'vendor_id',
     ];
 
     protected $casts = [
@@ -101,6 +102,7 @@ class Invoice extends BaseModel
         'updated_at' => 'timestamp',
         'created_at' => 'timestamp',
         'deleted_at' => 'timestamp',
+        'is_deleted' => 'bool',
     ];
 
     protected $with = [];
@@ -148,6 +150,11 @@ class Invoice extends BaseModel
     public function project()
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function vendor()
+    {
+        return $this->belongsTo(Vendor::class);
     }
 
     public function design()
@@ -408,7 +415,19 @@ class Invoice extends BaseModel
 
         $file_path = $this->client->invoice_filepath($invitation).$this->numberFormatter().'.pdf';
 
-        if(Ninja::isHosted() && $portal && Storage::disk(config('filesystems.default'))->exists($file_path)){
+        $file_exists = false;
+
+        /* Flysystem throws an exception if the path is "corrupted" so lets wrap it in a try catch and return a bool  06/01/2022*/
+        try{
+            $file_exists = Storage::disk(config('filesystems.default'))->exists($file_path);
+        }
+        catch(\Exception $e){
+
+            nlog($e->getMessage());
+
+        }
+
+        if(Ninja::isHosted() && $portal && $file_exists){
             return Storage::disk(config('filesystems.default'))->{$type}($file_path);
         }
         elseif(Ninja::isHosted()){
@@ -416,7 +435,16 @@ class Invoice extends BaseModel
             return Storage::disk(config('filesystems.default'))->{$type}($file_path);
         }
         
-        if(Storage::disk('public')->exists($file_path))
+        try{
+            $file_exists = Storage::disk('public')->exists($file_path);
+        }
+        catch(\Exception $e){
+
+            nlog($e->getMessage());
+            
+        }
+
+        if($file_exists)
             return Storage::disk('public')->{$type}($file_path);
 
         $file_path = CreateEntityPdf::dispatchNow($invitation);

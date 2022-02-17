@@ -41,7 +41,7 @@ trait DesignHelpers
         if (isset($this->context['invoices'])) {
             $this->invoices = $this->context['invoices'];
             
-            if (\count($this->invoices) >= 1) {
+            if ($this->invoices->count() >= 1) {
                 $this->entity = $this->invoices->first();
             }
         }
@@ -382,22 +382,23 @@ document.addEventListener('DOMContentLoaded', function() {
         return $converter->convertToHtml($markdown);
     }
 
-    public function processMarkdownOnLineItems(array &$items): void
-    {
-        foreach ($items as $key => $item) {
-            foreach ($item as $variable => $value) {
-                $item[$variable] = DesignHelpers::parseMarkdownToHtml($value ?? '');
-            }
+    // public function processMarkdownOnLineItems(array &$items): void
+    // {
+    //     foreach ($items as $key => $item) {
+    //         foreach ($item as $variable => $value) {
+    //             $item[$variable] = DesignHelpers::parseMarkdownToHtml($value ?? '');
+    //         }
 
-            $items[$key] = $item;
-        }
-    }
+    //         $items[$key] = $item;
+    //     }
+    // }
 
     public function processNewLines(array &$items): void
     {
         foreach ($items as $key => $item) {
             foreach ($item as $variable => $value) {
-                $item[$variable] = nl2br($value);
+               // $item[$variable] = nl2br($value, true);
+               $item[$variable] = str_replace( "\n", '<br>', $value);
             }
 
             $items[$key] = $item;

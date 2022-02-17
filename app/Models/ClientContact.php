@@ -92,7 +92,7 @@ class ClientContact extends Authenticatable implements HasLocalePreference
         'custom_value4',
         'email',
         'is_primary',
-        // 'client_id',
+        'send_email',
     ];
 
     /**
@@ -217,6 +217,9 @@ class ClientContact extends Authenticatable implements HasLocalePreference
     {
         $languages = Cache::get('languages');
 
+        if(!$languages)
+            $this->buildCache(true);
+        
         return $languages->filter(function ($item) {
             return $item->id == $this->client->getSetting('language_id');
         })->first()->locale;

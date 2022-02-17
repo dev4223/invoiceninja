@@ -26,44 +26,49 @@ class MarkSent extends AbstractService
     public function __construct(Client $client, Invoice $invoice)
     {
         $this->client = $client;
+        
         $this->invoice = $invoice;
     }
 
     public function run()
     {
 
-        /* Return immediately if status is not draft */
-        if ($this->invoice->fresh()->status_id != Invoice::STATUS_DRAFT) {
+        /* Return immediately if status is not draft or invoice has been deleted */
+        if ($this->invoice && ($this->invoice->fresh()->status_id != Invoice::STATUS_DRAFT || $this->invoice->is_deleted)) {
             return $this->invoice;
         }
+
+        $adjustment = $this->invoice->amount;
 
         /*Set status*/
         $this->invoice
              ->service()
              ->setStatus(Invoice::STATUS_SENT)
+             ->updateBalance($adjustment, true)
              ->save();
-
-         $this->invoice
-             ->service()
-             ->applyNumber()
-             ->setDueDate()
-             ->updateBalance($this->invoice->amount)
-             ->deletePdf()
-             ->setReminder()
-             ->save();
-
-        $this->invoice->markInvitationsSent();
 
         /*Adjust client balance*/
         $this->client
              ->service()
-             ->updateBalance($this->invoice->balance)
+             ->updateBalance($adjustment)
              ->save();
 
         /*Update ledger*/
         $this->invoice
              ->ledger()
-             ->updateInvoiceBalance($this->invoice->balance, "Invoice {$this->invoice->number} marked as sent.");
+             ->updateInvoiceBalance($adjustment, "Invoice {$this->invoice->number} marked as sent.");
+
+        /* Perform additional actions on invoice */
+        $this->invoice
+             ->service()
+             ->applyNumber()
+             ->setDueDate()
+             // ->deletePdf() //08-01-2022
+             ->touchPdf() //08-01-2022
+             ->setReminder()
+             ->save();
+
+        $this->invoice->markInvitationsSent();
 
         event(new InvoiceWasUpdated($this->invoice, $this->invoice->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
 

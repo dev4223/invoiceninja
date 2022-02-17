@@ -88,8 +88,6 @@ class ApplyPaymentAmount extends AbstractService
             $payment->service()->sendEmail();
         
         /* Update Invoice balance */
-        event(new PaymentWasCreated($payment, $payment->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
-        event(new InvoiceWasPaid($this->invoice, $payment, $payment->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
 
         $payment->ledger()
                 ->updatePaymentBalance($payment->amount * -1);
@@ -104,12 +102,17 @@ class ApplyPaymentAmount extends AbstractService
         $this->invoice->service()->workFlow()->save();
 
         event('eloquent.created: App\Models\Payment', $payment);
-
+        event(new PaymentWasCreated($payment, $payment->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
+        event(new InvoiceWasPaid($this->invoice, $payment, $payment->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
+        
         return $this->invoice;
     }
 
     private function setExchangeRate(Payment $payment)
     {
+
+        if($payment->exchange_rate != 1)
+            return;
 
         $client_currency = $payment->client->getSetting('currency_id');
         $company_currency = $payment->client->company->settings->currency_id;

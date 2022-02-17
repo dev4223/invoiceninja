@@ -113,8 +113,18 @@ class Ninja
 
     public static function eventVars($user_id = null)
     {
+
+            $ip = '';
+            
+            if(request()->hasHeader('Cf-Connecting-Ip'))
+                $ip = request()->header('Cf-Connecting-Ip');
+            elseif(request()->hasHeader('X-Forwarded-For'))
+                $ip = request()->header('X-Forwarded-For');
+            else
+                $ip = request()->ip() ?: ' ';
+
         return [
-            'ip' => request()->getClientIp(),
+            'ip' => $ip,
             'token' => request()->header('X-API-TOKEN'),
             'is_system' => app()->runningInConsole(),
             'user_id' => $user_id,

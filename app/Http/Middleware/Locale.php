@@ -1,4 +1,13 @@
 <?php
+/**
+ * Invoice Ninja (https://invoiceninja.com).
+ *
+ * @link https://github.com/invoiceninja/invoiceninja source repository
+ *
+ * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ *
+ * @license https://www.elastic.co/licensing/elastic-license
+ */
 
 namespace App\Http\Middleware;
 
@@ -23,10 +32,16 @@ class Locale
         if ($request->has('lang')) {
             $locale = $request->input('lang');
             App::setLocale($locale);
-        } elseif (auth('contact')->user()) {
-            App::setLocale(auth('contact')->user()->client->locale());
+        } elseif (auth()->guard('contact')->user()) {
+            App::setLocale(auth()->guard('contact')->user()->client->locale());
         } elseif (auth()->user()) {
-            App::setLocale(auth()->user()->company()->getLocale());
+
+            try{
+                App::setLocale(auth()->user()->company()->getLocale());
+            }
+            catch(\Exception $e){
+            }
+
         } else {
             App::setLocale(config('ninja.i18n.locale'));
         }

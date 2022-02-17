@@ -17,12 +17,14 @@ use App\Models\CompanyGateway;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Services\AbstractService;
+use App\Utils\Ninja;
+use Illuminate\Support\Facades\App;
 
 class AddGatewayFee extends AbstractService
 {
     private $company_gateway;
 
-    private $invoice;
+    public $invoice;
 
     private $amount;
 
@@ -59,7 +61,7 @@ class AddGatewayFee extends AbstractService
 
     private function cleanPendingGatewayFees()
     {
-        $invoice_items = $this->invoice->line_items;
+        $invoice_items = (array)$this->invoice->line_items;
 
         $invoice_items = collect($invoice_items)->filter(function ($item) {
             return $item->type_id != '3';
@@ -72,6 +74,11 @@ class AddGatewayFee extends AbstractService
 
     private function processGatewayFee($gateway_fee)
     {
+        App::forgetInstance('translator');
+        $t = app('translator');
+        $t->replace(Ninja::transformTranslations($this->invoice->company->settings));
+        App::setLocale($this->invoice->client->locale());
+
         $invoice_item = new InvoiceItem;
         $invoice_item->type_id = '3';
         $invoice_item->product_key = ctrans('texts.surcharge');
@@ -85,7 +92,7 @@ class AddGatewayFee extends AbstractService
             $invoice_item->tax_rate3 = $fees_and_limits->fee_tax_rate3;
         }
 
-        $invoice_items = $this->invoice->line_items;
+        $invoice_items = (array)$this->invoice->line_items;
         $invoice_items[] = $invoice_item;
 
         $this->invoice->line_items = $invoice_items;
@@ -98,6 +105,10 @@ class AddGatewayFee extends AbstractService
 
     private function processGatewayDiscount($gateway_fee)
     {
+        App::forgetInstance('translator');
+        $t = app('translator');
+        $t->replace(Ninja::transformTranslations($this->invoice->company->settings));
+        
         $invoice_item = new InvoiceItem;
         $invoice_item->type_id = '3';
         $invoice_item->product_key = ctrans('texts.discount');
@@ -105,13 +116,13 @@ class AddGatewayFee extends AbstractService
         $invoice_item->quantity = 1;
         $invoice_item->cost = $gateway_fee;
 
-        if ($fees_and_limits = $this->company_gateway->getFeesAndLimits()) {
+        if ($fees_and_limits = $this->company_gateway->getFeesAndLimits($this->gateway_type_id)) {
             $invoice_item->tax_rate1 = $fees_and_limits->fee_tax_rate1;
             $invoice_item->tax_rate2 = $fees_and_limits->fee_tax_rate2;
             $invoice_item->tax_rate3 = $fees_and_limits->fee_tax_rate3;
         }
 
-        $invoice_items = $this->invoice->line_items;
+        $invoice_items = (array)$this->invoice->line_items;
         $invoice_items[] = $invoice_item;
 
         $this->invoice->line_items = $invoice_items;

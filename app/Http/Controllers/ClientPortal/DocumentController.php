@@ -15,6 +15,7 @@ namespace App\Http\Controllers\ClientPortal;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ClientPortal\Documents\ShowDocumentRequest;
 use App\Http\Requests\Document\DownloadMultipleDocumentsRequest;
+use App\Libraries\MultiDB;
 use App\Models\Document;
 use App\Utils\TempFile;
 use App\Utils\Traits\MakesHash;
@@ -55,6 +56,8 @@ class DocumentController extends Controller
 
     public function publicDownload(string $document_hash)
     {
+        MultiDB::documentFindAndSetDb($document_hash);
+
         $document = Document::where('hash', $document_hash)->firstOrFail();
 
         $headers = [];
@@ -68,11 +71,11 @@ class DocumentController extends Controller
     public function downloadMultiple(DownloadMultipleDocumentsRequest $request)
     {
         $documents = Document::whereIn('id', $this->transformKeys($request->file_hash))
-            ->where('company_id', auth('contact')->user()->company->id)
+            ->where('company_id', auth()->guard('contact')->user()->company->id)
             ->get();
 
         $documents->map(function ($document) {
-            if (auth()->user('contact')->client->id != $document->documentable->id) {
+            if (auth()->guard('contact')->user()->client->id != $document->documentable->id) {
                 abort(401, 'Permission denied');
             }
         });

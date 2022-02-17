@@ -113,25 +113,26 @@ class BaseRepository
      * @param $action
      *
      * @return int
+     * @deprecated - this doesn't appear to be used anywhere?
      */
-    public function bulk($ids, $action)
-    {
-        if (! $ids) {
-            return 0;
-        }
+    // public function bulk($ids, $action)
+    // {
+    //     if (! $ids) {
+    //         return 0;
+    //     }
 
-        $ids = $this->transformKeys($ids);
+    //     $ids = $this->transformKeys($ids);
 
-        $entities = $this->findByPublicIdsWithTrashed($ids);
+    //     $entities = $this->findByPublicIdsWithTrashed($ids);
 
-        foreach ($entities as $entity) {
-            if (auth()->user()->can('edit', $entity)) {
-                $this->$action($entity);
-            }
-        }
+    //     foreach ($entities as $entity) {
+    //         if (auth()->user()->can('edit', $entity)) {
+    //             $this->$action($entity);
+    //         }
+    //     }
 
-        return count($entities);
-    }
+    //     return count($entities);
+    // }
 
     /* Returns an invoice if defined as a key in the $resource array*/
     public function getInvitation($invitation, $resource)
@@ -175,7 +176,7 @@ class BaseRepository
         if(array_key_exists('client_id', $data)) 
             $model->client_id = $data['client_id'];
 
-        $client = Client::where('id', $model->client_id)->withTrashed()->first();    
+        $client = Client::where('id', $model->client_id)->withTrashed()->firstOrFail();    
 
         $state = [];
 
@@ -221,17 +222,6 @@ class BaseRepository
         if (array_key_exists('documents', $data)) 
             $this->saveDocuments($data['documents'], $model);
 
-        /* Marks whether the client contact should receive emails based on the send_email property */
-        // if (isset($data['client_contacts'])) {
-        //     foreach ($data['client_contacts'] as $contact) {
-        //         if ($contact['send_email'] == 1 && is_string($contact['id'])) {
-        //             $client_contact = ClientContact::find($this->decodePrimaryKey($contact['id']));
-        //             $client_contact->send_email = true;
-        //             $client_contact->save();
-        //         }
-        //     }
-        // }
-
         /* If invitations are present we need to filter existing invitations with the new ones */
         if (isset($data['invitations'])) {
             $invitations = collect($data['invitations']);
@@ -276,7 +266,7 @@ class BaseRepository
                             $new_invitation = $invitation_factory_class::create($model->company_id, $model->user_id);
                             $new_invitation->{$lcfirst_resource_id} = $model->id;
                             $new_invitation->client_contact_id = $contact->id;
-                            $new_invitation->key = $this->createDbHash(config('database.default'));
+                            $new_invitation->key = $this->createDbHash($model->company->db);
                             $new_invitation->save();
 
                         }
@@ -337,6 +327,8 @@ class BaseRepository
             if (! $model->design_id) 
                 $model->design_id = $this->decodePrimaryKey($client->getSetting('credit_design_id'));
 
+            if(array_key_exists('invoice_id', $data) && $data['invoice_id'])
+                $model->invoice_id = $data['invoice_id'];
 
             if($this->new_model)
                 event('eloquent.created: App\Models\Credit', $model);            

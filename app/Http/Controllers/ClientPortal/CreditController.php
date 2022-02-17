@@ -1,4 +1,13 @@
 <?php
+/**
+ * Invoice Ninja (https://invoiceninja.com).
+ *
+ * @link https://github.com/invoiceninja/invoiceninja source repository
+ *
+ * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ *
+ * @license https://www.elastic.co/licensing/elastic-license
+ */
 
 namespace App\Http\Controllers\ClientPortal;
 
@@ -21,9 +30,12 @@ class CreditController extends Controller
     {
         set_time_limit(0);
 
-        $data = ['credit' => $credit];
+        $invitation = $credit->invitations()->where('client_contact_id', auth()->user()->id)->first();
 
-            $invitation = $credit->invitations()->where('client_contact_id', auth()->user()->id)->first();
+        $data = [
+            'credit' => $credit,
+            'key' => $invitation ? $invitation->key : false
+        ];
 
             if ($invitation && auth()->guard('contact') && ! request()->has('silent') && ! $invitation->viewed_date) {
 

@@ -110,8 +110,6 @@ class QuoteService
             $contact = $this->quote->invitations->first()->contact;
         }
 
-        event(new QuoteWasApproved($contact, $this->quote, $this->quote->company, Ninja::eventVars()));
-
         if ($this->quote->client->getSetting('auto_convert_quote')) {
             $this->convert();
 
@@ -123,11 +121,7 @@ class QuoteService
 
         }
 
-
-        if ($this->quote->client->getSetting('auto_archive_quote')) {
-            $quote_repo = new QuoteRepository();
-            $quote_repo->archive($this->quote);
-        }
+        event(new QuoteWasApproved($contact, $this->quote, $this->quote->company, Ninja::eventVars()));
 
         return $this;
     }

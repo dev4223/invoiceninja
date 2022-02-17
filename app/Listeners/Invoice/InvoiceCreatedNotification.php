@@ -24,6 +24,8 @@ class InvoiceCreatedNotification implements ShouldQueue
 {
     use UserNotifies;
 
+    public $delay = 5;
+    
     public function __construct()
     {
     }
@@ -52,6 +54,10 @@ class InvoiceCreatedNotification implements ShouldQueue
 
             /* The User */
             $user = $company_user->user;
+
+            if(!$user)
+                continue;
+            
             /* This is only here to handle the alternate message channels - ie Slack */
             // $notification = new EntitySentNotification($event->invitation, 'invoice');
 
@@ -71,11 +77,6 @@ class InvoiceCreatedNotification implements ShouldQueue
 
             }
 
-            /* Override the methods in the Notification Class */
-            // $notification->method = $methods;
-
-            //  Notify on the alternate channels 
-            // $user->notify($notification);
         }
     }
 }

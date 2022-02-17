@@ -302,11 +302,13 @@ trait MakesInvoiceValues
             $data[$key][$table_type . ".{$_table_type}3"] = $helpers->formatCustomFieldValue($this->client->company->custom_fields, "{$_table_type}3", $item->custom_value3, $this->client);
             $data[$key][$table_type . ".{$_table_type}4"] = $helpers->formatCustomFieldValue($this->client->company->custom_fields, "{$_table_type}4", $item->custom_value4, $this->client);
 
-            //$data[$key][$table_type.'.quantity'] = Number::formatValue($item->quantity, $this->client->currency());
+            // 08-02-2022 - fix for regression below
+            // $data[$key][$table_type.'.quantity'] = Number::formatValue($item->quantity, $this->client->currency());
             
-            //change quantity from localized number, to decimal format with no trailing zeroes 06/09/21
-            $data[$key][$table_type.'.quantity'] =  rtrim($item->quantity, $locale_info['decimal_point']);
-            $data[$key][$table_type.'.unit_cost'] = Number::formatMoney($item->cost, $this->client);
+            $data[$key][$table_type.'.quantity'] = Number::formatValueNoTrailingZeroes($item->quantity, $this->client->currency());
+            
+            $data[$key][$table_type.'.unit_cost'] = Number::formatMoneyNoRounding($item->cost, $this->client);
+
             $data[$key][$table_type.'.cost'] = Number::formatMoney($item->cost, $this->client);
 
             $data[$key][$table_type.'.line_total'] = Number::formatMoney($item->line_total, $this->client);
@@ -330,17 +332,17 @@ trait MakesInvoiceValues
             // but that's no longer necessary.
 
             if (isset($item->tax_rate1)) {
-                $data[$key][$table_type.'.tax_rate1'] = round($item->tax_rate1, 2).'%';
+                $data[$key][$table_type.'.tax_rate1'] = floatval($item->tax_rate1).'%';
                 $data[$key][$table_type.'.tax1'] = &$data[$key][$table_type.'.tax_rate1'];
             }
 
             if (isset($item->tax_rate2)) {
-                $data[$key][$table_type.'.tax_rate2'] = round($item->tax_rate2, 2).'%';
+                $data[$key][$table_type.'.tax_rate2'] = floatval($item->tax_rate2).'%';
                 $data[$key][$table_type.'.tax2'] = &$data[$key][$table_type.'.tax_rate2'];
             }
 
             if (isset($item->tax_rate3)) {
-                $data[$key][$table_type.'.tax_rate3'] = round($item->tax_rate3, 2).'%';
+                $data[$key][$table_type.'.tax_rate3'] = floatval($item->tax_rate3).'%';
                 $data[$key][$table_type.'.tax3'] = &$data[$key][$table_type.'.tax_rate3'];
             }
 

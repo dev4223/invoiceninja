@@ -58,14 +58,22 @@ class CreditCard
 
     public function paymentView(array $data)
     {
+
+
+        $description = $this->stripe->decodeUnicodeString(ctrans('texts.invoices') . ': ' . collect($data['invoices'])->pluck('invoice_number')) . " for client {$this->stripe->client->present()->name()}";
+
+
         $payment_intent_data = [
             'amount' => $this->stripe->convertToStripeAmount($data['total']['amount_with_fee'], $this->stripe->client->currency()->precision, $this->stripe->client->currency()),
             'currency' => $this->stripe->client->getCurrencyCode(),
             'customer' => $this->stripe->findOrCreateCustomer(),
-            'description' => $this->stripe->decodeUnicodeString(ctrans('texts.invoices') . ': ' . collect($data['invoices'])->pluck('invoice_number')),
+            'description' => $description,
+            'metadata' => [
+                'payment_hash' => $this->stripe->payment_hash->hash,
+                'gateway_type_id' => GatewayType::CREDIT_CARD,
+            ],
+            'setup_future_usage' => 'off_session',
         ];
-
-        $payment_intent_data['setup_future_usage'] = 'off_session';
 
         $data['intent'] = $this->stripe->createPaymentIntent($payment_intent_data);
         $data['gateway'] = $this->stripe;
@@ -123,7 +131,7 @@ class CreditCard
 
         $data = [
             'payment_method' => $this->stripe->payment_hash->data->server_response->payment_method,
-            'payment_type' => PaymentType::parseCardType(strtolower($stripe_method->card->brand)),
+            'payment_type' => PaymentType::parseCardType(strtolower($stripe_method->card->brand)) ?: PaymentType::CREDIT_CARD_OTHER,
             'amount' => $this->stripe->convertFromStripeAmount($this->stripe->payment_hash->data->server_response->amount, $this->stripe->client->currency()->precision, $this->stripe->client->currency()),
             'transaction_reference' => optional($this->stripe->payment_hash->data->payment_intent->charges->data[0])->id,
             'gateway_type_id' => GatewayType::CREDIT_CARD,

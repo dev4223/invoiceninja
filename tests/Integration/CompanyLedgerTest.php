@@ -84,7 +84,7 @@ class CompanyLedgerTest extends TestCase
 
         $settings = CompanySettings::defaults();
 
-        $settings->company_logo = 'https://app.invoiceninja.com/favicon-v2.png';
+        $settings->company_logo = 'https://pdf.invoicing.co/favicon-v2.png';
         $settings->website = 'www.invoiceninja.com';
         $settings->address1 = 'Address 1';
         $settings->address2 = 'Address 2';
@@ -128,6 +128,7 @@ class CompanyLedgerTest extends TestCase
         $company_token->account_id = $this->account->id;
         $company_token->name = 'test token';
         $company_token->token = $this->token;
+        $company_token->is_system = true;
         $company_token->save();
 
         $this->client = Client::factory()->create([

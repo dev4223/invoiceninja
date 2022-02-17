@@ -27,8 +27,9 @@ class ShowDocumentRequest extends FormRequest
      */
     public function authorize()
     {
-        return auth()->user('contact')->client->id == $this->document->documentable_id
-            || $this->document->documentable->client_id == auth()->user('contact')->client->id;
+        return auth()->guard('contact')->user()->client_id == $this->document->documentable_id
+            || $this->document->documentable->client_id == auth()->guard('contact')->user()->client_id
+            || $this->document->company_id == auth()->guard('contact')->user()->company_id;
     }
 
     /**

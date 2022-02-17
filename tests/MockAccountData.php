@@ -42,6 +42,7 @@ use App\Models\RecurringInvoice;
 use App\Models\RecurringQuote;
 use App\Models\Task;
 use App\Models\TaskStatus;
+use App\Models\TaxRate;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\VendorContact;
@@ -137,6 +138,13 @@ trait MockAccountData
     public $cu;
 
     /**
+     * @var
+     */
+
+    public $tax_rate;
+
+
+    /**
      *
      */
     public function makeTestData()
@@ -169,10 +177,17 @@ trait MockAccountData
             }
         }
 
-        $this->account = Account::factory()->create();
+        $this->account = Account::factory()->create([
+            'hosted_client_count' => 1000,
+            'hosted_company_count' => 1000
+        ]);
+        
+        $this->account->num_users = 3;
+        $this->account->save();
+        
         $this->company = Company::factory()->create([
-                            'account_id' => $this->account->id,
-                        ]);
+                'account_id' => $this->account->id,
+            ]);
 
         $this->company->client_registration_fields = ClientRegistrationFields::generate();
 
@@ -181,7 +196,7 @@ trait MockAccountData
 
         $settings = CompanySettings::defaults();
 
-        $settings->company_logo = 'https://app.invoiceninja.com/favicon-v2.png';
+        $settings->company_logo = 'https://pdf.invoicing.co/favicon-v2.png';
         // $settings->company_logo = asset('images/new_logo.png');
         $settings->website = 'www.invoiceninja.com';
         $settings->address1 = 'Address 1';
@@ -217,6 +232,8 @@ trait MockAccountData
 
         $user_id = $user->id;
         $this->user = $user;
+
+        // auth()->login($user);
 
         CreateCompanyTaskStatuses::dispatchNow($this->company, $this->user);
 
@@ -294,6 +311,7 @@ trait MockAccountData
         $this->project = Project::factory()->create([
                 'user_id' => $user_id,
                 'company_id' => $this->company->id,
+                'client_id' => $this->client->id,
         ]);
 
         $this->expense = Expense::factory()->create([
@@ -329,6 +347,11 @@ trait MockAccountData
         ]);
 
         $this->task_status = TaskStatus::factory()->create([
+            'user_id' => $user_id,
+            'company_id' => $this->company->id,
+        ]);
+
+        $this->tax_rate = TaxRate::factory()->create([
             'user_id' => $user_id,
             'company_id' => $this->company->id,
         ]);

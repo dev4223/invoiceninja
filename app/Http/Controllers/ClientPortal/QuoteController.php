@@ -30,6 +30,8 @@ use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use ZipStream\Option\Archive;
 use ZipStream\ZipStream;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class QuoteController extends Controller
 {
@@ -53,22 +55,25 @@ class QuoteController extends Controller
      * @return Factory|View|BinaryFileResponse
      */
     public function show(ShowQuoteRequest $request, Quote $quote)
-    {
+    {   
+        /* If the quote is expired, convert the status here */
+
+
+        $invitation = $quote->invitations()->where('client_contact_id', auth()->user()->id)->first();
+
         $data = [
             'quote' => $quote,
+            'key' => $invitation ? $invitation->key : false,
         ];
 
+        if ($invitation && auth()->guard('contact') && ! request()->has('silent') && ! $invitation->viewed_date) {
 
-            $invitation = $quote->invitations()->where('client_contact_id', auth()->user()->id)->first();
+            $invitation->markViewed();
 
-            if ($invitation && auth()->guard('contact') && ! request()->has('silent') && ! $invitation->viewed_date) {
-
-                $invitation->markViewed();
-
-                event(new InvitationWasViewed($quote, $invitation, $quote->company, Ninja::eventVars()));
-                event(new QuoteWasViewed($invitation, $invitation->company, Ninja::eventVars()));
-            
-            }
+            event(new InvitationWasViewed($quote, $invitation, $quote->company, Ninja::eventVars()));
+            event(new QuoteWasViewed($invitation, $invitation->company, Ninja::eventVars()));
+        
+        }
 
         if ($request->query('mode') === 'fullscreen') {
             return render('quotes.show-fullscreen', $data);
@@ -82,7 +87,7 @@ class QuoteController extends Controller
         $transformed_ids = $this->transformKeys($request->quotes);
 
         if ($request->action == 'download') {
-            return $this->downloadQuotePdf((array) $transformed_ids);
+            return $this->downloadQuotes((array) $transformed_ids);
         }
 
         if ($request->action = 'approve') {
@@ -92,10 +97,32 @@ class QuoteController extends Controller
         return back();
     }
 
+    public function downloadQuotes($ids)
+    {
+
+        $data['quotes'] = Quote::whereIn('id', $ids)
+                            ->whereClientId(auth()->user()->client->id)
+                            ->withTrashed()
+                            ->get();
+
+        if(count($data['quotes']) == 0)
+            return back()->with(['message' => ctrans('texts.no_items_selected')]);
+
+        return $this->render('quotes.download', $data);
+    }
+
+    public function download(Request $request)
+    {
+        $transformed_ids = $this->transformKeys($request->quotes);
+        
+        return $this->downloadQuotePdf((array) $transformed_ids);
+    }
+
     protected function downloadQuotePdf(array $ids)
     {
         $quotes = Quote::whereIn('id', $ids)
             ->whereClientId(auth()->user()->client->id)
+            ->withTrashed()
             ->get();
 
         if (! $quotes || $quotes->count() == 0) {
@@ -133,9 +160,10 @@ class QuoteController extends Controller
     protected function approve(array $ids, $process = false)
     {
         $quotes = Quote::whereIn('id', $ids)
-            ->where('client_id', auth('contact')->user()->client->id)
-            ->where('company_id', auth('contact')->user()->client->company_id)
-            ->where('status_id', Quote::STATUS_SENT)
+            ->where('client_id', auth()->guard('contact')->user()->client->id)
+            ->where('company_id', auth()->guard('contact')->user()->client->company_id)
+            ->whereIn('status_id', [Quote::STATUS_DRAFT, Quote::STATUS_SENT])
+            ->withTrashed()
             ->get();
 
         if (!$quotes || $quotes->count() == 0) {
@@ -147,12 +175,21 @@ class QuoteController extends Controller
         if ($process) {
             foreach ($quotes as $quote) {
                 $quote->service()->approve(auth()->user())->save();
-                event(new QuoteWasApproved(auth('contact')->user(), $quote, $quote->company, Ninja::eventVars()));
+                event(new QuoteWasApproved(auth()->guard('contact')->user(), $quote, $quote->company, Ninja::eventVars()));
 
                 if (request()->has('signature') && !is_null(request()->signature) && !empty(request()->signature)) {
                     InjectSignature::dispatch($quote, request()->signature);
                 }
             }
+
+        if(count($ids) == 1){
+
+            //forward client to the invoice if it exists
+            if($quote->invoice()->exists())
+                return redirect()->route('client.invoice.show', $quote->invoice->hashed_id);
+                    
+            return redirect()->route('client.quote.show', $quotes->first()->hashed_id);
+        }
 
             return redirect()
                 ->route('client.quotes.index')

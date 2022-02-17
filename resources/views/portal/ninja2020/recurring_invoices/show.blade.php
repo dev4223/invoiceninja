@@ -19,7 +19,7 @@
                             {{ ctrans('texts.start_date') }}
                         </dt>
                         <dd class="mt-1 text-sm leading-5 text-gray-900 sm:mt-0 sm:col-span-2">
-                            {{ $invoice->formatDate($invoice->start_date, $invoice->client->date_format()) }}
+                            {{ $invoice->translateDate($invoice->start_date, $invoice->client->date_format(), $invoice->client->locale()) }}
                         </dd>
                     </div>
                     <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -27,7 +27,7 @@
                             {{ ctrans('texts.next_send_date') }}
                         </dt>
                         <dd class="mt-1 text-sm leading-5 text-gray-900 sm:mt-0 sm:col-span-2">
-                            {{ $invoice->formatDate($invoice->next_send_date, $invoice->client->date_format()) }}
+                            {{ $invoice->translateDate($invoice->next_send_date, $invoice->client->date_format(), $invoice->client->locale()) }}
                         </dd>
                     </div>
                     <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -76,10 +76,10 @@
             </div>
         @endif
 
-        {{-- @if(is_null($invoice->subscription_id) || optional($invoice->subscription)->allow_cancellation) --}}
+        @if($invoice->subscription && optional($invoice->subscription)->allow_cancellation)
         {{-- INV2-591 --}}
-        @if(false)
-        <div class="bg-white shadow sm:rounded-lg mt-4 hidden">
+        {{-- @if(false) --}}
+        <div class="bg-white shadow sm:rounded-lg mt-4">
             <div class="px-4 py-5 sm:p-6">
                 <div class="sm:flex sm:items-start sm:justify-between">
                     <div>

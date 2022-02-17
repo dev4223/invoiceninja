@@ -45,11 +45,11 @@ class InvoiceTransformer extends BaseTransformer {
 			'client_id'         => $this->getClient( $this->getString( $invoice_data, 'client.name' ), $this->getString( $invoice_data, 'client.email' ) ),
 			'discount'          => $this->getFloat( $invoice_data, 'invoice.discount' ),
 			'po_number'         => $this->getString( $invoice_data, 'invoice.po_number' ),
-			'date'              => isset( $invoice_data['invoice.date'] ) ? date( 'Y-m-d', strtotime( $invoice_data['invoice.date'] ) ) : null,
+			'date'              => isset( $invoice_data['invoice.date'] ) ? date( 'Y-m-d', strtotime( $invoice_data['invoice.date'] ) ) : now()->format('Y-m-d'),
 			'due_date'          => isset( $invoice_data['invoice.due_date'] ) ? date( 'Y-m-d', strtotime( $invoice_data['invoice.due_date'] ) ) : null,
 			'terms'             => $this->getString( $invoice_data, 'invoice.terms' ),
 			'public_notes'      => $this->getString( $invoice_data, 'invoice.public_notes' ),
-			'is_sent'           => $this->getString( $invoice_data, 'invoice.is_sent' ),
+			// 'is_sent'           => $this->getString( $invoice_data, 'invoice.is_sent' ),
 			'private_notes'     => $this->getString( $invoice_data, 'invoice.private_notes' ),
 			'tax_name1'         => $this->getString( $invoice_data, 'invoice.tax_name1' ),
 			'tax_rate1'         => $this->getFloat( $invoice_data, 'invoice.tax_rate1' ),
@@ -72,7 +72,7 @@ class InvoiceTransformer extends BaseTransformer {
 			'status_id'         => $invoiceStatusMap[ $status =
 					strtolower( $this->getString( $invoice_data, 'invoice.status' ) ) ] ??
 				Invoice::STATUS_SENT,
-			'viewed'            => $status === 'viewed',
+			// 'viewed'            => $status === 'viewed',
 			'archived'          => $status === 'archived',
 		];
 
@@ -92,7 +92,7 @@ class InvoiceTransformer extends BaseTransformer {
 					'amount'                => $this->getFloat( $invoice_data, 'invoice.amount' ),
 				],
 			];
-		} elseif ( isset( $transformed['amount'] ) && isset( $transformed['balance'] ) ) {
+		} elseif ( isset( $transformed['amount'] ) && isset( $transformed['balance'] ) && ($transformed['amount'] != $transformed['balance'])) {
 			$transformed['payments'] = [
 				[
 					'date'                  => isset( $invoice_data['payment.date'] ) ? date( 'Y-m-d', strtotime( $invoice_data['payment.date'] ) ) : date( 'y-m-d' ),

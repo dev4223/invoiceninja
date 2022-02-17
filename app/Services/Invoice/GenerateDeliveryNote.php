@@ -61,7 +61,8 @@ class GenerateDeliveryNote
             : $this->decodePrimaryKey($this->invoice->client->getSetting('invoice_design_id'));
 
         $invitation = $this->invoice->invitations->first();
-        $file_path = sprintf('%s%s_delivery_note.pdf', $this->invoice->client->invoice_filepath($invitation), $this->invoice->number);
+        // $file_path = sprintf('%s%s_delivery_note.pdf', $this->invoice->client->invoice_filepath($invitation), $this->invoice->number);
+        $file_path = sprintf('%sdelivery_note.pdf', $this->invoice->client->invoice_filepath($invitation));
 
         if (config('ninja.phantomjs_pdf_generation') || config('ninja.pdf_generator') == 'phantom') {
             return (new Phantom)->generate($this->invoice->invitations->first());
@@ -108,11 +109,9 @@ class GenerateDeliveryNote
         }
 
         if(!Storage::disk($this->disk)->exists($this->invoice->client->invoice_filepath($invitation)))
+
             Storage::disk($this->disk)->makeDirectory($this->invoice->client->invoice_filepath($invitation), 0775);
-
-        Storage::disk($this->disk)->put($file_path, $pdf);
-
-        //return Storage::disk($this->disk)->path($file_path);
+            Storage::disk($this->disk)->put($file_path, $pdf, 'public');
 
         return $file_path;
     }

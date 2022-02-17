@@ -42,11 +42,11 @@ class StoreRecurringInvoiceRequest extends Request
             $documents = count($this->input('documents'));
 
             foreach (range(0, $documents) as $index) {
-                $rules['documents.'.$index] = 'file|mimes:png,ai,svg,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
+                $rules['documents.'.$index] = 'file|mimes:png,ai,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
             }
 
         } elseif ($this->input('documents')) {
-            $rules['documents'] = 'file|mimes:png,ai,svg,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
+            $rules['documents'] = 'file|mimes:png,ai,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
         }
 
         $rules['client_id'] = 'required|exists:clients,id,company_id,'.auth()->user()->company()->id;
@@ -74,6 +74,10 @@ class StoreRecurringInvoiceRequest extends Request
 
         if (array_key_exists('assigned_user_id', $input) && is_string($input['assigned_user_id'])) {
             $input['assigned_user_id'] = $this->decodePrimaryKey($input['assigned_user_id']);
+        }
+
+        if (array_key_exists('vendor_id', $input) && is_string($input['vendor_id'])) {
+            $input['vendor_id'] = $this->decodePrimaryKey($input['vendor_id']);
         }
 
         if (isset($input['client_contacts'])) {
@@ -110,6 +114,10 @@ class StoreRecurringInvoiceRequest extends Request
                 $input['auto_bill_enabled'] = $this->setAutoBillFlag($input['auto_bill']);
             }
         }
+    
+        /* If there is no number, just unset it here. */
+        if(array_key_exists('number', $input) && ( is_null($input['number']) || empty($input['number'])))
+            unset($input['number']);
     
         $this->replace($input);
     }

@@ -245,6 +245,11 @@ class Client extends BaseModel implements HasLocalePreference
         return $this->hasMany(RecurringInvoice::class)->withTrashed();
     }
 
+    public function recurring_expenses()
+    {
+        return $this->hasMany(RecurringExpense::class)->withTrashed();
+    }
+
     public function shipping_country()
     {
         return $this->belongsTo(Country::class, 'shipping_country_id', 'id');
@@ -276,6 +281,9 @@ class Client extends BaseModel implements HasLocalePreference
 
     public function locale()
     {
+        if(!$this->language())
+            return 'en';
+
         return $this->language()->locale ?: 'en';
     }
 
@@ -283,6 +291,9 @@ class Client extends BaseModel implements HasLocalePreference
     {
         $date_formats = Cache::get('date_formats');
 
+        if(!$date_formats)
+            $this->buildCache(true);
+        
         return $date_formats->filter(function ($item) {
             return $item->id == $this->getSetting('date_format_id');
         })->first()->format;
@@ -530,7 +541,7 @@ class Client extends BaseModel implements HasLocalePreference
             }
         }
 
-        if ($this->country->iso_3166_3 == 'GBR' && in_array(GatewayType::DIRECT_DEBIT, array_column($pms, 'gateway_type_id'))) {
+        if ($this->country && $this->country->iso_3166_3 == 'GBR' && in_array(GatewayType::DIRECT_DEBIT, array_column($pms, 'gateway_type_id'))) {
             foreach ($pms as $pm) {
                 if ($pm['gateway_type_id'] == GatewayType::DIRECT_DEBIT) {
                     $cg = CompanyGateway::find($pm['company_gateway_id']);

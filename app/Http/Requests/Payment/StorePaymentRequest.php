@@ -20,6 +20,7 @@ use App\Http\ValidationRules\ValidCreditsPresentRule;
 use App\Http\ValidationRules\ValidPayableInvoicesRule;
 use App\Models\Payment;
 use App\Utils\Traits\MakesHash;
+use Illuminate\Validation\Rule;
 
 class StorePaymentRequest extends Request
 {
@@ -53,7 +54,10 @@ class StorePaymentRequest extends Request
         if (isset($input['invoices']) && is_array($input['invoices']) !== false) {
             foreach ($input['invoices'] as $key => $value) {
                 $input['invoices'][$key]['invoice_id'] = $this->decodePrimaryKey($value['invoice_id']);
-                $invoices_total += $value['amount'];
+
+                if(array_key_exists('amount', $value))
+                    $invoices_total += $value['amount'];
+
             }
         }
 
@@ -90,27 +94,28 @@ class StorePaymentRequest extends Request
     public function rules()
     {
         $rules = [
-            'amount' => 'numeric|required',
+            'amount' => 'sometimes|numeric',
             'amount' => [new PaymentAmountsBalanceRule(), new ValidCreditsPresentRule()],
             'client_id' => 'bail|required|exists:clients,id',
             'invoices.*.invoice_id' => 'bail|required|distinct|exists:invoices,id',
+            'invoices.*.amount' => 'bail|required',
             'invoices.*.invoice_id' => new ValidInvoicesRules($this->all()),
-            'invoices.*.amount' => 'required',
             'credits.*.credit_id' => 'bail|required|exists:credits,id',
             'credits.*.credit_id' => new ValidCreditsRules($this->all()),
             'credits.*.amount' => ['required', new CreditsSumRule($this->all())],
             'invoices' => new ValidPayableInvoicesRule(),
-            'number' => 'bail|nullable|unique:payments,number,'.$this->id.',id,company_id,'.$this->company_id,
+            'number' => ['nullable', Rule::unique('payments')->where('company_id', auth()->user()->company()->id)],
+
         ];
 
         if ($this->input('documents') && is_array($this->input('documents'))) {
             $documents = count($this->input('documents'));
 
             foreach (range(0, $documents) as $index) {
-                $rules['documents.'.$index] = 'file|mimes:png,ai,svg,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
+                $rules['documents.'.$index] = 'file|mimes:png,ai,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
             }
         } elseif ($this->input('documents')) {
-            $rules['documents'] = 'file|mimes:png,ai,svg,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
+            $rules['documents'] = 'file|mimes:png,ai,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
         }
 
         return $rules;

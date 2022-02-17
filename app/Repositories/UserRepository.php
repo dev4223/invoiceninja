@@ -70,7 +70,7 @@ class UserRepository extends BaseRepository
         }
 
         if (!$user->confirmation_code) {
-            $user->confirmation_code = $this->createDbHash(config('database.default'));
+            $user->confirmation_code = $this->createDbHash($company->db);
         }
 
         $user->account_id = $account->id;
@@ -187,6 +187,14 @@ class UserRepository extends BaseRepository
     {
         if (! $user->trashed()) {
             return;
+        }
+
+        if (Ninja::isHosted()) {
+            
+            $count = User::where('account_id', auth()->user()->account_id)->count();
+            if($count >= auth()->user()->account->num_users)
+                return;
+
         }
 
         $user->is_deleted = false;

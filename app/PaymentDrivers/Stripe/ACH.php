@@ -74,13 +74,13 @@ class ACH
         $mailer = new NinjaMailerObject();
 
         $mailer->mailable = new ACHVerificationNotification(
-            auth('contact')->user()->client->company, 
-            route('client.contact_login', ['contact_key' => auth('contact')->user()->contact_key, 'next' => $verification])
+            auth()->guard('contact')->user()->client->company, 
+            route('client.contact_login', ['contact_key' => auth()->guard('contact')->user()->contact_key, 'next' => $verification])
         );
 
-        $mailer->company = auth('contact')->user()->client->company;
-        $mailer->settings = auth('contact')->user()->client->company->settings;
-        $mailer->to_user = auth('contact')->user();
+        $mailer->company = auth()->guard('contact')->user()->client->company;
+        $mailer->settings = auth()->guard('contact')->user()->client->company->settings;
+        $mailer->to_user = auth()->guard('contact')->user();
 
         NinjaMailerJob::dispatch($mailer);
 
@@ -210,7 +210,7 @@ class ACH
 
         $source = ClientGatewayToken::query()
             ->where('id', $this->decodePrimaryKey($request->source))
-            ->where('company_id', auth('contact')->user()->client->company->id)
+            ->where('company_id', auth()->guard('contact')->user()->client->company->id)
             ->first();
 
         if (!$source) {
@@ -231,12 +231,24 @@ class ACH
         $this->stripe->payment_hash->data = array_merge((array)$this->stripe->payment_hash->data, $state);
         $this->stripe->payment_hash->save();
 
+        $amount = array_sum(array_column($this->stripe->payment_hash->invoices(), 'amount')) + $this->stripe->payment_hash->fee_total;
+        $invoice = Invoice::whereIn('id', $this->transformKeys(array_column($this->stripe->payment_hash->invoices(), 'invoice_id')))
+                          ->withTrashed()
+                          ->first();
+
+        if ($invoice) {
+            $description = "Invoice {$invoice->number} for {$amount} for client {$this->stripe->client->present()->name()}";
+        } else {
+            $description = "Payment with no invoice for amount {$amount} for client {$this->stripe->client->present()->name()}";
+        }
+
         try {
             $state['charge'] = \Stripe\Charge::create([
                 'amount' => $state['amount'],
                 'currency' => $state['currency'],
                 'customer' => $state['customer'],
                 'source' => $state['source'],
+                'description' => $description,
             ], $this->stripe->stripe_connect_auth);
 
             $state = array_merge($state, $request->all());

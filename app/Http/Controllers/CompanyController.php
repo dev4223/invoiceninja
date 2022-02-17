@@ -240,7 +240,7 @@ class CompanyController extends BaseController
         /*
          * Create token
          */
-        $user_agent = request()->input('token_name') ?: request()->server('HTTP_USER_AGENT');
+        $user_agent = request()->has('token_name') ? request()->input('token_name') : request()->server('HTTP_USER_AGENT');
 
         $company_token = CreateCompanyToken::dispatchNow($company, auth()->user(), $user_agent);
 
@@ -504,7 +504,7 @@ class CompanyController extends BaseController
 
             LightLogs::create(new AccountDeleted())
                      ->increment()
-                     ->batch();
+                     ->queue();
 
         } else {
             $company_id = $company->id;

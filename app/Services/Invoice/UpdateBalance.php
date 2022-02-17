@@ -20,10 +20,13 @@ class UpdateBalance extends AbstractService
 
     public $balance_adjustment;
 
-    public function __construct($invoice, $balance_adjustment)
+    private $is_draft;
+
+    public function __construct($invoice, $balance_adjustment, bool $is_draft)
     {
         $this->invoice = $invoice;
         $this->balance_adjustment = $balance_adjustment;
+        $this->is_draft = $is_draft;
     }
 
     public function run()
@@ -31,12 +34,17 @@ class UpdateBalance extends AbstractService
         if ($this->invoice->is_deleted) {
             return $this->invoice;
         }
+nlog("invoice id = {$this->invoice->id}");
+nlog("invoice balance = {$this->invoice->balance}");
+nlog("invoice adjustment = {$this->balance_adjustment}");
 
         $this->invoice->balance += floatval($this->balance_adjustment);
         
-        if ($this->invoice->balance == 0) {
+        if ($this->invoice->balance == 0 && !$this->is_draft) {
             $this->invoice->status_id = Invoice::STATUS_PAID;
         }
+
+nlog("final balance = {$this->invoice->balance}");
 
         return $this->invoice;
     }

@@ -13,6 +13,7 @@ namespace App\Http\Requests\Credit;
 
 use App\Http\Requests\Request;
 use App\Http\ValidationRules\Credit\UniqueCreditNumberRule;
+use App\Http\ValidationRules\Credit\ValidInvoiceCreditRule;
 use App\Models\Credit;
 use App\Utils\Traits\CleanLineItems;
 use App\Utils\Traits\MakesHash;
@@ -46,18 +47,20 @@ class StoreCreditRequest extends Request
             $documents = count($this->input('documents'));
 
             foreach (range(0, $documents) as $index) {
-                $rules['documents.'.$index] = 'file|mimes:png,ai,svg,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
+                $rules['documents.'.$index] = 'file|mimes:png,ai,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
             }
         } elseif ($this->input('documents')) {
-            $rules['documents'] = 'file|mimes:png,ai,svg,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
+            $rules['documents'] = 'file|mimes:png,ai,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
         }
 
         $rules['client_id'] = 'required|exists:clients,id,company_id,'.auth()->user()->company()->id;
 
         // $rules['number'] = new UniqueCreditNumberRule($this->all());
         $rules['number'] = ['nullable', Rule::unique('credits')->where('company_id', auth()->user()->company()->id)];
+        $rules['discount']  = 'sometimes|numeric';
 
-
+        if($this->invoice_id)
+            $rules['invoice_id'] = new ValidInvoiceCreditRule();
 
         $rules['line_items'] = 'array';
 

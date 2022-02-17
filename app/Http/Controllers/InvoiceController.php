@@ -401,7 +401,7 @@ class InvoiceController extends BaseController
 
         $invoice = $this->invoice_repo->save($request->all(), $invoice);
         
-        $invoice->service()->triggeredActions($request)->deletePdf();
+        $invoice->service()->triggeredActions($request)->touchPdf();
 
         event(new InvoiceWasUpdated($invoice, $invoice->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
 
@@ -532,9 +532,10 @@ class InvoiceController extends BaseController
          * Download Invoice/s
          */
 
-        if ($action == 'download' && $invoices->count() > 1) {
+        if ($action == 'bulk_download' && $invoices->count() > 1) {
             $invoices->each(function ($invoice) {
                 if (auth()->user()->cannot('view', $invoice)) {
+                    nlog("access denied");
                     return response()->json(['message' => ctrans('text.access_denied')]);
                 }
             });
@@ -657,7 +658,8 @@ class InvoiceController extends BaseController
                 // code...
                 break;
             case 'mark_paid':
-                if ($invoice->balance < 0 || $invoice->status_id == Invoice::STATUS_PAID || $invoice->is_deleted === true) {
+                if ($invoice->status_id == Invoice::STATUS_PAID || $invoice->is_deleted === true) {
+                // if ($invoice->balance < 0 || $invoice->status_id == Invoice::STATUS_PAID || $invoice->is_deleted === true) {
                     return $this->errorResponse(['message' => ctrans('texts.invoice_cannot_be_marked_paid')], 400);
                 }
 
@@ -707,19 +709,19 @@ class InvoiceController extends BaseController
                 }
                 break;
             case 'cancel':
-                $invoice = $invoice->service()->handleCancellation()->deletePdf()->save();
+                $invoice = $invoice->service()->handleCancellation()->deletePdf()->touchPdf()->save();
 
                 if (! $bulk) {
                     $this->itemResponse($invoice);
                 }
                 break;
-            case 'reverse':
-                $invoice = $invoice->service()->handleReversal()->deletePdf()->save();
+            // case 'reverse':
+            //     $invoice = $invoice->service()->handleReversal()->deletePdf()->save();
 
-                if (! $bulk) {
-                    $this->itemResponse($invoice);
-                }
-                break;
+            //     if (! $bulk) {
+            //         $this->itemResponse($invoice);
+            //     }
+            //     break;
             case 'email':
                 //check query parameter for email_type and set the template else use calculateTemplate
 

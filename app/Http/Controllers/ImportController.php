@@ -14,6 +14,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\Import\ImportRequest;
 use App\Http\Requests\Import\PreImportRequest;
 use App\Jobs\Import\CSVImport;
+use App\Jobs\Import\CSVIngest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -81,9 +82,10 @@ class ImportController extends Controller {
 		/** @var UploadedFile $file */
 		foreach ( $request->files->get( 'files' ) as $entityType => $file ) {
 			$contents = file_get_contents( $file->getPathname() );
+			// $contents = mb_convert_encoding($contents, 'UTF-16LE', 'UTF-8');
 
 			// Store the csv in cache with an expiry of 10 minutes
-			Cache::put( $hash . '-' . $entityType, base64_encode( $contents ), 3600 );
+			Cache::put( $hash . '-' . $entityType, base64_encode( $contents ), 600 );
 
 			// Parse CSV
 			$csv_array = $this->getCsvData( $contents );
@@ -111,11 +113,13 @@ class ImportController extends Controller {
 				$contents = file_get_contents( $file->getPathname() );
 
 				// Store the csv in cache with an expiry of 10 minutes
-				Cache::put( $hash . '-' . $entityType, base64_encode( $contents ), 3600 );
+				Cache::put( $hash . '-' . $entityType, base64_encode( $contents ), 600 );
 			}
 		}
 
-		CSVImport::dispatch( $data, auth()->user()->company() );
+		unset($data['files']);
+		// CSVImport::dispatch( $data, auth()->user()->company() );
+		CSVIngest::dispatch( $data, auth()->user()->company() );
 
 		return response()->json( [ 'message' => ctrans( 'texts.import_started' ) ], 200 );
 	}

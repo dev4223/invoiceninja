@@ -70,13 +70,30 @@ class GmailTransport extends Transport
             if($child->getContentType() != 'text/plain')
             {
 
-            $this->gmail->attach(TempFile::filePath($child->getBody(), $child->getHeaders()->get('Content-Type')->getParameter('name') ));
+                $this->gmail->attach(TempFile::filePath($child->getBody(), $child->getHeaders()->get('Content-Type')->getParameter('name') ));
             
             }
 
         } 
 
-        $this->gmail->send();
+        /**
+         * Google is very strict with their
+         * sending limits, if we hit 429s, sleep and
+         * retry again later.
+         */
+        try{
+
+            $this->gmail->send();
+
+        }
+        catch(\Google\Service\Exception $e)
+        {
+            nlog("gmail exception");
+            nlog($e->getErrors());
+
+            sleep(5);
+            $this->gmail->send();
+        }
 
         $this->sendPerformed($message);
 

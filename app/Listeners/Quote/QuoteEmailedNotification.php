@@ -22,6 +22,9 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 
 class QuoteEmailedNotification implements ShouldQueue
 {
+
+    public $delay = 5;
+        
     use UserNotifies;
 
     public function __construct()
@@ -42,7 +45,7 @@ class QuoteEmailedNotification implements ShouldQueue
 
         $quote = $event->invitation->quote;
         $quote->last_sent_date = now();
-        $quote->save();
+        $quote->saveQuietly();
 
         $nmo = new NinjaMailerObject;
         $nmo->mailable = new NinjaMailer( (new EntitySentObject($event->invitation, 'quote', $event->template))->build() );

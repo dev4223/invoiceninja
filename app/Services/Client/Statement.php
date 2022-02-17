@@ -28,8 +28,11 @@ use App\Utils\Ninja;
 use App\Utils\Number;
 use App\Utils\PhantomJS\Phantom;
 use App\Utils\Traits\Pdf\PdfMaker as PdfMakerTrait;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\LazyCollection;
 
 class Statement
 {
@@ -108,7 +111,7 @@ class Statement
         }
 
         if ($this->rollback) {
-            DB::rollBack();
+            \DB::connection(config('database.default'))->rollBack();
         }
 
 
@@ -122,12 +125,13 @@ class Statement
      */
     protected function setupEntity(): self
     {
-        if (count($this->getInvoices()) >= 1) {
+        if ($this->getInvoices()->count() >= 1) {
             $this->entity = $this->getInvoices()->first();
         }
 
         if (\is_null($this->entity)) {
-            DB::beginTransaction();
+            \DB::connection(config('database.default'))->beginTransaction();
+
             $this->rollback = true;
 
             $invoice = InvoiceFactory::create($this->client->company->id, $this->client->user->id);
@@ -170,15 +174,17 @@ class Statement
                 $item->tax_rate1 = 5;
             }
 
-            $product = Product::all()->random();
+            //$product = Product::first();
 
-            $item->cost = (float) $product->cost;
-            $item->product_key = $product->product_key;
-            $item->notes = $product->notes;
-            $item->custom_value1 = $product->custom_value1;
-            $item->custom_value2 = $product->custom_value2;
-            $item->custom_value3 = $product->custom_value3;
-            $item->custom_value4 = $product->custom_value4;
+            $product = new \stdClass;
+
+            $item->cost = (float) 10;
+            $item->product_key = 'test';
+            $item->notes = 'test notes';
+            $item->custom_value1 = 'custom value1';
+            $item->custom_value2 = 'custom value2';
+            $item->custom_value3 = 'custom value3';
+            $item->custom_value4 = 'custom value4';
 
             $line_items[] = $item;
         }
@@ -217,16 +223,40 @@ class Statement
      *
      * @return Invoice[]|\Illuminate\Database\Eloquent\Collection
      */
-    protected function getInvoices(): Collection
+    protected function getInvoices(): \Illuminate\Support\LazyCollection
     {
         return Invoice::withTrashed()
             ->where('is_deleted', false)
             ->where('company_id', $this->client->company_id)
             ->where('client_id', $this->client->id)
-            ->whereIn('status_id', [Invoice::STATUS_SENT, Invoice::STATUS_PARTIAL, Invoice::STATUS_PAID])
-            ->whereBetween('date', [$this->options['start_date'], $this->options['end_date']])
-            ->orderBy('number', 'ASC')
-            ->get();
+            ->whereIn('status_id', $this->invoiceStatuses())
+            ->whereBetween('date', [Carbon::parse($this->options['start_date']), Carbon::parse($this->options['end_date'])])
+            ->orderBy('date', 'ASC')
+            ->cursor();
+    }
+
+    private function invoiceStatuses() :array
+    {
+        $status = 'all';
+
+        if(array_key_exists('status', $this->options))
+            $status = $this->options['status'];
+
+        switch ($status) {
+            case 'all':
+                return [Invoice::STATUS_SENT, Invoice::STATUS_PARTIAL, Invoice::STATUS_PAID];
+                break;
+            case 'paid':
+                return [Invoice::STATUS_PARTIAL, Invoice::STATUS_PAID];
+                break;
+            case 'unpaid':
+                return [Invoice::STATUS_SENT];
+                break;
+            
+            default:
+                return [Invoice::STATUS_SENT, Invoice::STATUS_PARTIAL, Invoice::STATUS_PAID];
+                break;
+        }
     }
 
     /**
@@ -234,7 +264,7 @@ class Statement
      *
      * @return Payment[]|\Illuminate\Database\Eloquent\Collection
      */
-    protected function getPayments(): Collection
+    protected function getPayments(): \Illuminate\Support\LazyCollection
     {
         return Payment::withTrashed()
             ->with('client.country','invoices')
@@ -242,9 +272,9 @@ class Statement
             ->where('company_id', $this->client->company_id)
             ->where('client_id', $this->client->id)
             ->whereIn('status_id', [Payment::STATUS_COMPLETED, Payment::STATUS_PARTIALLY_REFUNDED, Payment::STATUS_REFUNDED])
-            ->whereBetween('date', [$this->options['start_date'], $this->options['end_date']])
-            ->orderBy('number', 'ASC')
-            ->get();
+            ->whereBetween('date', [Carbon::parse($this->options['start_date']), Carbon::parse($this->options['end_date'])])
+            ->orderBy('date', 'ASC')
+            ->cursor();
     }
 
     /**
