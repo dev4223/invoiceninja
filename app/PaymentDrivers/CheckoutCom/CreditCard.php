@@ -14,7 +14,7 @@ namespace App\PaymentDrivers\CheckoutCom;
 
 use App\Exceptions\PaymentFailed;
 use App\Http\Requests\ClientPortal\Payments\PaymentResponseRequest;
-use App\Http\Requests\Request;
+use Illuminate\Http\Request;
 use App\Models\ClientGatewayToken;
 use App\Models\GatewayType;
 use App\PaymentDrivers\CheckoutComPaymentDriver;
@@ -112,7 +112,7 @@ class CreditCard implements MethodInterface
         $data['currency'] = $this->checkout->client->getCurrencyCode();
         $data['value'] = $this->checkout->convertToCheckoutAmount($data['total']['amount_with_fee'], $this->checkout->client->getCurrencyCode());
         $data['raw_value'] = $data['total']['amount_with_fee'];
-        $data['customer_email'] = $this->checkout->client->present()->email;
+        $data['customer_email'] = $this->checkout->client->present()->email();
 
         return render('gateways.checkout.credit_card.pay', $data);
     }
@@ -145,7 +145,7 @@ class CreditCard implements MethodInterface
     {
         $cgt = ClientGatewayToken::query()
             ->where('id', $this->decodePrimaryKey($request->input('token')))
-            ->where('company_id', auth('contact')->user()->client->company->id)
+            ->where('company_id', auth()->guard('contact')->user()->client->company->id)
             ->first();
 
         if (!$cgt) {
@@ -170,9 +170,18 @@ class CreditCard implements MethodInterface
 
     private function completePayment($method, PaymentResponseRequest $request)
     {
+
         $payment = new Payment($method, $this->checkout->payment_hash->data->currency);
         $payment->amount = $this->checkout->payment_hash->data->value;
         $payment->reference = $this->checkout->getDescription();
+        $payment->customer = [
+            'name' => $this->checkout->client->present()->name() ,
+            'email' => $this->checkout->client->present()->email(),
+        ];
+
+        $payment->metadata = [
+            'udf1' => "Invoice Ninja",
+        ];
 
         $this->checkout->payment_hash->data = array_merge((array)$this->checkout->payment_hash->data, ['checkout_payment_ref' => $payment]);
         $this->checkout->payment_hash->save();
@@ -209,10 +218,10 @@ class CreditCard implements MethodInterface
             if ($response->status == 'Declined') {
                 $this->checkout->unWindGatewayFees($this->checkout->payment_hash);
 
-                $this->checkout->sendFailureMail($response->response_summary);
-
+                // $this->checkout->sendFailureMail($response->response_summary);
+                
                 //@todo - this will double up the checkout . com failed mails
-                $this->checkout->clientPaymentFailureMailer($response->status);
+                // $this->checkout->clientPaymentFailureMailer($response->status);
                 
                 return $this->processUnsuccessfulPayment($response);
             }

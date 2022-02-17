@@ -54,6 +54,7 @@ class Account extends BaseModel
         'utm_term',
         'utm_content',
         'user_agent',
+        'platform',
     ];
 
     /**
@@ -65,6 +66,13 @@ class Account extends BaseModel
         'discount_expires',
         // 'trial_started',
         // 'plan_expires'
+    ];
+
+    protected $casts = [
+        'updated_at' => 'timestamp',
+        'created_at' => 'timestamp',
+        'deleted_at' => 'timestamp',
+        'onboarding' => 'object'
     ];
 
     const PLAN_FREE = 'free';

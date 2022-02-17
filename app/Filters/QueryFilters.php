@@ -88,6 +88,8 @@ abstract class QueryFilters
             }
         }
 
+        // nlog('[Search] SQL: ' . $this->builder->toSql() . " Bindings: " . implode(', ', $this->builder->getBindings()));
+
         return $this->builder->withTrashed();
     }
 
@@ -159,8 +161,8 @@ abstract class QueryFilters
      */
     public function clientFilter()
     {
-        if (auth('contact')->user()) {
-            return $this->builder->whereClientId(auth('contact')->user()->client->id);
+        if (auth()->guard('contact')->user()) {
+            return $this->builder->whereClientId(auth()->guard('contact')->user()->client->id);
         }
     }
 
@@ -188,9 +190,7 @@ abstract class QueryFilters
             return $this->builder;
         }
 
-        $this->builder->where('client_id', $this->decodePrimaryKey($client_id));
-
-        return $this->builder;
+        return $this->builder->where('client_id', $this->decodePrimaryKey($client_id));
         
     }
 
@@ -213,11 +213,17 @@ abstract class QueryFilters
     public function with_trashed($value)
     {
 
-        if($value == 'true'){
+        if($value == 'false'){
 
-            $this->builder->withTrashed();
+            return $this->builder->where('is_deleted', 0);
 
         }
+
+        // if($value == 'true'){
+
+        //     $this->builder->withTrashed();
+
+        // }
 
         return $this->builder;
 

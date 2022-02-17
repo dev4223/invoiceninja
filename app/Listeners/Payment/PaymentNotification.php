@@ -26,6 +26,9 @@ class PaymentNotification implements ShouldQueue
 {
     use UserNotifies;
 
+    public $delay = 5;
+
+    
     /**
      * Create the event listener.
      *
@@ -59,7 +62,12 @@ class PaymentNotification implements ShouldQueue
         foreach ($payment->company->company_users as $company_user) {
             $user = $company_user->user;
 
-            $methods = $this->findUserEntityNotificationType($payment, $company_user, ['payment_success', 'payment_success_all', 'all_notifications']);
+            $methods = $this->findUserEntityNotificationType($payment, $company_user, [
+                'payment_success', 
+                'payment_success_all', 
+                'payment_success_user', 
+                'all_notifications']
+            );
 
             if (($key = array_search('mail', $methods)) !== false) {
                 unset($methods[$key]);

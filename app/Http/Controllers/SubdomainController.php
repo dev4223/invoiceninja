@@ -20,6 +20,7 @@ class SubdomainController extends BaseController
         'app',
         'ninja',
         'sentry',
+        'sentry2',
         'staging',
         'pdf',
         'demo',
@@ -31,6 +32,7 @@ class SubdomainController extends BaseController
         'cname',
         'sandbox',
         'stage',
+        'html',
     ];
 
     public function __construct()

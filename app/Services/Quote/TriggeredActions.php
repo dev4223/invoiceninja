@@ -38,6 +38,7 @@ class TriggeredActions extends AbstractService
     {
 
         if ($this->request->has('send_email') && $this->request->input('send_email') == 'true') {
+            $this->quote = $this->quote->service()->markSent()->save();
             $this->sendEmail();
         }
 
@@ -57,7 +58,7 @@ class TriggeredActions extends AbstractService
     {
 
         $reminder_template = $this->quote->calculateTemplate('quote');
-        //$reminder_template = 'payment';
+        // $reminder_template = 'email_template_quote';
 
         $this->quote->invitations->load('contact.client.country', 'quote.client.country', 'quote.company')->each(function ($invitation) use ($reminder_template) {
             EmailEntity::dispatch($invitation, $this->quote->company, $reminder_template);

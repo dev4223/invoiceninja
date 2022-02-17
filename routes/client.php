@@ -18,21 +18,26 @@ Route::post('client/password/reset', 'Auth\ContactResetPasswordController@reset'
 Route::get('view/{entity_type}/{invitation_key}', 'ClientPortal\EntityViewController@index')->name('client.entity_view');
 Route::get('view/{entity_type}/{invitation_key}/password', 'ClientPortal\EntityViewController@password')->name('client.entity_view.password');
 Route::post('view/{entity_type}/{invitation_key}/password', 'ClientPortal\EntityViewController@handlePassword');
+Route::post('set_password', 'ClientPortal\EntityViewController@handlePasswordSet')->name('client.set_password')->middleware('domain_db');
 
 Route::get('tmp_pdf/{hash}', 'ClientPortal\TempRouteController@index')->name('tmp_pdf');
 
 Route::get('client/key_login/{contact_key}', 'ClientPortal\ContactHashLoginController@login')->name('client.contact_login')->middleware(['domain_db','contact_key_login']);
 Route::get('client/magic_link/{magic_link}', 'ClientPortal\ContactHashLoginController@magicLink')->name('client.contact_magic_link')->middleware(['domain_db','contact_key_login']);
-Route::get('documents/{document_hash}', 'ClientPortal\DocumentController@publicDownload')->name('documents.public_download')->middleware(['document_db']);
+Route::get('documents/{document_hash}', 'ClientPortal\DocumentController@publicDownload')->name('documents.public_download')->middleware(['domain_db']);
 Route::get('error', 'ClientPortal\ContactHashLoginController@errorPage')->name('client.error');
 Route::get('client/payment/{contact_key}/{payment_id}', 'ClientPortal\InvitationController@paymentRouter')->middleware(['domain_db','contact_key_login']);
 Route::get('client/ninja/{contact_key}/{company_key}', 'ClientPortal\NinjaPlanController@index')->name('client.ninja_contact_login')->middleware(['domain_db']);
 
-Route::group(['middleware' => ['auth:contact', 'locale', 'check_client_existence','domain_db'], 'prefix' => 'client', 'as' => 'client.'], function () {
+Route::group(['middleware' => ['auth:contact', 'locale', 'domain_db','check_client_existence'], 'prefix' => 'client', 'as' => 'client.'], function () {
     Route::get('dashboard', 'ClientPortal\DashboardController@index')->name('dashboard'); // name = (dashboard. index / create / show / update / destroy / edit
+
+    Route::get('plan', 'ClientPortal\NinjaPlanController@plan')->name('plan'); // name = (dashboard. index / create / show / update / destroy / edit
 
     Route::get('invoices', 'ClientPortal\InvoiceController@index')->name('invoices.index')->middleware('portal_enabled');
     Route::post('invoices/payment', 'ClientPortal\InvoiceController@bulk')->name('invoices.bulk');
+    Route::get('invoices/payment', 'ClientPortal\InvoiceController@catch_bulk')->name('invoices.catch_bulk');
+    Route::post('invoices/download', 'ClientPortal\InvoiceController@download')->name('invoices.download');
     Route::get('invoices/{invoice}', 'ClientPortal\InvoiceController@show')->name('invoice.show');
     Route::get('invoices/{invoice_invitation}', 'ClientPortal\InvoiceController@show')->name('invoice.show_invitation');
 
@@ -41,6 +46,8 @@ Route::group(['middleware' => ['auth:contact', 'locale', 'check_client_existence
     Route::get('recurring_invoices/{recurring_invoice}/request_cancellation', 'ClientPortal\RecurringInvoiceController@requestCancellation')->name('recurring_invoices.request_cancellation');
 
     Route::post('payments/process', 'ClientPortal\PaymentController@process')->name('payments.process');
+    Route::get('payments/process', 'ClientPortal\PaymentController@catch_process')->name('payments.catch_process');
+
     Route::post('payments/credit_response', 'ClientPortal\PaymentController@credit_response')->name('payments.credit_response');
 
     Route::get('payments', 'ClientPortal\PaymentController@index')->name('payments.index')->middleware('portal_enabled');
@@ -64,6 +71,7 @@ Route::group(['middleware' => ['auth:contact', 'locale', 'check_client_existence
     Route::get('quotes', 'ClientPortal\QuoteController@index')->name('quotes.index')->middleware('portal_enabled');
     Route::get('quotes/{quote}', 'ClientPortal\QuoteController@show')->name('quote.show');
     Route::get('quotes/{quote_invitation}', 'ClientPortal\QuoteController@show')->name('quote.show_invitation');
+    Route::post('quotes/download', 'ClientPortal\QuoteController@download')->name('quotes.download');
 
     Route::get('credits', 'ClientPortal\CreditController@index')->name('credits.index');
     Route::get('credits/{credit}', 'ClientPortal\CreditController@show')->name('credit.show');

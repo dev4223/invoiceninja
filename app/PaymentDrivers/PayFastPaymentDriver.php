@@ -49,7 +49,8 @@ class PayFastPaymentDriver extends BaseDriver
     {
         $types = [];
 
-        if($this->client->currency()->code == 'ZAR' || $this->client->currency()->code == 'USD')
+        // if($this->client->currency()->code == 'ZAR' || $this->client->currency()->code == 'USD')
+        if($this->client->currency()->code == 'ZAR')
             $types[] = GatewayType::CREDIT_CARD;
 
         return $types;
@@ -79,7 +80,7 @@ class PayFastPaymentDriver extends BaseDriver
 
         } catch(\Exception $e) {
 
-            echo '##PAYFAST## There was an exception: '.$e->getMessage();
+            nlog('##PAYFAST## There was an exception: '.$e->getMessage());
 
         }
 
@@ -203,8 +204,8 @@ class PayFastPaymentDriver extends BaseDriver
     {
 
         $data = $request->all();
-        nlog("payfast");
-        nlog($data);
+        // nlog("payfast");
+        // nlog($data);
 
         if(array_key_exists('m_payment_id', $data))
         {

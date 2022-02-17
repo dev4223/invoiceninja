@@ -14,11 +14,13 @@ namespace App\Utils;
 
 use App\Models\Country;
 use App\Models\CreditInvitation;
+use App\Models\GatewayType;
 use App\Models\InvoiceInvitation;
 use App\Models\QuoteInvitation;
 use App\Models\RecurringInvoiceInvitation;
 use App\Services\PdfMaker\Designs\Utilities\DesignHelpers;
 use App\Utils\Ninja;
+use App\Utils\Number;
 use App\Utils\Traits\MakesDates;
 use App\Utils\transformTranslations;
 use Exception;
@@ -151,6 +153,11 @@ class HtmlEngine
 
             if($this->entity->project) {
                 $data['$project.name'] = ['value' => $this->entity->project->name, 'label' => ctrans('texts.project_name')];
+                $data['$invoice.project'] = &$data['$project.name'];
+            }
+
+            if($this->entity->vendor) {
+                $data['$invoice.vendor'] = ['value' => $this->entity->vendor->present()->name(), 'label' => ctrans('texts.vendor_name')];
             }
         }
 
@@ -221,6 +228,14 @@ class HtmlEngine
 
         $data['$quote.balance_due'] = &$data['$balance_due'];
         $data['$invoice.balance_due'] = &$data['$balance_due'];
+
+
+        if ($this->entity_string == 'credit') {
+            $data['$balance_due'] = ['value' => Number::formatMoney($this->entity->balance, $this->client) ?: '&nbsp;', 'label' => ctrans('texts.credit_balance')];
+            $data['$balance_due_raw'] = ['value' => $this->entity->balance, 'label' => ctrans('texts.credit_balance')];
+            $data['$amount_raw'] = ['value' => $this->entity->amount, 'label' => ctrans('texts.amount')];         
+        }
+
         // $data['$balance_due'] = $data['$balance_due'];
         $data['$outstanding'] = &$data['$balance_due'];
         $data['$partial_due'] = ['value' => Number::formatMoney($this->entity->partial, $this->client) ?: '&nbsp;', 'label' => ctrans('texts.partial_due')];
@@ -312,7 +327,9 @@ class HtmlEngine
         $data['$client_address'] = ['value' => $this->client->present()->address() ?: '&nbsp;', 'label' => ctrans('texts.address')];
         $data['$client.address'] = &$data['$client_address'];
         $data['$client.postal_code'] = ['value' => $this->client->postal_code ?: '&nbsp;', 'label' => ctrans('texts.postal_code')];
+        $data['$client.public_notes'] = ['value' => $this->client->public_notes ?: '&nbsp;', 'label' => ctrans('texts.notes')];
         $data['$client.city'] = ['value' => $this->client->city ?: '&nbsp;', 'label' => ctrans('texts.city')];
+        $data['$client.state'] = ['value' => $this->client->state ?: '&nbsp;', 'label' => ctrans('texts.state')];
         $data['$client.id_number'] = &$data['$id_number'];
         $data['$client.vat_number'] = &$data['$vat_number'];
         $data['$client.website'] = &$data['$website'];
@@ -323,6 +340,22 @@ class HtmlEngine
         $data['$client.postal_city_state'] = &$data['$postal_city_state'];
         $data['$client.country'] = &$data['$country'];
         $data['$client.email'] = &$data['$email'];
+        
+        $data['$client.billing_address'] = &$data['$client_address'];
+        $data['$client.billing_address1'] = &$data['$client.address1'];
+        $data['$client.billing_address2'] = &$data['$client.address2'];
+        $data['$client.billing_city'] = &$data['$client.city'];
+        $data['$client.billing_state'] = &$data['$client.state'];
+        $data['$client.billing_postal_code'] = &$data['$client.postal_code'];
+        $data['$client.billing_country'] = &$data['$client.country'];
+
+        $data['$client.shipping_address'] = ['value' => $this->client->present()->shipping_address() ?: '&nbsp;', 'label' => ctrans('texts.shipping_address')];
+        $data['$client.shipping_address1'] = ['value' => $this->client->shipping_address1 ?: '&nbsp;', 'label' => ctrans('texts.shipping_address1')];
+        $data['$client.shipping_address2'] = ['value' => $this->client->shipping_address2 ?: '&nbsp;', 'label' => ctrans('texts.shipping_address2')];
+        $data['$client.shipping_city'] = ['value' => $this->client->shipping_city ?: '&nbsp;', 'label' => ctrans('texts.shipping_city')];
+        $data['$client.shipping_state'] = ['value' => $this->client->shipping_state ?: '&nbsp;', 'label' => ctrans('texts.shipping_state')];
+        $data['$client.shipping_postal_code'] = ['value' => $this->client->shipping_postal_code ?: '&nbsp;', 'label' => ctrans('texts.shipping_postal_code')];
+        $data['$client.shipping_country'] = ['value' => isset($this->client->shipping_country->name) ? ctrans('texts.country_' . $this->client->shipping_country->name) : '', 'label' => ctrans('texts.shipping_country')];
 
         $data['$client.currency'] = ['value' => $this->client->currency()->code, 'label' => ''];
 
@@ -402,7 +435,7 @@ class HtmlEngine
         $data['$product.tax_name2'] = ['value' => '', 'label' => ctrans('texts.tax')];
         $data['$product.tax_name3'] = ['value' => '', 'label' => ctrans('texts.tax')];
         $data['$product.line_total'] = ['value' => '', 'label' => ctrans('texts.line_total')];
-        $data['$product.gross_line_total'] = ['value' => '', 'label' => ctrans('texts.line_total')];
+        $data['$product.gross_line_total'] = ['value' => '', 'label' => ctrans('texts.gross_line_total')];
         $data['$product.description'] = ['value' => '', 'label' => ctrans('texts.description')];
         $data['$product.unit_cost'] = ['value' => '', 'label' => ctrans('texts.unit_cost')];
         $data['$product.product1'] = ['value' => '', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'product1')];
@@ -422,7 +455,7 @@ class HtmlEngine
         $data['$task.tax_name2'] = ['value' => '', 'label' => ctrans('texts.tax')];
         $data['$task.tax_name3'] = ['value' => '', 'label' => ctrans('texts.tax')];
         $data['$task.line_total'] = ['value' => '', 'label' => ctrans('texts.line_total')];
-        $data['$task.gross_line_total'] = ['value' => '', 'label' => ctrans('texts.line_total')];
+        $data['$task.gross_line_total'] = ['value' => '', 'label' => ctrans('texts.gross_line_total')];
         $data['$task.service'] = ['value' => '', 'label' => ctrans('texts.service')];
         $data['$task.task1'] = ['value' => '', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'task1')];
         $data['$task.task2'] = ['value' => '', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'task2')];
@@ -445,6 +478,8 @@ class HtmlEngine
         $data['_rate3'] = ['value' => '', 'label' => ctrans('texts.tax')];
 
         $data['$font_size'] = ['value' => $this->settings->font_size . 'px', 'label' => ''];
+        $data['$font_name'] = ['value' => Helpers::resolveFont($this->settings->primary_font)['name'], 'label' => ''];
+        $data['$font_url'] = ['value' => Helpers::resolveFont($this->settings->primary_font)['url'], 'label' => ''];
 
         $data['$invoiceninja.whitelabel'] = ['value' => 'https://raw.githubusercontent.com/invoiceninja/invoiceninja/v5-develop/public/images/new_logo.png', 'label' => ''];
 
@@ -456,7 +491,8 @@ class HtmlEngine
 
         //$data['$entity_footer'] = ['value' => $this->client->getSetting("{$this->entity_string}_footer"), 'label' => ''];
         $data['$entity_footer'] = ['value' => Helpers::processReservedKeywords(\nl2br($this->entity->footer), $this->client), 'label' => ''];
-
+        $data['$footer'] = &$data['$entity_footer'];
+        
         $data['$page_size'] = ['value' => $this->settings->page_size, 'label' => ''];
         $data['$page_layout'] = ['value' => property_exists($this->settings, 'page_layout') ? $this->settings->page_layout : 'Portrait', 'label' => ''];
 
@@ -477,6 +513,22 @@ class HtmlEngine
 
         $data['$statement_amount'] = ['value' => '', 'label' => ctrans('texts.amount')];
         $data['$statement'] = ['value' => '', 'label' => ctrans('texts.statement')];
+
+        $data['$entity_images'] = ['value' => $this->generateEntityImagesMarkup(), 'label' => ''];
+
+        $data['$payments'] = ['value' => '', 'label' => ctrans('texts.payments')];
+
+        if ($this->entity_string == 'invoice' && $this->entity->payments()->exists()) {
+            
+            $payment_list = '<br><br>';
+
+            foreach ($this->entity->payments as $payment) {
+                $payment_list .= ctrans('texts.payment_subject') . ": " . $this->formatDate($payment->date, $this->client->date_format()) . " :: " . Number::formatMoney($payment->amount, $this->client) ." :: ". GatewayType::getAlias($payment->gateway_type_id) . "<br>";
+            }
+
+            $data['$payments'] = ['value' => $payment_list, 'label' => ctrans('texts.payments')];
+        }
+
 
         $arrKeysLength = array_map('strlen', array_keys($data));
         array_multisort($arrKeysLength, SORT_DESC, $data);
@@ -733,5 +785,39 @@ html {
         $css .= '}';
 
         return $css;
+    }
+
+    /**
+     * Generate markup for HTML images on entity.
+     * 
+     * @return string|void 
+     */
+    protected function generateEntityImagesMarkup()
+    {
+        if ($this->client->getSetting('embed_documents') === false) {
+            return '';
+        }
+
+        $dom = new \DOMDocument('1.0', 'UTF-8');
+
+        $container =  $dom->createElement('div');
+        $container->setAttribute('style', 'display:grid; grid-auto-flow: row; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr);');
+
+        foreach ($this->entity->documents as $document) {
+            if (!$document->isImage()) {
+                continue;
+            }
+
+            $image = $dom->createElement('img');
+
+            $image->setAttribute('src', $document->generateUrl());
+            $image->setAttribute('style', 'max-height: 100px; margin-top: 20px;');
+
+            $container->appendChild($image);
+        }
+
+        $dom->appendChild($container);
+
+        return $dom->saveHTML();
     }
 }

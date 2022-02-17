@@ -18,6 +18,7 @@ use App\Models\ClientContact;
 use App\Models\User;
 use App\Services\PdfMaker\Designs\Utilities\DesignHelpers;
 use App\Utils\HtmlEngine;
+use App\Utils\Ninja;
 use App\Utils\TemplateEngine;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -51,7 +52,8 @@ class TemplateEmail extends Mailable
 
     public function build()
     {
-         $template_name = 'email.template.'.$this->build_email->getTemplate();
+        
+        $template_name = 'email.template.'.$this->build_email->getTemplate();
 
         if ($this->build_email->getTemplate() == 'light' || $this->build_email->getTemplate() == 'dark') {
             $template_name = 'email.template.client';
@@ -107,12 +109,16 @@ class TemplateEmail extends Mailable
                 'settings' => $settings,
                 'company' => $company,
                 'whitelabel' => $this->client->user->account->isPaid() ? true : false,
-                'logo' => $this->company->present()->logo(),
+                'logo' => $this->company->present()->logo($settings),
             ])
             ->withSwiftMessage(function ($message) use($company){
                 $message->getHeaders()->addTextHeader('Tag', $company->company_key);
                 $message->invitation = $this->invitation;
             });
+
+            /*In the hosted platform we need to slow things down a little for Storage to catch up.*/
+            if(Ninja::isHosted())
+                sleep(1);
 
             foreach ($this->build_email->getAttachments() as $file) {
 
@@ -123,7 +129,7 @@ class TemplateEmail extends Mailable
 
             }
 
-        if($this->invitation && $this->invitation->invoice && $settings->ubl_email_attachment && $this->company->account->hasFeature(Account::FEATURE_DOCUMENTS)){
+        if($this->invitation && $this->invitation->invoice && $settings->ubl_email_attachment && $this->company->account->hasFeature(Account::FEATURE_PDF_ATTACHMENT)){
 
             $ubl_string = CreateUbl::dispatchNow($this->invitation->invoice);
 

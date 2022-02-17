@@ -62,7 +62,7 @@ trait Utilities
 
         $data = [
             'payment_method' => $_payment->source['id'],
-            'payment_type' => PaymentType::parseCardType(strtolower($_payment->source['scheme'])),
+            'payment_type' => 12,
             'amount' => $this->getParent()->payment_hash->data->raw_value,
             'transaction_reference' => $_payment->id,
             'gateway_type_id' => GatewayType::CREDIT_CARD,
@@ -85,8 +85,15 @@ trait Utilities
     public function processUnsuccessfulPayment(Payment $_payment, $throw_exception = true)
     {
 
-        $this->getParent()->sendFailureMail($_payment->status . " " . $_payment->response_summary);
+        $error_message = '';
 
+        if(property_exists($_payment, 'server_response'))
+            $error_message = $_payment->response_summary;
+        elseif(property_exists($_payment, 'status'))
+            $error_message = $_payment->status;
+
+        $this->getParent()->sendFailureMail($error_message);
+                
         $message = [
             'server_response' => $_payment,
             'data' => $this->getParent()->payment_hash->data,
@@ -102,7 +109,8 @@ trait Utilities
         );
 
         if ($throw_exception) {
-            throw new PaymentFailed($_payment->status . " " . $_payment->response_summary, $_payment->http_code);
+
+            throw new PaymentFailed($_payment->status . " " . $error_message, $_payment->http_code);
         }
     }
 

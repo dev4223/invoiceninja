@@ -26,8 +26,8 @@
                         <div class="relative inline-block text-left">
                             <div>
                                 <div class="rounded-md shadow-sm">
-                                    <button type="button" id="approve-button"
-                                            class="inline-flex justify-center w-full rounded-md border border-gray-300 px-4 py-2 bg-white text-sm leading-5 font-medium text-gray-700 hover:text-gray-500 focus:outline-none focus:border-blue-300 focus:shadow-outline-blue active:bg-gray-50 active:text-gray-800 transition ease-in-out duration-150">
+                                    <button type="button" id="approve-button" onclick="setTimeout(() => this.disabled = true, 0); return true;"
+                                            class="inline-flex justify-center w-full rounded-md border border-gray-300 px-4 py-2 bg-white text-sm leading-5 font-medium text-gray-700 hover:text-gray-500 focus:outline-none focus:border-blue-300 focus:ring-blue active:bg-gray-50 active:text-gray-800 transition ease-in-out duration-150">
                                         {{ ctrans('texts.approve') }}
                                     </button>
                                 </div>
@@ -62,7 +62,7 @@
                                         {{ ctrans('texts.quote_date') }}
                                     </dt>
                                     <dd class="mt-1 text-sm leading-5 text-gray-900 sm:mt-0 sm:col-span-2">
-                                        {{ $quote->formatDate($quote->date, $quote->client->date_format()) }}
+                                        {{ $quote->translateDate($quote->date, $quote->client->date_format(), $quote->client->locale()) }}
                                     </dd>
                                 </div>
                                 <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">

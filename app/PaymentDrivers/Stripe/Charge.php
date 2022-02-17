@@ -56,7 +56,6 @@ class Charge
         if($cgt->gateway_type_id == GatewayType::BANK_TRANSFER)
             return (new ACH($this->stripe))->tokenBilling($cgt, $payment_hash);
 
-        nlog(" DB = ".$this->stripe->client->company->db);
         $amount = array_sum(array_column($payment_hash->invoices(), 'amount')) + $payment_hash->fee_total;
         $invoice = Invoice::whereIn('id', $this->transformKeys(array_column($payment_hash->invoices(), 'invoice_id')))->withTrashed()->first();
 
@@ -79,6 +78,10 @@ class Charge
               'customer' => $cgt->gateway_customer_reference,
               'confirm' => true,
               'description' => $description,
+              'metadata' => [
+                'payment_hash' => $payment_hash->hash,
+                'gateway_type_id' => GatewayType::CREDIT_CARD,
+                ],
             ];
 
             $response = $this->stripe->createPaymentIntent($data, $this->stripe->stripe_connect_auth);
@@ -119,7 +122,6 @@ class Charge
                     $data['message'] = $e->getMessage();
                 break;
             }
-                
 
             $this->stripe->processInternallyFailedPayment($this->stripe, $e);
 

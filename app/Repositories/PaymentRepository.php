@@ -47,9 +47,13 @@ class PaymentRepository extends BaseRepository {
      */
     public function save(array $data, Payment $payment): ?Payment
     {
-        if ($payment->amount >= 0) {
+        // if ($payment->amount >= 0) {
+        //     return $this->applyPayment($data, $payment);
+        // }
+
+
             return $this->applyPayment($data, $payment);
-        }
+
 
         return $payment;
     }
@@ -80,8 +84,8 @@ class PaymentRepository extends BaseRepository {
 
                 $client->service()->updatePaidToDate($data['amount'])->save();
             }
-            elseif($data['amount'] >0){
-
+            // elseif($data['amount'] >0){
+            else{
                 //this fixes an edge case with unapplied payments
                 $client->service()->updatePaidToDate($data['amount'])->save();
             }
@@ -102,6 +106,7 @@ class PaymentRepository extends BaseRepository {
         $payment->fill($data);
         $payment->is_manual = true;
         $payment->status_id = Payment::STATUS_COMPLETED;
+
         $payment->save();
 
         /*Save documents*/
@@ -129,7 +134,7 @@ class PaymentRepository extends BaseRepository {
 
             //todo optimize this into a single query
             foreach ($data['invoices'] as $paid_invoice) {
-                $invoice = Invoice::whereId($paid_invoice['invoice_id'])->first();
+                $invoice = Invoice::withTrashed()->whereId($paid_invoice['invoice_id'])->first();
 
                 if ($invoice) {
                     $invoice = $invoice->service()
@@ -185,13 +190,13 @@ class PaymentRepository extends BaseRepository {
      * @param $payment
      * @return
      */
-    private function processExchangeRates($data, $payment)
+    public function processExchangeRates($data, $payment)
     {
 
         if(array_key_exists('exchange_rate', $data) && isset($data['exchange_rate']))
             return $payment;
 
-        $client = Client::find($data['client_id']);
+        $client = Client::withTrashed()->find($data['client_id']);
 
         $client_currency = $client->getSetting('currency_id');
         $company_currency = $client->company->settings->currency_id;
@@ -203,8 +208,13 @@ class PaymentRepository extends BaseRepository {
             $payment->exchange_rate = $exchange_rate->exchangeRate($client_currency, $company_currency, Carbon::parse($payment->date));
             // $payment->exchange_currency_id = $client_currency;
             $payment->exchange_currency_id = $company_currency;
+            $payment->currency_id = $client_currency;
 
+            return $payment;
         }
+        
+        $payment->currency_id = $company_currency;
+
 
         return $payment;
     }

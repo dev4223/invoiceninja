@@ -37,6 +37,7 @@ class ContactKeyLogin
     {
         if (Auth::guard('contact')->check()) {
             Auth::guard('contact')->logout();
+            $request->session()->invalidate();
         }
 
         if ($request->segment(2) && $request->segment(2) == 'magic_link' && $request->segment(3)) {
@@ -52,7 +53,7 @@ class ContactKeyLogin
                  if(empty($client_contact->email))
                     $client_contact->email = Str::random(15) . "@example.com"; $client_contact->save();
     
-                auth()->guard('contact')->login($client_contact, true);
+                auth()->guard('contact')->loginUsingId($client_contact->id, true);
 
                 if ($request->query('redirect') && !empty($request->query('redirect'))) {
                     return redirect()->to($request->query('redirect'));
@@ -70,7 +71,7 @@ class ContactKeyLogin
                 if(empty($client_contact->email))
                     $client_contact->email = Str::random(6) . "@example.com"; $client_contact->save();
 
-                auth()->guard('contact')->login($client_contact, true);
+                auth()->guard('contact')->loginUsingId($client_contact->id, true);
 
                 if ($request->query('next')) {
                     return redirect()->to($request->query('next'));
@@ -86,7 +87,7 @@ class ContactKeyLogin
                     $client_contact->email = Str::random(6) . "@example.com"; $client_contact->save();
                 }
     
-                auth()->guard('contact')->login($client_contact, true);
+                auth()->guard('contact')->loginUsingId($client_contact->id, true);
 
                 if ($request->query('next')) {
                     return redirect($request->query('next'));
@@ -104,7 +105,7 @@ class ContactKeyLogin
                 if(empty($primary_contact->email))
                     $primary_contact->email = Str::random(6) . "@example.com"; $primary_contact->save();
 
-                    auth()->guard('contact')->login($primary_contact, true);
+                    auth()->guard('contact')->loginUsingId($primary_contact->id, true);
                     return redirect()->to('client/dashboard');
                 }
             }
@@ -116,7 +117,7 @@ class ContactKeyLogin
                 if(empty($primary_contact->email))
                     $primary_contact->email = Str::random(6) . "@example.com"; $primary_contact->save();
 
-                    auth()->guard('contact')->login($primary_contact, true);
+                    auth()->guard('contact')->loginUsingId($primary_contact->id, true);
 
                 return redirect()->to('client/dashboard');
             }

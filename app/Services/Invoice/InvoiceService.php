@@ -33,7 +33,7 @@ class InvoiceService
 {
     use MakesHash;
 
-    private $invoice;
+    public $invoice;
 
     public function __construct($invoice)
     {
@@ -78,6 +78,9 @@ class InvoiceService
      */
     public function setExchangeRate()
     {
+
+        if($this->invoice->exchange_rate != 1)
+            return $this;
 
         $client_currency = $this->invoice->client->getSetting('currency_id');
         $company_currency = $this->invoice->company->settings->currency_id;
@@ -134,9 +137,19 @@ class InvoiceService
      *
      * @return InvoiceService                     Parent class object
      */
-    public function updateBalance($balance_adjustment)
+    public function updateBalance($balance_adjustment, bool $is_draft = false)
     {
-        $this->invoice = (new UpdateBalance($this->invoice, $balance_adjustment))->run();
+
+        if ((bool)$this->invoice->is_deleted !== false) {
+            nlog($this->invoice->number . " is deleted returning");
+            return $this;
+        }
+
+        $this->invoice->balance += $balance_adjustment;
+        
+        if (round($this->invoice->balance,2) == 0 && !$is_draft) {
+            $this->invoice->status_id = Invoice::STATUS_PAID;
+        }
 
         if ((int)$this->invoice->balance == 0) {
             $this->invoice->next_send_date = null;
@@ -235,7 +248,7 @@ class InvoiceService
 
     public function autoBill()
     {
-        $this->invoice = (new AutoBillInvoice($this->invoice, $this->invoice->company->db))->run();
+        (new AutoBillInvoice($this->invoice, $this->invoice->company->db))->run();
 
         return $this;
     }
@@ -275,7 +288,7 @@ class InvoiceService
 
     public function setCalculatedStatus()
     {
-        if ((int)$this->invoice->balance == 0) {
+        if (round($this->invoice->balance,2) == 0) {
             $this->setStatus(Invoice::STATUS_PAID);
         } elseif ($this->invoice->balance > 0 && $this->invoice->balance < $this->invoice->amount) {
             $this->setStatus(Invoice::STATUS_PARTIAL);
@@ -289,14 +302,11 @@ class InvoiceService
         if($this->invoice->status_id == Invoice::STATUS_DRAFT)
             return $this;
 
-        // if ((int)$this->invoice->balance == 0) {
-            
-        //     $this->setStatus(Invoice::STATUS_PAID)->workFlow();
-
-        // }
-
-        if ($this->invoice->balance > 0 && $this->invoice->balance < $this->invoice->amount) {
-            $this->setStatus(Invoice::STATUS_PARTIAL);
+        if(round($this->invoice->balance,2) == 0){
+            $this->invoice->status_id = Invoice::STATUS_PAID;
+        }
+        elseif ($this->invoice->balance > 0 && $this->invoice->balance < $this->invoice->amount) {
+            $this->invoice->status_id = Invoice::STATUS_PARTIAL;
         }
 
         return $this;
@@ -313,8 +323,6 @@ class InvoiceService
                                          return $item;
                                      })->toArray();
 
-        //$this->invoice = $this->invoice->calc()->getInvoice();
-
         $this->deletePdf();
 
         return $this;
@@ -326,11 +334,19 @@ class InvoiceService
 
         $this->invoice->invitations->each(function ($invitation){
 
-            Storage::disk(config('filesystems.default'))->delete($this->invoice->client->invoice_filepath($invitation) . $this->invoice->numberFormatter().'.pdf');
+        try{
+
+            if(Storage::disk(config('filesystems.default'))->exists($this->invoice->client->invoice_filepath($invitation) . $this->invoice->numberFormatter().'.pdf'))
+                Storage::disk(config('filesystems.default'))->delete($this->invoice->client->invoice_filepath($invitation) . $this->invoice->numberFormatter().'.pdf');
             
-            if(Ninja::isHosted()) {
+            if(Ninja::isHosted() && Storage::disk(config('filesystems.default'))->exists($this->invoice->client->invoice_filepath($invitation) . $this->invoice->numberFormatter().'.pdf')) {
                 Storage::disk('public')->delete($this->invoice->client->invoice_filepath($invitation) . $this->invoice->numberFormatter().'.pdf');
             }
+
+        }catch(\Exception $e){
+            nlog($e->getMessage());
+        }
+
 
         });
 
@@ -339,6 +355,10 @@ class InvoiceService
 
     public function removeUnpaidGatewayFees()
     {
+        //return early if type three does not exist.
+        if(!collect($this->invoice->line_items)->contains('type_id', 3))
+            return $this;
+
         $this->invoice->line_items = collect($this->invoice->line_items)
                                      ->reject(function ($item) {
                                          return $item->type_id == '3';
@@ -373,18 +393,27 @@ class InvoiceService
      */
     public function touchPdf($force = false)
     {
-        if($force){
+        try {
+        
+            if($force){
+
+                $this->invoice->invitations->each(function ($invitation) {
+                    CreateEntityPdf::dispatchNow($invitation);
+                });
+
+                return $this;
+            }
 
             $this->invoice->invitations->each(function ($invitation) {
-                CreateEntityPdf::dispatchNow($invitation);
+                CreateEntityPdf::dispatch($invitation);
             });
-
-            return $this;
+        
         }
+        catch(\Exception $e){
 
-        $this->invoice->invitations->each(function ($invitation) {
-            CreateEntityPdf::dispatch($invitation);
-        });
+            nlog("failed creating invoices in Touch PDF");
+        
+        }
 
         return $this;
     }
@@ -468,6 +497,10 @@ class InvoiceService
         /* If client currency differs from the company default currency, then insert the client exchange rate on the model.*/
         if(!isset($this->invoice->exchange_rate) && $this->invoice->client->currency()->id != (int) $this->invoice->company->settings->currency_id)
             $this->invoice->exchange_rate = $this->invoice->client->currency()->exchange_rate;
+
+        if($settings->counter_number_applied == 'when_saved'){
+            $this->invoice->service()->applyNumber()->save();
+        }
 
         return $this;
     }

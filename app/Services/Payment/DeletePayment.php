@@ -98,7 +98,7 @@ class DeletePayment
                     $paymentable_invoice->client
                                         ->service()
                                         ->updateBalance($net_deletable)
-                                        ->updatePaidToDate($net_deletable * -1)
+                                        // ->updatePaidToDate($net_deletable * -1)
                                         ->save();
 
                     if ($paymentable_invoice->balance == $paymentable_invoice->amount) {
@@ -115,15 +115,22 @@ class DeletePayment
                                         ->updatePaidToDate($net_deletable * -1)
                                         ->save();
 
-                    // $paymentable_invoice->client
-                    // ->service()
-                    // ->updatePaidToDate($net_deletable * -1)
-                    // ->save();
+
                 }
 
             });
         }
+        // else {
 
+            /* If there are no invoices - then we need to still adjust the total client->paid_to_date amount*/
+
+            $this->payment
+            ->client
+            ->service()
+            ->updatePaidToDate(($this->payment->amount - $this->payment->refunded)*-1)
+            ->save();
+
+        // }
         return $this;
     }
 
@@ -132,8 +139,13 @@ class DeletePayment
         if ($this->payment->credits()->exists()) {
             $this->payment->credits()->each(function ($paymentable_credit) {
                 
+                $multiplier = 1;
+
+                    if($paymentable_credit->pivot->amount < 0)
+                        $multiplier = -1;
+
                 $paymentable_credit->service()
-                                   ->updateBalance($paymentable_credit->pivot->amount)
+                                   ->updateBalance($paymentable_credit->pivot->amount*$multiplier)
                                    ->updatePaidToDate($paymentable_credit->pivot->amount*-1)
                                    ->setStatus(Credit::STATUS_SENT)
                                    ->save();

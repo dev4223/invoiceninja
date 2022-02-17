@@ -52,6 +52,8 @@ class Handler extends ExceptionHandler
         MaxAttemptsExceededException::class,
         CommandNotFoundException::class,
         ValidationException::class,
+        ModelNotFoundException::class,
+        NotFoundHttpException::class,
     ];
 
     /**
@@ -190,7 +192,7 @@ class Handler extends ExceptionHandler
         } elseif ($exception instanceof MethodNotAllowedHttpException && $request->expectsJson()) {
             return response()->json(['message'=>'Method not supported for this route'], 404);
         } elseif ($exception instanceof ValidationException && $request->expectsJson()) {
-            nlog($exception->validator->getMessageBag());
+            // nlog($exception->validator->getMessageBag());
             return response()->json(['message' => 'The given data was invalid.', 'errors' => $exception->validator->getMessageBag()], 422);
         } elseif ($exception instanceof RelationNotFoundException && $request->expectsJson()) {
             return response()->json(['message' => $exception->getMessage()], 400);

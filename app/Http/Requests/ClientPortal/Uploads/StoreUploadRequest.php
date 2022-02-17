@@ -13,7 +13,7 @@ class StoreUploadRequest extends FormRequest
      */
     public function authorize()
     {
-        return (bool) auth('contact')->user()->client->getSetting('client_portal_enable_uploads');
+        return (bool) auth()->guard('contact')->user()->client->getSetting('client_portal_enable_uploads');
     }
 
     /**
@@ -24,7 +24,7 @@ class StoreUploadRequest extends FormRequest
     public function rules()
     {
         return [
-            'file' => ['file', 'mimes:png,ai,svg,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000'],
+            'file' => ['file', 'mimes:png,ai,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000'],
         ];
     }
 

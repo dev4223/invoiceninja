@@ -174,12 +174,7 @@ class PreviewController extends BaseController
 
         MultiDB::setDb($company->db);
 
-        if($request->input('entity') == 'invoice'){
-            $repo = new InvoiceRepository();
-            $entity_obj = InvoiceFactory::create($company->id, auth()->user()->id);
-            $class = Invoice::class;
-        }
-        elseif($request->input('entity') == 'quote'){
+        if($request->input('entity') == 'quote'){
             $repo = new QuoteRepository();
             $entity_obj = QuoteFactory::create($company->id, auth()->user()->id);
             $class = Quote::class;
@@ -195,7 +190,11 @@ class PreviewController extends BaseController
             $entity_obj = RecurringInvoiceFactory::create($company->id, auth()->user()->id);
             $class = RecurringInvoice::class;
         }
-            
+        else { //assume it is either an invoice or a null object
+            $repo = new InvoiceRepository();
+            $entity_obj = InvoiceFactory::create($company->id, auth()->user()->id);
+            $class = Invoice::class;
+        }            
 
         try {
 
@@ -217,8 +216,6 @@ class PreviewController extends BaseController
             if(!$request->has('entity_id'))
                 $entity_obj->service()->fillDefaults()->save();
                 
-            // $entity_obj->load('client.contacts','client.company');
-
             App::forgetInstance('translator');
             $t = app('translator');
             App::setLocale($entity_obj->client->locale());
@@ -297,7 +294,7 @@ class PreviewController extends BaseController
             {
                 LightLogs::create(new LivePreview())
                          ->increment()
-                         ->batch();
+                         ->queue();
             }
 
 
@@ -308,12 +305,68 @@ class PreviewController extends BaseController
 
     }
 
-
     private function blankEntity()
     {
         App::forgetInstance('translator');
         $t = app('translator');
         $t->replace(Ninja::transformTranslations(auth()->user()->company()->settings));
+
+        $invitation = InvoiceInvitation::where('company_id', auth()->user()->company()->id)->orderBy('id', 'desc')->first();
+
+        /* If we don't have a valid invitation in the system - create a mock using transactions */
+        if(!$invitation)
+            return $this->mockEntity();
+
+        $design_object = json_decode(json_encode(request()->input('design')));
+
+        if (! is_object($design_object)) {
+            return response()->json(['message' => 'Invalid custom design object'], 400);
+        }
+
+        $html = new HtmlEngine($invitation);
+
+        $design = new Design(Design::CUSTOM, ['custom_partials' => request()->design['design']]);
+
+        $state = [
+            'template' => $design->elements([
+                'client' => $invitation->invoice->client,
+                'entity' => $invitation->invoice,
+                'pdf_variables' => (array) $invitation->invoice->company->settings->pdf_variables,
+                'products' => request()->design['design']['product'],
+            ]),
+            'variables' => $html->generateLabelsAndValues(),
+            'process_markdown' => $invitation->invoice->client->company->markdown_enabled,
+        ];
+
+        $maker = new PdfMaker($state);
+
+        $maker
+            ->design($design)
+            ->build();
+
+        if (request()->query('html') == 'true') {
+            return $maker->getCompiledHTML();
+        }
+
+        if (config('ninja.phantomjs_pdf_generation') || config('ninja.pdf_generator') == 'phantom') {
+            return (new Phantom)->convertHtmlToPdf($maker->getCompiledHTML(true));
+        }
+
+        if(config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja'){
+            return (new NinjaPdf())->build($maker->getCompiledHTML(true));
+        }
+            
+        $file_path = PreviewPdf::dispatchNow($maker->getCompiledHTML(true), auth()->user()->company());
+
+        $response = Response::make($file_path, 200);
+        $response->header('Content-Type', 'application/pdf');
+
+        return $response;
+
+    }
+
+    private function mockEntity()
+    {
 
         DB::connection(auth()->user()->company()->db)->beginTransaction();
 
@@ -334,6 +387,9 @@ class PreviewController extends BaseController
                     'user_id' => auth()->user()->id,
                     'company_id' => auth()->user()->company()->id,
                     'client_id' => $client->id,
+                    'terms' => 'Sample Terms',
+                    'footer' => 'Sample Footer',
+                    'public_notes' => 'Sample Public Notes',
                 ]);
 
         $invitation = InvoiceInvitation::factory()->create([
@@ -347,8 +403,6 @@ class PreviewController extends BaseController
         $invoice->setRelation('client', $client);
         $invoice->setRelation('company', auth()->user()->company());
         $invoice->load('client.company');
-
-        // nlog(print_r($invoice->toArray(),1));
 
         $design_object = json_decode(json_encode(request()->input('design')));
 
@@ -377,6 +431,8 @@ class PreviewController extends BaseController
             ->design($design)
             ->build();
 
+        DB::connection(auth()->user()->company()->db)->rollBack();
+
         if (request()->query('html') == 'true') {
             return $maker->getCompiledHTML();
         }
@@ -390,8 +446,6 @@ class PreviewController extends BaseController
         }
             
         $file_path = PreviewPdf::dispatchNow($maker->getCompiledHTML(true), auth()->user()->company());
-
-        DB::connection(auth()->user()->company()->db)->rollBack();
 
         $response = Response::make($file_path, 200);
         $response->header('Content-Type', 'application/pdf');

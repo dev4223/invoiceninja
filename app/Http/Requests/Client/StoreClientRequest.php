@@ -13,6 +13,7 @@ namespace App\Http\Requests\Client;
 
 use App\DataMapper\ClientSettings;
 use App\Http\Requests\Request;
+use App\Http\ValidationRules\Client\CountryCodeExistsRule;
 use App\Http\ValidationRules\Ninja\CanStoreClientsRule;
 use App\Http\ValidationRules\ValidClientGroupSettingsRule;
 use App\Models\Client;
@@ -24,7 +25,6 @@ use Illuminate\Validation\Rule;
 class StoreClientRequest extends Request
 {
     use MakesHash;
-
     /**
      * Determine if the user is authorized to make this request.
      *
@@ -41,14 +41,22 @@ class StoreClientRequest extends Request
             $documents = count($this->input('documents'));
 
             foreach (range(0, $documents) as $index) {
-                $rules['documents.'.$index] = 'file|mimes:png,ai,svg,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
+                $rules['documents.'.$index] = 'file|mimes:png,ai,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
             }
         } elseif ($this->input('documents')) {
-            $rules['documents'] = 'file|mimes:png,ai,svg,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
+            $rules['documents'] = 'file|mimes:png,ai,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
         }
 
         if (isset($this->number)) {
             $rules['number'] = Rule::unique('clients')->where('company_id', auth()->user()->company()->id);
+        }
+
+        if(isset($this->currency_code)){
+            $rules['currency_code'] = 'sometimes|exists:currencies,code';
+        }
+
+        if(isset($this->country_code)){
+            $rules['country_code'] = new CountryCodeExistsRule();
         }
 
         /* Ensure we have a client name, and that all emails are unique*/
@@ -81,8 +89,6 @@ class StoreClientRequest extends Request
     {
         $input = $this->all();
 
-        //@todo implement feature permissions for > 50 clients
-        
         $settings = ClientSettings::defaults();
 
         if (array_key_exists('settings', $input) && ! empty($input['settings'])) {
@@ -124,6 +130,10 @@ class StoreClientRequest extends Request
             $input['shipping_country_id'] = $this->getCountryCode($input['shipping_country_code']);
         }
 
+        /* If there is no number, just unset it here. */
+        if(array_key_exists('number', $input) && ( is_null($input['number']) || empty($input['number'])))
+            unset($input['number']);
+
         $this->replace($input);
     }
 
@@ -133,6 +143,7 @@ class StoreClientRequest extends Request
             // 'unique' => ctrans('validation.unique', ['attribute' => ['email','number']),
             //'required' => trans('validation.required', ['attribute' => 'email']),
             'contacts.*.email.required' => ctrans('validation.email', ['attribute' => 'email']),
+            'currency_code' => 'Currency code does not exist',
         ];
     }
 
@@ -158,6 +169,9 @@ class StoreClientRequest extends Request
             return $item->code == $code;
         })->first();
 
-        return (string) $currency->id;
+        if($currency)
+            return (string) $currency->id;
+
+        return "";
     }
 }

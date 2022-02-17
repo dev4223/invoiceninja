@@ -97,6 +97,7 @@ class Company extends BaseModel
         'use_comma_as_decimal_place',
         'report_include_drafts',
         'client_registration_fields',
+        'convert_rate_to_client',
     ];
 
     protected $hidden = [
@@ -171,7 +172,7 @@ class Company extends BaseModel
 
     public function users()
     {
-        return $this->hasManyThrough(User::class, CompanyUser::class, 'company_id', 'id', 'id', 'user_id');
+        return $this->hasManyThrough(User::class, CompanyUser::class, 'company_id', 'id', 'id', 'user_id')->withTrashed();
     }
 
     public function expense_categories()

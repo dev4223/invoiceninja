@@ -232,6 +232,7 @@ class Import implements ShouldQueue
 
         $account = $this->company->account;
         $account->default_company_id = $this->company->id;
+        $account->is_migrated = true;
         $account->save();
 
         //company size check
@@ -470,11 +471,17 @@ class Import implements ShouldQueue
                     
                 }
 
-                if ($key == 'payment_terms' && $key = '') {
-                    $value = -1;
+                /* changes $key = '' to $value == '' and changed the return value from -1 to "0" 06/01/2022 */
+                if ($key == 'payment_terms' && $value == '') {
+                    $value = "0";
                 }
 
                 $company_settings->{$key} = $value;
+
+                if($key == 'payment_terms'){
+                    settype($company_settings->payment_terms, 'string');
+                }
+
             }
 
             $data['settings'] = $company_settings;
@@ -1104,7 +1111,7 @@ class Import implements ShouldQueue
             throw new MigrationValidatorFailed(json_encode($validator->errors()));
         }
 
-        $quote_repository = new QuoteRepository();
+        $quote_repository = new InvoiceMigrationRepository();
 
         foreach ($data as $resource) {
             $modified = $resource;
@@ -1143,7 +1150,7 @@ class Import implements ShouldQueue
                     $resource['invitations'][$key]['user_id'] = $modified['user_id'];
                     $resource['invitations'][$key]['company_id'] = $this->company->id;
                     $resource['invitations'][$key]['email_status'] = '';
-                    unset($resource['invitations'][$key]['invoice_id']);
+                    unset($resource['invitations'][$key]['quote_id']);
                     unset($resource['invitations'][$key]['id']);
                 }
 
@@ -1831,7 +1838,7 @@ class Import implements ShouldQueue
         $job_failure->string_metric6 = $exception->getMessage();
 
         LightLogs::create($job_failure)
-                 ->batch();
+                 ->queue();
 
         info(print_r($exception->getMessage(), 1));
 
@@ -1864,10 +1871,19 @@ class Import implements ShouldQueue
 
     private function processNinjaTokens(array $data)
     {
+        
         nlog("attempting to process Ninja Tokens");
 
-        if(Ninja::isHosted())
-            \Modules\Admin\Jobs\Account\NinjaUser::dispatchNow($data, $this->company);
+        if(Ninja::isHosted()){
+
+            try{
+                \Modules\Admin\Jobs\Account\NinjaUser::dispatchNow($data, $this->company);
+            }
+            catch(\Exception $e){
+                nlog($e->getMessage());
+            }
+
+        }
 
     }
 

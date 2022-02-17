@@ -75,6 +75,8 @@ class Quote extends BaseModel
         'assigned_user_id',
         'exchange_rate',
         'subscription_id',
+        'uses_inclusive_taxes',
+        'vendor_id',
     ];
 
     protected $casts = [
@@ -86,6 +88,7 @@ class Quote extends BaseModel
         'updated_at' => 'timestamp',
         'created_at' => 'timestamp',
         'deleted_at' => 'timestamp',
+        'is_deleted' => 'boolean',
     ];
 
     protected $dates = [];
@@ -116,9 +119,24 @@ class Quote extends BaseModel
         return $this->dateMutator($value);
     }
 
+    public function getStatusIdAttribute($value)
+    {
+        if($this->due_date && !$this->is_deleted && $value == Quote::STATUS_SENT && Carbon::parse($this->due_date)->lte(now()->startOfDay())){
+            return Quote::STATUS_EXPIRED;
+        }
+
+        return $value;
+
+    }
+
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function vendor()
+    {
+        return $this->belongsTo(Vendor::class);
     }
 
     public function history()
@@ -141,10 +159,10 @@ class Quote extends BaseModel
         return $this->belongsTo(Client::class)->withTrashed();
     }
 
-    // public function contacts()
-    // {
-    //     return $this->hasManyThrough(ClientContact::class, Client::class);
-    // }
+    public function invoice()
+    {
+        return $this->belongsTo(Invoice::class)->withTrashed();
+    }
 
     public function assigned_user()
     {

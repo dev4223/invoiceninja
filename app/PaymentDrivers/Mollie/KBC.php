@@ -13,7 +13,7 @@
 namespace App\PaymentDrivers\Mollie;
 
 use App\Exceptions\PaymentFailed;
-use App\Http\Requests\Request;
+use Illuminate\Http\Request;
 use App\Http\Requests\ClientPortal\Payments\PaymentResponseRequest;
 use App\Jobs\Util\SystemLogger;
 use App\Models\GatewayType;
@@ -86,6 +86,9 @@ class KBC implements MethodInterface
                 'webhookUrl' => $this->mollie->company_gateway->webhookUrl(),
                 'metadata' => [
                     'client_id' => $this->mollie->client->hashed_id,
+                    'hash' => $this->mollie->payment_hash->hash,
+                    'gateway_type_id' => GatewayType::KBC,
+                    'payment_type_id' => PaymentType::KBC,
                 ],
             ]);
 

@@ -39,6 +39,8 @@ class BECS
 
     public function paymentView(array $data)
     {
+        $this->stripe->init();
+        
         $data['gateway'] = $this->stripe;
         $data['payment_method_id'] = GatewayType::BECS;
         $data['stripe_amount'] = $this->stripe->convertToStripeAmount($data['total']['amount_with_fee'], $this->stripe->client->currency()->precision, $this->stripe->client->currency());
@@ -54,8 +56,11 @@ class BECS
             'setup_future_usage' => 'off_session',
             'customer' => $this->stripe->findOrCreateCustomer(),
             'description' => $this->stripe->decodeUnicodeString(ctrans('texts.invoices') . ': ' . collect($data['invoices'])->pluck('invoice_number')),
-
-        ]);
+            'metadata' => [
+                'payment_hash' => $this->stripe->payment_hash->hash,
+                'gateway_type_id' => GatewayType::BECS,
+            ],
+        ], $this->stripe->stripe_connect_auth);
 
         $data['pi_client_secret'] = $intent->client_secret;
 
@@ -141,8 +146,8 @@ class BECS
             $method = $this->stripe->getStripePaymentMethod($intent->payment_method);
 
             $payment_meta = new \stdClass;
-            $payment_meta->brand = (string) \sprintf('%s (%s)', $method->sepa_debit->bank_code, ctrans('texts.becs'));
-            $payment_meta->last4 = (string) $method->sepa_debit->last4;
+            $payment_meta->brand = (string) \sprintf('%s (%s)', $method->au_becs_debit->bank_code, ctrans('texts.becs'));
+            $payment_meta->last4 = (string) $method->au_becs_debit->last4;
             $payment_meta->state = 'authorized';
             $payment_meta->type = GatewayType::BECS;
 

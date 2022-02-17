@@ -13,7 +13,6 @@ namespace App\PaymentDrivers\Braintree;
 
 use App\Exceptions\PaymentFailed;
 use App\Http\Requests\ClientPortal\Payments\PaymentResponseRequest;
-use App\Http\Requests\Request;
 use App\Jobs\Util\SystemLogger;
 use App\Models\ClientGatewayToken;
 use App\Models\GatewayType;
@@ -23,6 +22,7 @@ use App\Models\SystemLog;
 use App\PaymentDrivers\BraintreePaymentDriver;
 use App\PaymentDrivers\Common\MethodInterface;
 use App\Utils\Traits\MakesHash;
+use Illuminate\Http\Request;
 
 class ACH implements MethodInterface
 {
@@ -109,7 +109,7 @@ class ACH implements MethodInterface
         $customer = $this->braintree->findOrCreateCustomer();
 
         $token = ClientGatewayToken::query()
-            ->where('client_id', auth('contact')->user()->client->id)
+            ->where('client_id', auth()->guard('contact')->user()->client->id)
             ->where('id', $this->decodePrimaryKey($request->source))
             ->firstOrFail();
 

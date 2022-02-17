@@ -110,7 +110,7 @@ class NinjaMailerJob implements ShouldQueue
                 ->send($this->nmo->mailable);
 
             LightLogs::create(new EmailSuccess($this->nmo->company->company_key))
-                     ->batch();
+                     ->queue();
 
             /* Count the amount of emails sent across all the users accounts */
             Cache::increment($this->company->account->key);
@@ -210,8 +210,16 @@ class NinjaMailerJob implements ShouldQueue
                 $user = $user->fresh();
             }
 
+                //17-01-2022 - ensure we have a token otherwise we fail gracefully to default sending engine
+                // if(strlen($user->oauth_user_token) == 0){
+                //     $this->nmo->settings->email_sending_method = 'default';
+                //     return $this->setMailDriver();
+                // }
+
             $google->getClient()->setAccessToken(json_encode($user->oauth_user_token));
 
+            //need to slow down gmail requests otherwise we hit 429's
+            sleep(rand(2,6));
         }
         catch(\Exception $e) {
             $this->logMailError('Gmail Token Invalid', $this->company->clients()->first());
@@ -224,9 +232,6 @@ class NinjaMailerJob implements ShouldQueue
          *  mail driver at runtime and also set the token which will persist
          *  just for this request.
         */
-
-        // config(['mail.driver' => 'gmail']);
-        // (new MailServiceProvider(app()))->register();
 
         $token = $user->oauth_user_token->access_token;
 
@@ -280,7 +285,7 @@ class NinjaMailerJob implements ShouldQueue
         $job_failure->string_metric6 = substr($errors, 0, 150);
 
         LightLogs::create($job_failure)
-                 ->batch();
+                 ->queue();
     }
 
     public function failed($exception = null)

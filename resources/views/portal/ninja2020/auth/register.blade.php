@@ -11,6 +11,10 @@
             <p class="block text-center text-gray-600">{{ ctrans('texts.register_label') }}</p>
 
             <form action="{{ route('client.register', request()->route('company_key')) }}" method="POST" x-data="{ more: false }">
+                @if($company)
+                <input type="hidden" name="company_key" value="{{ $company->company_key }}">
+                @endif
+
                 @csrf
 
                 <div class="grid grid-cols-12 gap-4 mt-10">
@@ -49,7 +53,7 @@
                                     <select 
                                         id="shipping_country"
                                         class="input w-full form-select"
-                                        name="shipping_country">
+                                        name="country_id">
                                             <option value="none"></option>
                                         @foreach(App\Utils\TranslationHelper::getCountries() as $country)
                                             <option

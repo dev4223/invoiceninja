@@ -105,6 +105,7 @@ class AutoBillInvoice extends AbstractService
             $fee = 0;
 
         /* Build payment hash */
+
         $payment_hash = PaymentHash::create([
             'hash' => Str::random(64),
             'data' => ['invoices' => [['invoice_id' => $this->invoice->hashed_id, 'amount' => $amount, 'invoice_number' => $this->invoice->number]]],
@@ -123,14 +124,15 @@ class AutoBillInvoice extends AbstractService
                                  ->tokenBilling($gateway_token, $payment_hash);
          }
          catch(\Exception $e){
-            nlog($e->getMessage());
+            nlog("payment NOT captured for ". $this->invoice->number . " with error " . $e->getMessage());
+            $this->invoice->service()->removeUnpaidGatewayFees()->save();
          }
 
         if($payment){
             info("Auto Bill payment captured for ".$this->invoice->number);
         }
 
-        return $this->invoice;
+        // return $this->invoice->fresh();
     }
 
     /**
@@ -175,8 +177,6 @@ class AutoBillInvoice extends AbstractService
 
         }
 
-        event('eloquent.created: App\Models\Payment', $payment);
-
         $payment->ledger()
                     ->updatePaymentBalance($amount * -1)
                     ->save();
@@ -192,7 +192,7 @@ class AutoBillInvoice extends AbstractService
                           ->updateCreditBalance($amount * -1, "Credit {$current_credit->number} used to pay down Invoice {$this->invoice->number}")
                           ->save();
 
-
+        event('eloquent.created: App\Models\Payment', $payment);
         event(new PaymentWasCreated($payment, $payment->company, Ninja::eventVars()));
 
         return $this->invoice

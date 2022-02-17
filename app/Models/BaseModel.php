@@ -113,10 +113,10 @@ class BaseModel extends Model
      * to persist the new settings we will also need to pass back a
      * reference to the parent class.
      *
-     * @param mixes $key The key of property
+     * @param $key The key of property
      * @return
      */
-    public function getSettingsByKey(mixes $key)
+    public function getSettingsByKey($key)
     {
         /* Does Setting Exist @ client level */
         if (isset($this->getSettings()->{$key})) {
@@ -194,6 +194,11 @@ class BaseModel extends Model
         $formatted_number =  mb_ereg_replace("([^\w\s\d\-_~,;\[\]\(\).])", '', $number);
         // Remove any runs of periods (thanks falstro!)
         $formatted_number = mb_ereg_replace("([\.]{2,})", '', $formatted_number);
+
+        // $formatted_number = str_replace(" ", "_", $formatted_number);
+        
+        //11-01-2021 fixes for multiple spaces
+        $formatted_number = preg_replace('/\s+/', '_', $formatted_number);
 
         return $formatted_number;
     }

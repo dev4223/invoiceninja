@@ -1,13 +1,15 @@
 <style id="style">
+      @import url($font_url);
+
       :root {
-        --primary-color: #298aab;
-        --secondary-color: #7081e0;
+        --primary-color: $primary_color;
+        --secondary-color: $secondary_color;
       }
 
       body {
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
-        font-family: Arial, Helvetica, sans-serif;
+        font-family: $font_name, Helvetica, sans-serif;
         font-size: "7px";
         zoom: 80%;
       }
@@ -47,8 +49,8 @@
 
       #header, #header-spacer {
           height: 160px;
-          padding: 3rem;
-          margin-bottom: 3rem;
+          padding: 1rem;
+          margin-bottom: 1rem;
       }
 
       .company-name {
@@ -71,7 +73,7 @@
       }
 
       .logo-client-wrapper {
-        margin: 0 2rem 3rem;
+        margin: 0 2rem 0rem;
         display: grid;
         grid-template-columns: 1.5fr 1fr;
       }
@@ -90,7 +92,7 @@
       }
 
       .table-wrapper {
-        margin: 3rem 2rem;
+        margin: 0rem 2rem;
       }
 
       [data-ref="table"] {
@@ -147,32 +149,34 @@
 
       #footer, #footer-spacer {
           height: 220px;
-          padding: 1rem 3rem;
-          margin-top: 1rem;
+          padding: 0rem 0rem;
+          margin-top: 0rem;
       }
 
       .footer-content {
         display: flex;
-        gap: 20px;
+        gap: 10px;
         width: 100%;
         /* grid-template-columns: 1fr 1fr 1fr; */
         color: #fff4e9;
         max-height: 140px;
         justify-content: space-between;
+        margin-top: 0.5rem;
+        margin-left: 0.5rem;
       }
 
       .footer-company-details-address-wrapper {
         display: flex;
-        gap: 25px;
-        margin-right: 150px;
+        gap: 0px;
+        margin-right: 60px;
       }
 
       #company-address,
       #company-details {
         display: flex;
         flex-direction: column;
-        margin-top: 2rem;
-        margin-bottom: 2rem;
+        margin-top: 0.5rem;
+        margin-bottom: 0rem;
       }
 
       #company-address > *,
@@ -224,8 +228,8 @@
       }
 
       [data-ref="total_table-footer"] {
-          margin-top: 2rem;
-          margin-bottom: 2rem;
+          margin-top: 1rem;
+          margin-bottom: 1rem;
       }
 
       table {
@@ -342,26 +346,32 @@
     </table>
 </div>
 
+$entity_images
+
 <div id="footer">
     <div class="footer-content">
-        <div>
+        <div style="width: 70%">
             <p data-ref="total_table-footer">$entity_footer</p>
 
-            <script>
-                // Clear up space a bit, if [product-table, tasks-table, delivery-note-table] isn't present.
-                document.addEventListener('DOMContentLoaded', () => {
-                    let tables = [
-                        'product-table', 'task-table', 'delivery-note-table',  'statement-invoice-table-totals', 'statement-payment-table-totals','statement-invoice-table-totals',
-                        'statement-invoice-table', 'statement-payment-table', 'statement-aging-table', 'statement-aging-table-totals', 'statement-payment-table-totals'
-                    ];
+        <script>
+            // Clear up space a bit, if [product-table, tasks-table, delivery-note-table] isn't present.
+            document.addEventListener('DOMContentLoaded', () => {
+                let tables = [
+                    'product-table', 'task-table', 'delivery-note-table',
+                    'statement-invoice-table', 'statement-payment-table', 'statement-aging-table-totals',
+                    'statement-invoice-table-totals', 'statement-payment-table-totals', 'statement-aging-table'
+                ];
 
-                    tables.forEach((tableIdentifier) => {
-                        document.getElementById(tableIdentifier).childElementCount === 0
-                                ? document.getElementById(tableIdentifier).remove()
-                                : '';
-                    });
+                tables.forEach((tableIdentifier) => {
+                    console.log(document.getElementById(tableIdentifier));
+
+                    document.getElementById(tableIdentifier)?.childElementCount === 0
+                        ? document.getElementById(tableIdentifier).style.setProperty('display', 'none', 'important')
+                        : '';
                 });
-            </script>
+            });
+        </script>
+            
         </div>
         <div class="footer-company-details-address-wrapper">
             <div id="company-details"></div>

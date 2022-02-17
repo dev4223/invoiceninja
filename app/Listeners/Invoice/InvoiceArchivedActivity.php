@@ -21,6 +21,8 @@ class InvoiceArchivedActivity implements ShouldQueue
 {
     protected $activity_repo;
 
+    public $delay = 5;
+    
     /**
      * Create the event listener.
      *
@@ -41,7 +43,7 @@ class InvoiceArchivedActivity implements ShouldQueue
     {
         MultiDB::setDb($event->company->db);
 
-        $event->invoice->service()->deletePdf();
+        // $event->invoice->service()->deletePdf();
         
         $fields = new stdClass;
 
