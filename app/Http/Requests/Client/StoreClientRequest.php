@@ -37,6 +37,7 @@ class StoreClientRequest extends Request
 
     public function rules()
     {
+        
         if ($this->input('documents') && is_array($this->input('documents'))) {
             $documents = count($this->input('documents'));
 
@@ -50,6 +51,8 @@ class StoreClientRequest extends Request
         if (isset($this->number)) {
             $rules['number'] = Rule::unique('clients')->where('company_id', auth()->user()->company()->id);
         }
+        
+        $rules['country_id'] = 'integer|nullable';
 
         if(isset($this->currency_code)){
             $rules['currency_code'] = 'sometimes|exists:currencies,code';
@@ -76,7 +79,7 @@ class StoreClientRequest extends Request
                                         ];
 
         if (auth()->user()->company()->account->isFreeHostedClient()) {
-            $rules['hosted_clients'] = new CanStoreClientsRule($this->company_id);
+            $rules['id'] = new CanStoreClientsRule(auth()->user()->company()->id);
         }
 
         $rules['number'] = ['nullable',Rule::unique('clients')->where('company_id', auth()->user()->company()->id)];
@@ -93,6 +96,10 @@ class StoreClientRequest extends Request
 
         if (array_key_exists('settings', $input) && ! empty($input['settings'])) {
             foreach ($input['settings'] as $key => $value) {
+
+                if($key == 'default_task_rate')
+                    $value = floatval($value);
+                
                 $settings->{$key} = $value;
             }
         }
@@ -118,6 +125,10 @@ class StoreClientRequest extends Request
 
         if (isset($input['currency_code'])) {
             $settings->currency_id = $this->getCurrencyCode($input['currency_code']);
+        }
+
+        if (isset($input['language_code'])) {
+            $settings->language_id = $this->getLanguageId($input['language_code']);
         }
 
         $input['settings'] = $settings;
@@ -146,6 +157,21 @@ class StoreClientRequest extends Request
             'currency_code' => 'Currency code does not exist',
         ];
     }
+
+    private function getLanguageId($language_code)
+    {
+        $languages = Cache::get('languages');
+
+        $language = $languages->filter(function ($item) use ($language_code) {
+            return $item->locale == $language_code;
+        })->first();
+
+        if($language)
+            return (string) $language->id;
+
+        return "";
+    }
+
 
     private function getCountryCode($country_code)
     {

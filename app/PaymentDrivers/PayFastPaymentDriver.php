@@ -151,8 +151,6 @@ class PayFastPaymentDriver extends BaseDriver
         if($this->company_gateway->getConfigField('passphrase'))
             $fields['passphrase'] = $this->company_gateway->getConfigField('passphrase');
 
-        nlog(http_build_query($fields));
-
         return md5(http_build_query($fields));
     }
 
@@ -224,7 +222,7 @@ class PayFastPaymentDriver extends BaseDriver
 
                 default:
 
-                    $payment_hash = PaymentHash::whereRaw('BINARY `hash`= ?', [$data['m_payment_id']])->first();
+                    $payment_hash = PaymentHash::where('hash', $data['m_payment_id'])->first();
 
                     $this->setPaymentMethod(GatewayType::CREDIT_CARD)
                          ->setPaymentHash($payment_hash)

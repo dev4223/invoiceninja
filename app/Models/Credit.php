@@ -90,6 +90,8 @@ class Credit extends BaseModel
         'updated_at' => 'timestamp',
         'created_at' => 'timestamp',
         'deleted_at' => 'timestamp',
+        'is_amount_discount' => 'bool',
+
     ];
 
     protected $touches = [];
@@ -300,4 +302,21 @@ class Credit extends BaseModel
         });
     }
 
+    public function transaction_event()
+    {
+
+        $credit = $this->fresh();
+
+        return [
+            'credit_id' => $credit->id, 
+            'credit_amount' => $credit->amount ?: 0, 
+            'credit_balance' => $credit->balance ?: 0, 
+            'credit_status' => $credit->status_id ?: 1,
+        ];
+    }
+
+    public function translate_entity()
+    {
+        return ctrans('texts.credit');
+    }
 }

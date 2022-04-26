@@ -12,7 +12,11 @@
 
 @section('body')
 
-    @if(!$invoice->isPayable() && $client->getSetting('custom_message_paid_invoice'))
+    @if($invoice->isPayable() && $client->getSetting('custom_message_unpaid_invoice'))
+        @component('portal.ninja2020.components.message')
+            {{ $client->getSetting('custom_message_unpaid_invoice') }}
+        @endcomponent
+    @elseif($invoice->status_id === 4 && $client->getSetting('custom_message_paid_invoice'))
         @component('portal.ninja2020.components.message')
             {{ $client->getSetting('custom_message_paid_invoice') }}
         @endcomponent
@@ -59,7 +63,7 @@
                                 @if($settings->client_portal_allow_under_payment || $settings->client_portal_allow_over_payment)
                                     <button class="button button-primary bg-primary">{{ ctrans('texts.pay_now') }}</button>
                                 @else
-                                    @livewire('pay-now-dropdown', ['total' => $invoice->partial > 0 ? $invoice->partial : $invoice->balance, 'company' => $company])
+                                    @livewire('pay-now-dropdown', ['total' => $invoice->getPayableAmount(), 'company' => $company])
                                 @endif
                             </div>
                         </div>
@@ -104,19 +108,6 @@
     <script type="text/javascript">
 
         var clipboard = new ClipboardJS('.btn');
-
-            // clipboard.on('success', function(e) {
-            //     console.info('Action:', e.action);
-            //     console.info('Text:', e.text);
-            //     console.info('Trigger:', e.trigger);
-
-            //     e.clearSelection();
-            // });
-
-            // clipboard.on('error', function(e) {
-            //     console.error('Action:', e.action);
-            //     console.error('Trigger:', e.trigger);
-            // });
 
     </script>
 @endsection

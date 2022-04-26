@@ -223,7 +223,7 @@ class AuthorizeCreditCard
 
     private function processSuccessfulResponse($data, $request)
     {
-        $payment_hash = PaymentHash::whereRaw('BINARY `hash`= ?', [$request->input('payment_hash')])->firstOrFail();
+        $payment_hash = PaymentHash::where('hash', $request->input('payment_hash'))->firstOrFail();
         $payment = $this->storePayment($payment_hash, $data);
 
         $vars = [
@@ -256,8 +256,8 @@ class AuthorizeCreditCard
         $code = "Error";
         $description = "There was an error processing the payment";
 
-        if ($response->getErrors() != null) {
-            $code = $response->getErrors()[0]->getErrorCode();
+        if ($response && $response->getErrors() != null) {
+            $code = (int)$response->getErrors()[0]->getErrorCode();
             $description = $response->getErrors()[0]->getErrorText();
         }
 

@@ -103,6 +103,7 @@ class Invoice extends BaseModel
         'created_at' => 'timestamp',
         'deleted_at' => 'timestamp',
         'is_deleted' => 'bool',
+        'is_amount_discount' => 'bool',
     ];
 
     protected $with = [];
@@ -227,9 +228,19 @@ class Invoice extends BaseModel
         return $this->hasMany(Task::class);
     }
 
+    public function task()
+    {
+        return $this->hasOne(Task::class);
+    }
+
     public function expenses()
     {
         return $this->hasMany(Expense::class);
+    }
+
+    public function expense()
+    {
+        return $this->hasOne(Expense::class);
     }
     /**
      * Service entry points.
@@ -455,6 +466,7 @@ class Invoice extends BaseModel
     {
         $this->invitations->each(function ($invitation) {
             if (! isset($invitation->sent_date)) {
+                $invitation->load('invoice');
                 $invitation->sent_date = Carbon::now();
                 $invitation->save();
             }
@@ -497,6 +509,20 @@ class Invoice extends BaseModel
         return $this->calc()->getTotal();
     }
 
+    public function getPayableAmount()
+    {
+        if($this->partial > 0)
+            return $this->partial;
+
+        if($this->balance > 0)
+            return $this->balance;
+
+        if($this->status_id = 1)
+            return $this->amount;
+
+        return 0;
+    }
+
     public function entityEmailEvent($invitation, $reminder_template, $template)
     {
         switch ($reminder_template) {
@@ -519,5 +545,25 @@ class Invoice extends BaseModel
                 # code...
                 break;
         }
+    }
+
+    public function transaction_event()
+    {
+
+        $invoice = $this->fresh();
+
+        return [
+            'invoice_id' => $invoice->id, 
+            'invoice_amount' => $invoice->amount ?: 0, 
+            'invoice_partial' => $invoice->partial ?: 0, 
+            'invoice_balance' => $invoice->balance ?: 0, 
+            'invoice_paid_to_date' => $invoice->paid_to_date ?: 0,
+            'invoice_status' => $invoice->status_id ?: 1,
+        ];
+    }
+
+    public function translate_entity()
+    {
+        return ctrans('texts.invoice');
     }
 }

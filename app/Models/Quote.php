@@ -89,6 +89,7 @@ class Quote extends BaseModel
         'created_at' => 'timestamp',
         'deleted_at' => 'timestamp',
         'is_deleted' => 'boolean',
+        'is_amount_discount' => 'bool',
     ];
 
     protected $dates = [];
@@ -309,5 +310,10 @@ class Quote extends BaseModel
     public function getTotalAttribute()
     {
         return $this->calc()->getTotal();
+    }
+
+    public function translate_entity()
+    {
+        return ctrans('texts.quote');
     }
 }

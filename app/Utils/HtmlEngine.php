@@ -58,7 +58,7 @@ class HtmlEngine
 
         $this->company = $invitation->company;
 
-        $this->contact = $invitation->contact;
+        $this->contact = $invitation->contact->load('client');
         
         $this->client = $this->contact->client->load('company','country');
         
@@ -122,6 +122,9 @@ class HtmlEngine
         $data['$invoice.date'] = &$data['$date'];
         $data['$invoiceDate'] = &$data['$date'];
         $data['$due_date'] = ['value' => $this->translateDate($this->entity->due_date, $this->client->date_format(), $this->client->locale()) ?: '&nbsp;', 'label' => ctrans('texts.'.$this->entity_string.'_due_date')];
+
+        $data['$partial_due_date'] = ['value' => $this->translateDate($this->entity->partial_due_date, $this->client->date_format(), $this->client->locale()) ?: '&nbsp;', 'label' => ctrans('texts.'.$this->entity_string.'_due_date')];
+        
         $data['$dueDate'] = &$data['$due_date'];
 
         $data['$payment_due'] = ['value' => $this->translateDate($this->entity->due_date, $this->client->date_format(), $this->client->locale()) ?: '&nbsp;', 'label' => ctrans('texts.payment_due')];
@@ -165,7 +168,7 @@ class HtmlEngine
             $data['$entity'] = ['value' => '', 'label' => ctrans('texts.quote')];
             $data['$number'] = ['value' => $this->entity->number ?: '', 'label' => ctrans('texts.quote_number')];
             $data['$number_short'] = ['value' => $this->entity->number ?: '', 'label' => ctrans('texts.quote_number_short')];
-            $data['$entity.terms'] = ['value' => $this->entity->terms ?: '', 'label' => ctrans('texts.quote_terms')];
+            $data['$entity.terms'] = ['value' => Helpers::processReservedKeywords(\nl2br($this->entity->terms), $this->client) ?: '', 'label' => ctrans('texts.quote_terms')];
             $data['$terms'] = &$data['$entity.terms'];
             $data['$view_link'] = ['value' => '<a class="button" href="'.$this->invitation->getLink().'">'.ctrans('texts.view_quote').'</a>', 'label' => ctrans('texts.view_quote')];
             $data['$viewLink'] = &$data['$view_link'];
@@ -174,13 +177,23 @@ class HtmlEngine
             $data['$approveButton'] = ['value' => '<a class="button" href="'.$this->invitation->getLink().'">'.ctrans('texts.view_quote').'</a>', 'label' => ctrans('texts.approve')];
             $data['$view_url'] = ['value' => $this->invitation->getLink(), 'label' => ctrans('texts.view_quote')];
             $data['$date'] = ['value' => $this->translateDate($this->entity->date, $this->client->date_format(), $this->client->locale()) ?: '&nbsp;', 'label' => ctrans('texts.quote_date')];
+
+            if($this->entity->project) {
+                $data['$project.name'] = ['value' => $this->entity->project->name, 'label' => ctrans('texts.project_name')];
+                $data['$invoice.project'] = &$data['$project.name'];
+            }
+
+            if($this->entity->vendor) {
+                $data['$invoice.vendor'] = ['value' => $this->entity->vendor->present()->name(), 'label' => ctrans('texts.vendor_name')];
+            }
+
         }
 
         if ($this->entity_string == 'credit') {
             $data['$entity'] = ['value' => '', 'label' => ctrans('texts.credit')];
             $data['$number'] = ['value' => $this->entity->number ?: '', 'label' => ctrans('texts.credit_number')];
             $data['$number_short'] = ['value' => $this->entity->number ?: '', 'label' => ctrans('texts.credit_number_short')];
-            $data['$entity.terms'] = ['value' => $this->entity->terms ?: '', 'label' => ctrans('texts.credit_terms')];
+            $data['$entity.terms'] = ['value' => Helpers::processReservedKeywords(\nl2br($this->entity->terms), $this->client) ?: '', 'label' => ctrans('texts.credit_terms')];
             $data['$terms'] = &$data['$entity.terms'];
             $data['$view_link'] = ['value' => '<a class="button" href="'.$this->invitation->getLink().'">'.ctrans('texts.view_credit').'</a>', 'label' => ctrans('texts.view_credit')];
             $data['$viewButton'] = &$data['$view_link'];
@@ -317,6 +330,7 @@ class HtmlEngine
         $data['$website'] = ['value' => $this->client->present()->website() ?: '&nbsp;', 'label' => ctrans('texts.website')];
         $data['$phone'] = ['value' => $this->client->present()->phone() ?: '&nbsp;', 'label' => ctrans('texts.phone')];
         $data['$country'] = ['value' => isset($this->client->country->name) ? ctrans('texts.country_' . $this->client->country->name) : '', 'label' => ctrans('texts.country')];
+        $data['$country_2'] = ['value' => isset($this->client->country) ? $this->client->country->iso_3166_2 : '', 'label' => ctrans('texts.country')];
         $data['$email'] = ['value' => isset($this->contact) ? $this->contact->email : 'no contact email on record', 'label' => ctrans('texts.email')];
         $data['$client_name'] = ['value' => $this->entity->present()->clientName() ?: '&nbsp;', 'label' => ctrans('texts.client_name')];
         $data['$client.name'] = &$data['$client_name'];
@@ -359,6 +373,8 @@ class HtmlEngine
 
         $data['$client.currency'] = ['value' => $this->client->currency()->code, 'label' => ''];
 
+        $data['$client.lang_2'] = ['value' => optional($this->client->language())->locale, 'label' => ''];
+
         $data['$client.balance'] = ['value' => Number::formatMoney($this->client->balance, $this->client), 'label' => ctrans('texts.account_balance')];
         $data['$client_balance'] = ['value' => Number::formatMoney($this->client->balance, $this->client), 'label' => ctrans('texts.account_balance')];
         $data['$paid_to_date'] = ['value' => Number::formatMoney($this->entity->paid_to_date, $this->client), 'label' => ctrans('texts.paid_to_date')];
@@ -392,6 +408,7 @@ class HtmlEngine
         $data['$company.state'] = ['value' => $this->settings->state ?: '&nbsp;', 'label' => ctrans('texts.state')];
         $data['$company.postal_code'] = ['value' => $this->settings->postal_code ?: '&nbsp;', 'label' => ctrans('texts.postal_code')];
         $data['$company.country'] = ['value' => $this->getCountryName(), 'label' => ctrans('texts.country')];
+        $data['$company.country_2'] = ['value' => $this->getCountryCode(), 'label' => ctrans('texts.country')];
         $data['$company.phone'] = ['value' => $this->settings->phone ?: '&nbsp;', 'label' => ctrans('texts.phone')];
         $data['$company.email'] = ['value' => $this->settings->email ?: '&nbsp;', 'label' => ctrans('texts.email')];
         $data['$company.vat_number'] = ['value' => $this->settings->vat_number ?: '&nbsp;', 'label' => ctrans('texts.vat_number')];
@@ -529,7 +546,6 @@ class HtmlEngine
             $data['$payments'] = ['value' => $payment_list, 'label' => ctrans('texts.payments')];
         }
 
-
         $arrKeysLength = array_map('strlen', array_keys($data));
         array_multisort($arrKeysLength, SORT_DESC, $data);
 
@@ -617,6 +633,19 @@ class HtmlEngine
         return '&nbsp;';
     }
 
+
+    private function getCountryCode() :string
+    {
+        $country = Country::find($this->settings->country_id);
+
+        if($country)
+            return $country->iso_3166_2;
+        // if ($country) {
+        //     return ctrans('texts.country_' . $country->iso_3166_2);
+        // }
+
+        return '&nbsp;';
+    }
     /**
      * Due to the way we are compiling the blade template we
      * have no ability to iterate, so in the case

@@ -47,12 +47,6 @@ class MarkSent extends AbstractService
              ->updateBalance($adjustment, true)
              ->save();
 
-        /*Adjust client balance*/
-        $this->client
-             ->service()
-             ->updateBalance($adjustment)
-             ->save();
-
         /*Update ledger*/
         $this->invoice
              ->ledger()
@@ -63,10 +57,21 @@ class MarkSent extends AbstractService
              ->service()
              ->applyNumber()
              ->setDueDate()
-             // ->deletePdf() //08-01-2022
-             ->touchPdf() //08-01-2022
+             ->touchPdf()
              ->setReminder()
              ->save();
+
+        /*Adjust client balance*/
+        
+
+        \DB::connection(config('database.default'))->transaction(function () use($adjustment){
+
+        /* Get the last record for the client and set the current balance*/
+            $client = Client::where('id', $this->client->id)->lockForUpdate()->first();
+            $client->balance += $adjustment;
+            $client->save();
+
+        }, 1);
 
         $this->invoice->markInvitationsSent();
 
