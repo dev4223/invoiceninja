@@ -146,9 +146,21 @@ class CreditCard
 
         }
 
+        $invoice_numbers = '';
+
+        if($this->eway_driver->payment_hash->data)
+            $invoice_numbers =  collect($this->eway_driver->payment_hash->data->invoices)->pluck('invoice_number')->implode(',');
+        
+        $amount = array_sum(array_column($this->eway_driver->payment_hash->invoices(), 'amount')) + $this->eway_driver->payment_hash->fee_total;
+
+        $description = "Invoices: {$invoice_numbers} for {$amount} for client {$this->eway_driver->client->present()->name()}";
+
         $transaction = [
             'Payment' => [
                 'TotalAmount' => $this->convertAmountForEway(),
+                'CurrencyCode' => $this->eway_driver->client->currency()->code,
+                'InvoiceNumber' => $invoice_numbers,
+                'InvoiceDescription' => substr($invoice_numbers, 0, 63)
             ],
             'TransactionType' => \Eway\Rapid\Enum\TransactionType::PURCHASE,
             'SecuredCardData' => $request->input('securefieldcode'),
@@ -156,20 +168,54 @@ class CreditCard
 
         $response = $this->eway_driver->init()->eway->createTransaction(\Eway\Rapid\Enum\ApiMethod::DIRECT, $transaction);
 
-        $response_status = ErrorCode::getStatus($response->ResponseMessage);
+        $this->logResponse($response);
 
-        if(!$response_status['success']){
+        // if(!$response || !property_exists($response, 'ResponseMessage'))
+        //     throw new PaymentFailed('The gateway did not return a valid response. Please check your gateway credentials.', 400);
 
-            $this->logResponse($response, false);
+        // $response_status = ErrorCode::getStatus($response->ResponseMessage);
 
-            $this->eway_driver->sendFailureMail($response_status['message']);
+        // if(!$response_status['success']){
 
-            throw new PaymentFailed($response_status['message'], 400);
-        }
+        //     if($response->getErrors())
+        //     {
+        //         $message = false;
 
-        $this->logResponse($response, true);
+        //         foreach ($response->getErrors() as $error) {
+        //             $message = \Eway\Rapid::getMessage($error);
+        //         }
 
-        $payment = $this->storePayment($response);
+        //         $return_message = $message ?: $response_status['message'];
+        //     }
+
+        //     $this->eway_driver->sendFailureMail($response_status['message']);
+
+        //     throw new PaymentFailed($response_status['message'], 400);
+        // }
+
+            if($response->TransactionStatus)
+                $payment = $this->storePayment($response);
+            else {
+
+                $message = 'Error processing payment.';
+
+                if(isset($response->ResponseMessage))
+                    $message .= " Gateway Error Code = {$response->ResponseMessage}";
+
+                if($response->getErrors())
+                {
+    
+                    foreach ($response->getErrors() as $error) {
+                        $message = \Eway\Rapid::getMessage($error);
+                    }
+
+                }
+
+                $this->eway_driver->sendFailureMail($message);
+
+                throw new PaymentFailed($message, 400);
+            }
+
 
         return redirect()->route('client.payments.show', ['payment' => $this->encodePrimaryKey($payment->id)]);
 
@@ -225,32 +271,54 @@ class CreditCard
     {
         $amount = array_sum(array_column($payment_hash->invoices(), 'amount')) + $payment_hash->fee_total;
 
+        $invoice_numbers = '';
+        
+        if($this->eway_driver->payment_hash->data)
+            $invoice_numbers =  collect($this->eway_driver->payment_hash->data->invoices)->pluck('invoice_number')->implode(',');
+        
+        $description = "Invoices: {$invoice_numbers} for {$amount} for client {$this->eway_driver->client->present()->name()}";
+
         $transaction = [
             'Customer' => [
                 'TokenCustomerID' => $token,
             ],
             'Payment' => [
                 'TotalAmount' => $this->convertAmountForEway($amount),
+                'CurrencyCode' => $this->eway_driver->client->currency()->code,
+                'InvoiceNumber' => $invoice_numbers,
+                'InvoiceDescription' => substr($invoice_numbers, 0, 63)
             ],
             'TransactionType' => \Eway\Rapid\Enum\TransactionType::RECURRING,
         ];
 
         $response = $this->eway_driver->init()->eway->createTransaction(\Eway\Rapid\Enum\ApiMethod::DIRECT, $transaction);
 
-        $response_status = ErrorCode::getStatus($response->ResponseMessage);
+            if($response->TransactionStatus){
+                $this->logResponse($response, true);
+                $payment = $this->storePayment($response);
+            }
+            else {
 
-        if(!$response_status['success']){
+                $message = 'Error processing payment.';
 
-            $this->logResponse($response, false);
+                if(isset($response->ResponseMessage))
+                    $message .= " Gateway Error Code = {$response->ResponseMessage}";
 
-            $this->eway_driver->sendFailureMail($response_status['message']);
+                if($response->getErrors())
+                {
+    
+                    foreach ($response->getErrors() as $error) {
+                        $message = \Eway\Rapid::getMessage($error);
+                    }
 
-            throw new PaymentFailed($response_status['message'], 400);
-        }
+                }
 
-        $this->logResponse($response, true);
+                $this->logResponse($response, false);
 
-        $payment = $this->storePayment($response);
+                $this->eway_driver->sendFailureMail($message);
+
+                throw new PaymentFailed($message, 400);
+            }
 
         return $payment;
     }

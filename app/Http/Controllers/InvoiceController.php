@@ -27,13 +27,16 @@ use App\Http\Requests\Invoice\StoreInvoiceRequest;
 use App\Http\Requests\Invoice\UpdateInvoiceRequest;
 use App\Http\Requests\Invoice\UploadInvoiceRequest;
 use App\Jobs\Entity\EmailEntity;
+use App\Jobs\Invoice\BulkInvoiceJob;
 use App\Jobs\Invoice\StoreInvoice;
 use App\Jobs\Invoice\ZipInvoices;
+use App\Jobs\Ninja\TransactionLog;
 use App\Jobs\Util\UnlinkFile;
 use App\Models\Account;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\Quote;
+use App\Models\TransactionEvent;
 use App\Repositories\InvoiceRepository;
 use App\Transformers\InvoiceTransformer;
 use App\Transformers\QuoteTransformer;
@@ -213,7 +216,7 @@ class InvoiceController extends BaseController
     public function store(StoreInvoiceRequest $request)
     {
 
-        $client = Client::find($request->input('client_id'));
+        // $client = Client::find($request->input('client_id'));
 
         $invoice = $this->invoice_repo->save($request->all(), InvoiceFactory::create(auth()->user()->company()->id, auth()->user()->id));
 
@@ -223,6 +226,16 @@ class InvoiceController extends BaseController
                            ->save();
 
         event(new InvoiceWasCreated($invoice, $invoice->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
+        
+        $transaction = [
+            'invoice' => $invoice->transaction_event(),
+            'payment' => [],
+            'client' => $invoice->client->transaction_event(),
+            'credit' => [],
+            'metadata' => [],
+        ];
+
+        TransactionLog::dispatch(TransactionEvent::INVOICE_UPDATED, $transaction, $invoice->company->db);
         
         return $this->itemResponse($invoice);
     }
@@ -404,6 +417,16 @@ class InvoiceController extends BaseController
         $invoice->service()->triggeredActions($request)->touchPdf();
 
         event(new InvoiceWasUpdated($invoice, $invoice->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
+
+        $transaction = [
+            'invoice' => $invoice->transaction_event(),
+            'payment' => [],
+            'client' => $invoice->client->transaction_event(),
+            'credit' => [],
+            'metadata' => [],
+        ];
+
+        TransactionLog::dispatch(TransactionEvent::INVOICE_UPDATED, $transaction, $invoice->company->db);
 
         return $this->itemResponse($invoice);
     }
@@ -663,7 +686,7 @@ class InvoiceController extends BaseController
                     return $this->errorResponse(['message' => ctrans('texts.invoice_cannot_be_marked_paid')], 400);
                 }
 
-                $invoice = $invoice->service()->markPaid();
+                $invoice = $invoice->service()->markPaid()->save();
 
                 if (! $bulk) {
                     return $this->itemResponse($invoice);
@@ -725,23 +748,14 @@ class InvoiceController extends BaseController
             case 'email':
                 //check query parameter for email_type and set the template else use calculateTemplate
 
+
                 if (request()->has('email_type') && property_exists($invoice->company->settings, request()->input('email_type'))) {
                     $this->reminder_template = $invoice->client->getSetting(request()->input('email_type'));
                 } else {
                     $this->reminder_template = $invoice->calculateTemplate('invoice');
                 }
 
-                //touch reminder1,2,3_sent + last_sent here if the email is a reminder.
-                //$invoice->service()->touchReminder($this->reminder_template)->deletePdf()->save();
-                $invoice->service()->touchReminder($this->reminder_template)->markSent()->save();
-
-                $invoice->invitations->load('contact.client.country', 'invoice.client.country', 'invoice.company')->each(function ($invitation) use ($invoice) {
-                    EmailEntity::dispatch($invitation, $invoice->company, $this->reminder_template)->delay(now()->addSeconds(30));
-                });
-
-                if ($invoice->invitations->count() >= 1) {
-                    $invoice->entityEmailEvent($invoice->invitations->first(), 'invoice', $this->reminder_template);
-                }
+                BulkInvoiceJob::dispatch($invoice, $this->reminder_template);
 
                 if (! $bulk) {
                     return response()->json(['message' => 'email sent'], 200);
@@ -933,6 +947,9 @@ class InvoiceController extends BaseController
             return $this->featureFailure();
         
         if ($request->has('documents')) 
+            $this->saveDocuments($request->file('documents'), $invoice);
+
+        if ($request->has('file')) 
             $this->saveDocuments($request->file('documents'), $invoice);
 
         return $this->itemResponse($invoice->fresh());

@@ -12,13 +12,26 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\FilePermissionsFailure;
+use App\Models\Client;
 use App\Utils\Ninja;
+use App\Utils\Traits\ClientGroupSettingsSaver;
 use Illuminate\Foundation\Bus\DispatchesJobs;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Storage;
 
 class SelfUpdateController extends BaseController
 {
     use DispatchesJobs;
+    use ClientGroupSettingsSaver;
+
+    private array $purge_file_list = [
+        'bootstrap/cache/compiled.php',
+        'bootstrap/cache/config.php',
+        'bootstrap/cache/packages.php',
+        'bootstrap/cache/services.php',
+        'bootstrap/cache/routes-v7.php',
+        'bootstrap/cache/livewire-components.php',
+    ];
 
     public function __construct()
     {
@@ -53,8 +66,43 @@ class SelfUpdateController extends BaseController
      *       ),
      *     )
      */
-    public function update(\Codedge\Updater\UpdaterManager $updater)
+    // public function old_update(\Codedge\Updater\UpdaterManager $updater)
+    // {
+    //     set_time_limit(0);
+    //     define('STDIN', fopen('php://stdin', 'r'));
+
+    //     if (Ninja::isHosted()) {
+    //         return response()->json(['message' => ctrans('texts.self_update_not_available')], 403);
+    //     }
+
+    //     $this->testWritable();
+
+    //     // Get the new version available
+    //     $versionAvailable = $updater->source()->getVersionAvailable();
+
+    //     // Create a release
+    //     $release = $updater->source()->fetch($versionAvailable);
+
+    //     $updater->source()->update($release);
+
+            
+    //     $cacheCompiled = base_path('bootstrap/cache/compiled.php');
+    //     if (file_exists($cacheCompiled)) { unlink ($cacheCompiled); }
+    //     $cacheServices = base_path('bootstrap/cache/services.php');
+    //     if (file_exists($cacheServices)) { unlink ($cacheServices); }
+
+    //     Artisan::call('clear-compiled');
+    //     Artisan::call('route:clear');
+    //     Artisan::call('view:clear');
+    //     Artisan::call('optimize');
+
+    //     return response()->json(['message' => 'Update completed'], 200);
+
+    // }
+
+    public function update()
     {
+
         set_time_limit(0);
         define('STDIN', fopen('php://stdin', 'r'));
 
@@ -64,27 +112,50 @@ class SelfUpdateController extends BaseController
 
         $this->testWritable();
 
-        // Get the new version available
-        $versionAvailable = $updater->source()->getVersionAvailable();
+        copy($this->getDownloadUrl(), storage_path('app/invoiceninja.zip'));
 
-        // Create a release
-        $release = $updater->source()->fetch($versionAvailable);
+        $file = Storage::disk('local')->path('invoiceninja.zip');
 
-        $updater->source()->update($release);
+        $zipFile = new \PhpZip\ZipFile();
 
-            
-        $cacheCompiled = base_path('bootstrap/cache/compiled.php');
-        if (file_exists($cacheCompiled)) { unlink ($cacheCompiled); }
-        $cacheServices = base_path('bootstrap/cache/services.php');
-        if (file_exists($cacheServices)) { unlink ($cacheServices); }
+        $zipFile->openFile($file);
+
+        $zipFile->extractTo(base_path());
+
+        $zipFile->close();
+
+        unlink($file);
+
+        foreach($this->purge_file_list as $purge_file_path)
+        {
+            $purge_file = base_path($purge_file_path);
+            if (file_exists($purge_file)) { unlink ($purge_file); }
+
+        }
 
         Artisan::call('clear-compiled');
         Artisan::call('route:clear');
         Artisan::call('view:clear');
-        Artisan::call('config:clear');
+        Artisan::call('migrate', ['--force' => true]);
+        Artisan::call('optimize');
 
         return response()->json(['message' => 'Update completed'], 200);
 
+
+    }
+
+    private function postHookUpdate()
+    {
+        if(config('ninja.app_version') == '5.3.82')
+        {
+            Client::withTrashed()->cursor()->each( function ($client) {
+                $entity_settings = $this->checkSettingType($client->settings);
+                $entity_settings->md5 = md5(time());
+                $client->settings = $entity_settings;
+                $client->save();
+                
+            });
+        }
     }
 
     private function testWritable()
@@ -96,7 +167,7 @@ class SelfUpdateController extends BaseController
             if(strpos($file->getPathname(), '.git') !== false)
                 continue;
 
-            // nlog($file->getPathname());
+            //nlog($file->getPathname());
 
             if ($file->isFile() && ! $file->isWritable()) {
                 // throw new FilePermissionsFailure($file);
@@ -112,5 +183,12 @@ class SelfUpdateController extends BaseController
     public function checkVersion()
     {
         return trim(file_get_contents(config('ninja.version_url')));
+    }
+
+    private function getDownloadUrl()
+    {
+        $version = $this->checkVersion();
+
+        return "https://github.com/invoiceninja/invoiceninja/releases/download/v{$version}/invoiceninja.zip";
     }
 }

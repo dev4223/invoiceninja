@@ -92,9 +92,8 @@ class TemplateEmail extends Mailable
             $this->bcc(explode(",",str_replace(" ", "", $settings->bcc_email)));//remove whitespace if any has been inserted.
 
         $this->subject($this->build_email->getSubject())
-            ->text('email.template.plain', [
-                'body' => $this->build_email->getBody(),
-                'footer' => $this->build_email->getFooter(),
+            ->text('email.template.text', [
+                'text_body' => $this->build_email->getTextBody(),
                 'whitelabel' => $this->client->user->account->isPaid() ? true : false,
                 'settings' => $settings,
             ])
@@ -132,8 +131,6 @@ class TemplateEmail extends Mailable
         if($this->invitation && $this->invitation->invoice && $settings->ubl_email_attachment && $this->company->account->hasFeature(Account::FEATURE_PDF_ATTACHMENT)){
 
             $ubl_string = CreateUbl::dispatchNow($this->invitation->invoice);
-
-            nlog($ubl_string);
             
             if($ubl_string)
                 $this->attachData($ubl_string, $this->invitation->invoice->getFileName('xml'));

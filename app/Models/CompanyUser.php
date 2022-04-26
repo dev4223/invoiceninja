@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class CompanyUser extends Pivot
 {
     use SoftDeletes;
+    use \Awobaz\Compoships\Compoships;
 
     //   protected $guarded = ['id'];
 
@@ -50,6 +51,8 @@ class CompanyUser extends Pivot
     ];
 
     protected $touches = ['user'];
+
+    protected $with = ['user','account'];
 
     public function getEntityType()
     {

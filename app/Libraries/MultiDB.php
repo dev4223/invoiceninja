@@ -205,7 +205,7 @@ class MultiDB
         $current_db = config('database.default');  
 
         foreach (self::$dbs as $db) {
-            if (ClientContact::on($db)->whereRaw('BINARY `token`= ?', [$token])->exists()) {
+            if (ClientContact::on($db)->where('token', $token)->exists()) {
                 self::setDb($db);
                 return true;
             }
@@ -257,7 +257,7 @@ class MultiDB
         $current_db = config('database.default');  
 
         foreach (self::$dbs as $db) {
-            if (CompanyToken::on($db)->whereRaw('BINARY `token`= ?', [$token])->exists()) {
+            if (CompanyToken::on($db)->where('token', $token)->exists()) {
                 self::setDb($db);
                 return true;
             }
@@ -276,6 +276,22 @@ class MultiDB
             if (Company::on($db)->where('company_key', $company_key)->exists()) {
                 self::setDb($db);
                 return true;
+            }
+        }
+
+        self::setDB($current_db);
+
+        return false;
+    }
+
+    public static function findAndSetDbByCompanyId($company_id) :?Company
+    {
+        $current_db = config('database.default');  
+
+        foreach (self::$dbs as $db) {
+            if ($company = Company::on($db)->where('id', $company_id)->first()) {
+                self::setDb($db);
+                return $company;
             }
         }
 
@@ -324,6 +340,22 @@ class MultiDB
             if (Client::on($db)->where('client_hash', $client_hash)->exists()) {
                 self::setDb($db);
                 return true;
+            }
+        }
+
+        self::setDB($current_db);
+
+        return false;
+    }
+
+    public static function findAndSetDbByClientId($client_id) :?Client
+    {
+        $current_db = config('database.default');  
+
+        foreach (self::$dbs as $db) {
+            if ($client = Client::on($db)->where('id', $client_id)->first()) {
+                self::setDb($db);
+                return $client;
             }
         }
 

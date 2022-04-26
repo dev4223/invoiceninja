@@ -167,7 +167,7 @@ class TemplateEngine
             'allow_unsafe_links' => false,
         ]);
 
-        $this->body = $converter->convertToHtml($this->body);
+        $this->body = $converter->convert($this->body);
     }
 
     private function entityValues($contact)

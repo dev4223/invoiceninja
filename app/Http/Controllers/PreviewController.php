@@ -97,6 +97,7 @@ class PreviewController extends BaseController
             ! empty(request()->input('entity')) &&
             ! empty(request()->input('entity_id')) &&
             request()->has('body')) {
+            
             $design_object = json_decode(json_encode(request()->input('design')));
 
             if (! is_object($design_object)) {
@@ -147,7 +148,7 @@ class PreviewController extends BaseController
                 ->build();
 
             if (request()->query('html') == 'true') {
-                return $maker->getCompiledHTML;
+                return $maker->getCompiledHTML();
             }
 
             //if phantom js...... inject here..
@@ -266,7 +267,7 @@ class PreviewController extends BaseController
             DB::connection(config('database.default'))->rollBack();
 
             if (request()->query('html') == 'true') {
-                return $maker->getCompiledHTML;
+                return $maker->getCompiledHTML();
             }
 
 

@@ -19,6 +19,7 @@ use App\Transformers\EntityTransformer;
 use App\Utils\Ninja;
 use App\Utils\Statics;
 use App\Utils\Traits\AppSetup;
+use App\Utils\TruthSource;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -217,7 +218,7 @@ class BaseController extends Controller
         $query->with(
             [
             'company' => function ($query) use ($updated_at, $user) {
-                $query->whereNotNull('updated_at')->with('documents')->with('users');
+                $query->whereNotNull('updated_at')->with('documents','users');
             },
             'company.clients' => function ($query) use ($updated_at, $user) {
                 $query->where('clients.updated_at', '>=', $updated_at)->with('contacts.company', 'gateway_tokens', 'documents');
@@ -391,7 +392,7 @@ class BaseController extends Controller
         $query->with(
             [
             'company' => function ($query) use ($created_at, $user) {
-                $query->whereNotNull('created_at')->with('documents');
+                $query->whereNotNull('created_at')->with('documents','users');
             },
             'company.designs'=> function ($query) use ($created_at, $user) {
                 $query->where('created_at', '>=', $created_at)->with('company');
@@ -465,7 +466,7 @@ class BaseController extends Controller
         $query->with(
             [
             'company' => function ($query) use ($created_at, $user) {
-                $query->whereNotNull('created_at')->with('documents');
+                $query->whereNotNull('created_at')->with('documents','users');
             },
             'company.clients' => function ($query) use ($created_at, $user) {
                 $query->where('clients.created_at', '>=', $created_at)->with('contacts.company', 'gateway_tokens', 'documents');
@@ -499,9 +500,6 @@ class BaseController extends Controller
             },
             'company.groups' => function ($query) use ($created_at, $user) {
                 $query->where('created_at', '>=', $created_at)->with('documents');
-
-                // if(!$user->isAdmin())
-                //   $query->where('group_settings.user_id', $user->id);
             },
             'company.invoices'=> function ($query) use ($created_at, $user) {
                 $query->where('created_at', '>=', $created_at)->with('invitations', 'documents');
@@ -582,13 +580,30 @@ class BaseController extends Controller
                   $query->where('activities.user_id', $user->id);
 
             },
+            'company.webhooks'=> function ($query) use($user) {
+
+              if(!$user->isAdmin())
+                  $query->where('webhooks.user_id', $user->id);
+
+            },
+            'company.tokens'=> function ($query) use($user) {
+                  $query->where('company_tokens.user_id', $user->id);
+            },
+            'company.system_logs',
             'company.subscriptions'=> function ($query) use($created_at, $user) {
               $query->where('created_at', '>=', $created_at);
 
               if(!$user->isAdmin())
                   $query->where('subscriptions.user_id', $user->id);
 
-            }
+            },
+            'company.recurring_expenses'=> function ($query) use ($created_at, $user) {
+                $query->where('created_at', '>=', $created_at)->with('documents');
+
+                if(!$user->hasPermission('view_recurring_expense'))
+                  $query->where('recurring_expenses.user_id', $user->id)->orWhere('recurring_expenses.assigned_user_id', $user->id);
+
+            },
           ]
         );
 
@@ -610,6 +625,7 @@ class BaseController extends Controller
 
     protected function listResponse($query)
     {
+
         $this->buildManager();
 
         $transformer = new $this->entity_transformer(request()->input('serializer'));
@@ -621,7 +637,7 @@ class BaseController extends Controller
         $query->with($includes);
 
         // 10-01-2022 need to ensure we snake case properly here to ensure permissions work as expected
-        // if (auth()->user() && ! auth()->user()->hasPermission('view_'.lcfirst(class_basename($this->entity_type)))) {
+        // 28-03-2022 this is definitely correct here, do not append _ to the view, it resolved correctly when snake cased
         if (auth()->user() && ! auth()->user()->hasPermission('view'.lcfirst(class_basename(Str::snake($this->entity_type))))) {
             $query->where('user_id', '=', auth()->user()->id);
         }
@@ -764,7 +780,8 @@ class BaseController extends Controller
 
             $this->buildCache();
 
-            return view('index.index', $data);
+            return response()->view('index.index', $data)->header('X-Frame-Options', 'SAMEORIGIN', false);
+
         }
 
         return redirect('/setup');

@@ -142,7 +142,7 @@ class BaseRepository
         
         $invitation_class = sprintf('App\\Models\\%sInvitation', $resource);
 
-        $invitation = $invitation_class::whereRaw('BINARY `key`= ?', [$invitation['key']])->first();
+        $invitation = $invitation_class::where('key', $invitation['key'])->first();
 
         return $invitation;
     }
@@ -221,6 +221,9 @@ class BaseRepository
         /* Save any documents */
         if (array_key_exists('documents', $data)) 
             $this->saveDocuments($data['documents'], $model);
+
+        if (array_key_exists('file', $data)) 
+            $this->saveDocuments($data['file'], $model);
 
         /* If invitations are present we need to filter existing invitations with the new ones */
         if (isset($data['invitations'])) {

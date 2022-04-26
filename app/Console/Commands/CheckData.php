@@ -13,6 +13,7 @@ namespace App\Console\Commands;
 
 use App;
 use App\Factory\ClientContactFactory;
+use App\Factory\VendorContactFactory;
 use App\Models\Account;
 use App\Models\Client;
 use App\Models\ClientContact;
@@ -27,6 +28,7 @@ use App\Models\Payment;
 use App\Models\Paymentable;
 use App\Models\QuoteInvitation;
 use App\Models\RecurringInvoiceInvitation;
+use App\Models\Vendor;
 use App\Utils\Ninja;
 use Exception;
 use Illuminate\Console\Command;
@@ -72,7 +74,7 @@ class CheckData extends Command
     /**
      * @var string
      */
-    protected $signature = 'ninja:check-data {--database=} {--fix=} {--client_id=} {--paid_to_date=} {--client_balance=}';
+    protected $signature = 'ninja:check-data {--database=} {--fix=} {--client_id=} {--vendor_id=} {--paid_to_date=} {--client_balance=} {--ledger_balance=}';
 
     /**
      * @var string
@@ -100,7 +102,7 @@ class CheckData extends Command
             config(['database.default' => $database]);
         }
 
-        // $this->checkInvoiceBalances();
+        $this->checkInvoiceBalances();
         $this->checkInvoiceBalancesNew();
         //$this->checkInvoicePayments();
         
@@ -112,9 +114,12 @@ class CheckData extends Command
         $this->checkClientBalances();
 
         $this->checkContacts();
+        $this->checkVendorContacts();
         $this->checkEntityInvitations();
         $this->checkCompanyData();
 
+        if(Ninja::isHosted())
+            $this->checkAccountStatuses();
 
         if (! $this->option('client_id')) {
             $this->checkOAuth();
@@ -244,39 +249,69 @@ class CheckData extends Command
             }
         }
 
-        // // check for more than one primary contact
-        // $clients = DB::table('clients')
-        //             ->leftJoin('client_contacts', function ($join) {
-        //                 $join->on('client_contacts.client_id', '=', 'clients.id')
-        //                     ->where('client_contacts.is_primary', '=', true)
-        //                     ->whereNull('client_contacts.deleted_at');
-        //             })
-        //             ->groupBy('clients.id')
-        //             ->havingRaw('count(client_contacts.id) != 1');
-
-        // if ($this->option('client_id')) {
-        //     $clients->where('clients.id', '=', $this->option('client_id'));
-        // }
-
-        // $clients = $clients->get(['clients.id', 'clients.user_id', 'clients.company_id']);
-        // // $this->logMessage($clients->count().' clients without a single primary contact');
-
-        // // if ($this->option('fix') == 'true') {
-        // //     foreach ($clients as $client) {
-        // //         $this->logMessage("Fixing missing primary contacts #{$client->id}");
-                
-        // //         $new_contact = ClientContactFactory::create($client->company_id, $client->user_id);
-        // //         $new_contact->client_id = $client->id;
-        // //         $new_contact->contact_key = Str::random(40);
-        // //         $new_contact->is_primary = true;
-        // //         $new_contact->save();
-        // //     }
-        // // }
-
-        // if ($clients->count() > 0) {
-        //     $this->isValid = false;
-        // }
     }
+
+    private function checkVendorContacts()
+    {
+        // check for contacts with the contact_key value set
+        $contacts = DB::table('vendor_contacts')
+                        ->whereNull('contact_key')
+                        ->orderBy('id')
+                        ->get(['id']);
+        $this->logMessage($contacts->count().' contacts without a contact_key');
+
+        if ($contacts->count() > 0) {
+            $this->isValid = false;
+        }
+
+        if ($this->option('fix') == 'true') {
+            foreach ($contacts as $contact) {
+                DB::table('vendor_contacts')
+                    ->where('id', '=', $contact->id)
+                    ->whereNull('contact_key')
+                    ->update([
+                        'contact_key' => Str::random(config('ninja.key_length')),
+                    ]);
+            }
+        }
+
+        // check for missing contacts
+        $vendors = DB::table('vendors')
+                    ->leftJoin('vendor_contacts', function ($join) {
+                        $join->on('vendor_contacts.vendor_id', '=', 'vendors.id')
+                            ->whereNull('vendor_contacts.deleted_at');
+                    })
+                    ->groupBy('vendors.id', 'vendors.user_id', 'vendors.company_id')
+                    ->havingRaw('count(vendor_contacts.id) = 0');
+
+        if ($this->option('vendor_id')) {
+            $vendors->where('vendors.id', '=', $this->option('vendor_id'));
+        }
+
+        $vendors = $vendors->get(['vendors.id', 'vendors.user_id', 'vendors.company_id']);
+        $this->logMessage($vendors->count().' vendors without any contacts');
+
+        if ($vendors->count() > 0) {
+            $this->isValid = false;
+        }
+
+        if ($this->option('fix') == 'true') {
+
+            $vendors = Vendor::withTrashed()->doesntHave('contacts')->get();
+
+            foreach ($vendors as $vendor) {
+                $this->logMessage("Fixing missing vendor contacts #{$vendor->id}");
+                
+                $new_contact = VendorContactFactory::create($vendor->company_id, $vendor->user_id);
+                $new_contact->vendor_id = $vendor->id;
+                $new_contact->contact_key = Str::random(40);
+                $new_contact->is_primary = true;
+                $new_contact->save();
+            }
+        }
+
+    }
+
 
     private function checkFailedJobs()
     {
@@ -445,10 +480,12 @@ class CheckData extends Command
         LEFT JOIN paymentables
         ON
         payments.id = paymentables.payment_id
-        WHERE paymentable_type = 'App\\Models\\Credit'
+        WHERE paymentable_type = ?
         AND paymentables.deleted_at is NULL
+        AND paymentables.amount > 0
+        AND payments.is_deleted = 0
         AND payments.client_id = ?;
-        "), [$client->id] );
+        "), [App\Models\Credit::class, $client->id] );
     
         return $results;
     }
@@ -463,15 +500,17 @@ class CheckData extends Command
         {
             $client = Client::withTrashed()->find($_client->client_id);
 
+            $credits_from_reversal = Credit::withTrashed()->where('client_id', $client->id)->where('is_deleted', 0)->whereNotNull('invoice_id')->sum('amount');
+
             $credits_used_for_payments = $this->clientCreditPaymentables($client);
 
-            $total_paid_to_date = $_client->payments_applied + $credits_used_for_payments[0]->credit_payment;
+            $total_paid_to_date = $_client->payments_applied + $credits_used_for_payments[0]->credit_payment - $credits_from_reversal;
 
             if(round($total_paid_to_date,2) != round($_client->client_paid_to_date,2)){
 
                 $this->wrong_paid_to_dates++;
 
-                $this->logMessage($client->present()->name.' id = # '.$client->id." - Paid to date does not match Client Paid To Date = {$client->paid_to_date} - Invoice Payments = {$total_paid_to_date}");
+                $this->logMessage($client->present()->name.' id = # '.$client->id." - Client Paid To Date = {$client->paid_to_date} != Invoice Payments = {$total_paid_to_date} - {$_client->payments_applied} + {$credits_used_for_payments[0]->credit_payment}");
 
                 $this->isValid = false;
 
@@ -700,7 +739,7 @@ ORDER BY clients.id;
                 $this->logMessage($client_object->present()->name.' - '.$client_object->id." - calculated client balances do not match Invoice Balances = {$invoice_balance} - Client Balance = ".rtrim($client['client_balance'], '0'). " Ledger balance = {$ledger->balance}");
  
      
-                if($this->option('client_balance')){
+                if($this->option('ledger_balance')){
                     
                     $this->logMessage("# {$client_object->id} " . $client_object->present()->name.' - '.$client_object->number." Fixing {$client_object->balance} to {$invoice_balance}");
                     $client_object->balance = $invoice_balance;
@@ -817,18 +856,16 @@ ORDER BY clients.id;
 
         foreach (Client::where('is_deleted', 0)->where('clients.updated_at', '>', now()->subDays(2))->cursor() as $client) {
             $invoice_balance = $client->invoices()->where('is_deleted', false)->where('status_id', '>', 1)->sum('balance');
-            $credit_balance = $client->credits()->where('is_deleted', false)->sum('balance');
-
             $ledger = CompanyLedger::where('client_id', $client->id)->orderBy('id', 'DESC')->first();
 
-            if ($ledger && number_format($invoice_balance, 4) != number_format($client->balance, 4)) {
+            if ($ledger && number_format($ledger->balance, 4) != number_format($client->balance, 4)) {
                 $this->wrong_balances++;
-                $this->logMessage("# {$client->id} " . $client->present()->name.' - '.$client->number." - Balance Failure - Invoice Balances = {$invoice_balance} Client Balance = {$client->balance} Ledger Balance = {$ledger->balance}");
+                $this->logMessage("# {$client->id} " . $client->present()->name.' - '.$client->number." - Balance Failure - Client Balance = {$client->balance} Ledger Balance = {$ledger->balance}");
 
                 $this->isValid = false;
 
 
-                if($this->option('client_balance')){
+                if($this->option('ledger_balance')){
                     
                     $this->logMessage("# {$client->id} " . $client->present()->name.' - '.$client->number." Fixing {$client->balance} to {$invoice_balance}");
                     $client->balance = $invoice_balance;
@@ -843,7 +880,7 @@ ORDER BY clients.id;
             }
         }
 
-        $this->logMessage("{$this->wrong_balances} clients with incorrect balances");
+        $this->logMessage("{$this->wrong_balances} clients with incorrect ledger balances");
     }
 
     private function checkLogoFiles()
@@ -948,8 +985,53 @@ ORDER BY clients.id;
 
         return $type.'s';
     }
+
+    public function checkAccountStatuses()
+    {
+        Account::where('plan_expires', '<=', now()->subDays(2))->cursor()->each(function ($account){
+
+        $client = Client::on('db-ninja-01')->where('company_id', config('ninja.ninja_default_company_id'))->where('custom_value2', $account->key)->first();
+          
+        if($client){  
+            $payment = Payment::on('db-ninja-01')
+                          ->where('company_id', config('ninja.ninja_default_company_id'))
+                          ->where('client_id', $client->id)
+                          ->where('date', '>=', now()->subDays(2))
+                          ->exists();
+          
+          if($payment)
+                $this->logMessage("I found a payment for {$account->key}");
+
+
+        }
+          
+          
+        });
+    }
+
 }
 
+
+/* //used to set a company owner on the company_users table
+
+$c = Company::whereDoesntHave('company_users', function ($query){
+  $query->where('is_owner', true)->withTrashed();
+})->cursor()->each(function ($company){
+  
+    if(!$company->company_users()->exists()){
+        echo "No company users AT ALL {$company->id}\n";
+       
+    }
+    else{
+
+      $cu = $company->company_users()->orderBy('id', 'ASC')->orderBy('is_admin', 'ASC')->first();
+        echo "{$company->id} - {$cu->id} \n";
+        $cu->is_owner=true;
+        $cu->save();
+      
+    }
+});
+*/
 
 /* query if we want to company company ledger to client balance
         $results = \DB::select( \DB::raw("

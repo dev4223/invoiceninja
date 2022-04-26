@@ -83,12 +83,11 @@ class PaymentMethod
 
         } else {
 
-             $this->gateways = $this->client
-                             ->company
-                             ->company_gateways
+             $this->gateways = CompanyGateway::with('gateway')
+                             ->where('company_id', $this->client->company_id)
                              ->where('gateway_key', '!=', '54faab2ab6e3223dbe848b1686490baa')
                              ->whereNull('deleted_at')
-                             ->where('is_deleted', false);
+                             ->where('is_deleted', false)->get();
 
         }
         
@@ -119,12 +118,11 @@ class PaymentMethod
 
         } else {
 
-             $this->gateways = $this->client
-                             ->company
-                             ->company_gateways
+             $this->gateways = CompanyGateway::with('gateway')
+                             ->where('company_id', $this->client->company_id)
                              ->where('gateway_key', '54faab2ab6e3223dbe848b1686490baa')
                              ->whereNull('deleted_at')
-                             ->where('is_deleted', false);
+                             ->where('is_deleted', false)->get();
 
         }
         
