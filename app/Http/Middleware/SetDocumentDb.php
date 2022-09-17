@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -33,10 +33,9 @@ class SetDocumentDb
         ];
 
         if (config('ninja.db.multi_db_enabled')) {
-            
-            if (! MultiDB::documentFindAndSetDb($request->segment(2))) 
+            if (! MultiDB::documentFindAndSetDb($request->segment(2))) {
                 return response()->json($error, 400);
-            
+            }
         }
 
         return $next($request);

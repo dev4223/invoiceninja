@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -49,23 +49,23 @@ class ClientGatewayTokenTransformer extends EntityTransformer
         $casted = new stdClass;
 
         if (property_exists($meta, 'exp_month')) {
-            $casted->exp_month = (string)$meta->exp_month;
+            $casted->exp_month = (string) $meta->exp_month;
         }
 
         if (property_exists($meta, 'exp_year')) {
-            $casted->exp_year = (string)$meta->exp_year;
+            $casted->exp_year = (string) $meta->exp_year;
         }
 
         if (property_exists($meta, 'brand')) {
-            $casted->brand = (string)$meta->brand;
+            $casted->brand = (string) $meta->brand;
         }
 
         if (property_exists($meta, 'last4')) {
-            $casted->last4 = (string)$meta->last4;
+            $casted->last4 = (string) $meta->last4;
         }
 
         if (property_exists($meta, 'type')) {
-            $casted->type = (int)$meta->type;
+            $casted->type = (int) $meta->type;
         }
 
         return $casted;

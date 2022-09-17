@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -20,7 +20,7 @@ use App\Models\Webhook;
 class InvoiceObserver
 {
     public $afterCommit = true;
-    
+
     /**
      * Handle the client "created" event.
      *
@@ -29,14 +29,12 @@ class InvoiceObserver
      */
     public function created(Invoice $invoice)
     {
-
         $subscriptions = Webhook::where('company_id', $invoice->company_id)
                             ->where('event_id', Webhook::EVENT_CREATE_INVOICE)
                             ->exists();
 
         if ($subscriptions) {
-    
-            WebhookHandler::dispatch(Webhook::EVENT_CREATE_INVOICE, $invoice, $invoice->company, 'client');
+            WebhookHandler::dispatch(Webhook::EVENT_CREATE_INVOICE, $invoice, $invoice->company, 'client')->delay(now()->addSeconds(2));
         }
     }
 
@@ -48,17 +46,13 @@ class InvoiceObserver
      */
     public function updated(Invoice $invoice)
     {
-            
         $subscriptions = Webhook::where('company_id', $invoice->company_id)
                             ->where('event_id', Webhook::EVENT_UPDATE_INVOICE)
                             ->exists();
 
         if ($subscriptions) {
-                
-            WebhookHandler::dispatch(Webhook::EVENT_UPDATE_INVOICE, $invoice, $invoice->company, 'client');
-        
+            WebhookHandler::dispatch(Webhook::EVENT_UPDATE_INVOICE, $invoice, $invoice->company, 'client')->delay(now()->addSeconds(2));
         }
-
     }
 
     /**
@@ -74,8 +68,7 @@ class InvoiceObserver
                             ->exists();
 
         if ($subscriptions) {
-        
-            WebhookHandler::dispatch(Webhook::EVENT_DELETE_INVOICE, $invoice, $invoice->company, 'client');
+            WebhookHandler::dispatch(Webhook::EVENT_DELETE_INVOICE, $invoice, $invoice->company, 'client')->delay(now()->addSeconds(2));
         }
     }
 

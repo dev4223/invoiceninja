@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -28,7 +28,7 @@ class MailCssInlinerServiceProvider extends ServiceProvider
     public function boot()
     {
         $this->publishes([
-            __DIR__ . '/../config/css-inliner.php' => base_path('config/css-inliner.php'),
+            __DIR__.'/../config/css-inliner.php' => base_path('config/css-inliner.php'),
         ], 'config');
     }
 
@@ -47,10 +47,8 @@ class MailCssInlinerServiceProvider extends ServiceProvider
         //     return new CssInlinerPlugin([]);
         // });
 
-        $this->app->bind(CssInlinerPlugin::class, function($app) {
+        $this->app->bind(CssInlinerPlugin::class, function ($app) {
             return new CssInlinerPlugin([]);
         });
     }
 }
-
-

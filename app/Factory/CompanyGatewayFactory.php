@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -24,7 +24,7 @@ class CompanyGatewayFactory
         $company_gateway->require_billing_address = false;
         $company_gateway->require_shipping_address = false;
         $company_gateway->config = encrypt(json_encode(new \stdClass));
-        
+
         return $company_gateway;
     }
 }

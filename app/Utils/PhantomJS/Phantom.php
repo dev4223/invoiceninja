@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -25,15 +25,16 @@ use App\Services\PdfMaker\PdfMaker as PdfMakerService;
 use App\Utils\CurlUtils;
 use App\Utils\HtmlEngine;
 use App\Utils\Traits\MakesHash;
+use App\Utils\Traits\Pdf\PageNumbering;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 class Phantom
 {
-    use MakesHash;
+    use MakesHash, PageNumbering;
 
     /**
      * Generate a PDF from the
@@ -82,9 +83,9 @@ class Phantom
         $url = config('ninja.app_url').'/phantom/'.$entity.'/'.$invitation->key.'?phantomjs_secret='.config('ninja.phantomjs_secret');
         info($url);
 
-        $key         = config( 'ninja.phantomjs_key' );
+        $key = config('ninja.phantomjs_key');
         $phantom_url = "https://phantomjscloud.com/api/browser/v2/{$key}/";
-        $pdf         = CurlUtils::post( $phantom_url, json_encode( [
+        $pdf = CurlUtils::post($phantom_url, json_encode([
             'url'            => $url,
             'renderType'     => 'pdf',
             'outputAsJson'   => false,
@@ -95,13 +96,20 @@ class Phantom
                     'printBackground'   => true,
                 ],
             ],
-        ] ) );
+        ]));
 
         $this->checkMime($pdf, $invitation, $entity);
-        
-        if(!Storage::disk(config('filesystems.default'))->exists($path))
+
+        $numbered_pdf = $this->pageNumbering($pdf, $invitation->company);
+
+        if ($numbered_pdf) {
+            $pdf = $numbered_pdf;
+        }
+
+        if (! Storage::disk(config('filesystems.default'))->exists($path)) {
             Storage::disk(config('filesystems.default'))->makeDirectory($path, 0775);
-                
+        }
+
         $instance = Storage::disk(config('filesystems.default'))->put($file_path, $pdf);
 
         return $file_path;
@@ -109,9 +117,9 @@ class Phantom
 
     public function convertHtmlToPdf($html)
     {
-        $key         = config( 'ninja.phantomjs_key' );
+        $key = config('ninja.phantomjs_key');
         $phantom_url = "https://phantomjscloud.com/api/browser/v2/{$key}/";
-        $pdf         = CurlUtils::post( $phantom_url, json_encode( [
+        $pdf = CurlUtils::post($phantom_url, json_encode([
             'content'            => $html,
             'renderType'     => 'pdf',
             'outputAsJson'   => false,
@@ -122,7 +130,7 @@ class Phantom
                     'printBackground'   => true,
                 ],
             ],
-        ] ) );
+        ]));
 
         $response = Response::make($pdf, 200);
         $response->header('Content-Type', 'application/pdf');
@@ -133,11 +141,9 @@ class Phantom
     /* Check if the returning PDF is valid. */
     private function checkMime($pdf, $invitation, $entity)
     {
-
         $finfo = new \finfo(FILEINFO_MIME);
 
-        if($finfo->buffer($pdf) != 'application/pdf; charset=binary')
-        {
+        if ($finfo->buffer($pdf) != 'application/pdf; charset=binary') {
             SystemLogger::dispatch(
                 $pdf,
                 SystemLog::CATEGORY_PDF,
@@ -148,20 +154,16 @@ class Phantom
             );
 
             throw new PhantomPDFFailure('There was an error generating the PDF with Phantom JS');
-        }
-        else {
-
+        } else {
             SystemLogger::dispatch(
-                "Entity PDF generated sucessfully => " . $invitation->{$entity}->number,
+                'Entity PDF generated sucessfully => '.$invitation->{$entity}->number,
                 SystemLog::CATEGORY_PDF,
                 SystemLog::EVENT_PDF_RESPONSE,
                 SystemLog::TYPE_PDF_SUCCESS,
                 $invitation->contact->client,
                 $invitation->company,
             );
-
         }
-
     }
 
     public function displayInvitation(string $entity, string $invitation_key)
@@ -177,10 +179,11 @@ class Phantom
 
         App::setLocale($invitation->contact->preferredLocale());
 
-        $entity_design_id = $entity . '_design_id';
+        $entity_design_id = $entity.'_design_id';
 
-        if($entity == 'recurring_invoice')
+        if ($entity == 'recurring_invoice') {
             $entity_design_id = 'invoice_design_id';
+        }
 
         $design_id = $entity_obj->design_id ? $entity_obj->design_id : $this->decodePrimaryKey($entity_obj->client->getSetting($entity_design_id));
 
@@ -189,8 +192,8 @@ class Phantom
 
         if ($design->is_custom) {
             $options = [
-            'custom_partials' => json_decode(json_encode($design->design), true)
-          ];
+                'custom_partials' => json_decode(json_encode($design->design), true),
+            ];
             $template = new PdfMakerDesign(PdfDesignModel::CUSTOM, $options);
         } else {
             $template = new PdfMakerDesign(strtolower($design->name));

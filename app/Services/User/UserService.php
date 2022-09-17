@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -21,7 +21,6 @@ use App\Utils\Ninja;
 
 class UserService
 {
-
     public $user;
 
     public function __construct(User $user)
@@ -32,7 +31,6 @@ class UserService
     public function invite($company)
     {
         try {
-
             $nmo = new NinjaMailerObject;
             $nmo->mailable = new NinjaMailer((new VerifyUserObject($this->user, $company))->build());
             $nmo->company = $company;
@@ -42,9 +40,8 @@ class UserService
             NinjaMailerJob::dispatch($nmo, true);
 
             Ninja::registerNinjaUser($this->user);
-            
         } catch (\Exception $e) {
-            nlog("I couldn't send the verification email " . $e->getMessage());
+            nlog("I couldn't send the verification email ".$e->getMessage());
         }
 
         return $this->user;

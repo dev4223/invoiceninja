@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -23,12 +23,13 @@ use Illuminate\Support\Facades\Cache;
 class WePayController extends BaseController
 {
     use MakesHash;
-    
+
     /**
      * Initialize WePay Signup.
      */
     public function signup(string $token)
     {
+        // return render('gateways.wepay.signup.finished');
 
         $hash = Cache::get($token);
 
@@ -44,7 +45,6 @@ class WePayController extends BaseController
         $wepay_driver = new WePayPaymentDriver(new CompanyGateway, null, null);
 
         return $wepay_driver->setup($data);
-
     }
 
     public function finished()

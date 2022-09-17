@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -50,7 +50,7 @@ class VendorContactRepository extends BaseRepository
             $update_contact = null;
 
             if (isset($contact['id'])) {
-                $update_contact = VendorContact::find($this->decodePrimaryKey($contact['id']));
+                $update_contact = VendorContact::find($contact['id']);
             }
 
             if (! $update_contact) {

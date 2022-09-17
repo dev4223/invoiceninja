@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -32,7 +32,6 @@ class VerifyCsrfToken extends Middleware
         // 'livewire/message/*'
     ];
 
-
     // public function handle($request, \Closure $next) {
 
     //     try {
@@ -43,5 +42,4 @@ class VerifyCsrfToken extends Middleware
 
     //     }
     // }
-
 }

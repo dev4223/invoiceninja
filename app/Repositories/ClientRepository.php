@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -17,6 +17,7 @@ use App\Models\Company;
 use App\Utils\Traits\ClientGroupSettingsSaver;
 use App\Utils\Traits\GeneratesCounter;
 use App\Utils\Traits\SavesDocuments;
+use Illuminate\Database\QueryException;
 
 /**
  * ClientRepository.
@@ -25,6 +26,8 @@ class ClientRepository extends BaseRepository
 {
     use GeneratesCounter;
     use SavesDocuments;
+
+    private bool $completed = true;
 
     /**
      * @var ClientContactRepository
@@ -39,7 +42,7 @@ class ClientRepository extends BaseRepository
     {
         $this->contact_repo = $contact_repo;
     }
-    
+
     /**
      * Saves the client and its contacts.
      *
@@ -55,29 +58,45 @@ class ClientRepository extends BaseRepository
     {
 
         /* When uploading documents, only the document array is sent, so we must return early*/
-        if (array_key_exists('documents', $data) && count($data['documents']) >=1) {
+        if (array_key_exists('documents', $data) && count($data['documents']) >= 1) {
             $this->saveDocuments($data['documents'], $client);
+
             return $client;
         }
 
         $client->fill($data);
 
-
         if (array_key_exists('settings', $data)) {
             $client->saveSettings($data['settings'], $client);
         }
 
-        if(!$client->country_id){
+        if (! $client->country_id) {
             $company = Company::find($client->company_id);
             $client->country_id = $company->settings->country_id;
         }
 
         $client->save();
 
-        
-        if (!isset($client->number) || empty($client->number) || strlen($client->number) == 0) {
-            $client->number = $this->getNextClientNumber($client);
-            $client->save();
+        if (! isset($client->number) || empty($client->number) || strlen($client->number) == 0) {
+            // $client->number = $this->getNextClientNumber($client);
+            // $client->save();
+
+            $x = 1;
+
+            do {
+                try {
+                    $client->number = $this->getNextClientNumber($client);
+                    $client->saveQuietly();
+
+                    $this->completed = false;
+                } catch (QueryException $e) {
+                    $x++;
+
+                    if ($x > 10) {
+                        $this->completed = false;
+                    }
+                }
+            } while ($this->completed);
         }
 
         if (empty($data['name'])) {
@@ -105,7 +124,6 @@ class ClientRepository extends BaseRepository
 
     public function purge($client)
     {
-
         $client->contacts()->forceDelete();
         $client->tasks()->forceDelete();
         $client->invoices()->forceDelete();
@@ -122,6 +140,5 @@ class ClientRepository extends BaseRepository
         $client->documents()->forceDelete();
         $client->payments()->forceDelete();
         $client->forceDelete();
-
     }
 }

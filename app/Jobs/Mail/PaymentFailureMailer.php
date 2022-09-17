@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -77,13 +77,14 @@ class PaymentFailureMailer implements ShouldQueue
         MultiDB::setDb($this->company->db);
 
         //iterate through company_users
-        $this->company->company_users->each(function ($company_user) {        
+        $this->company->company_users->each(function ($company_user) {
 
             //determine if this user has the right permissions
-            $methods = $this->findCompanyUserNotificationType($company_user, ['payment_failure_all','payment_failure', 'payment_failure_user', 'all_notifications']);
+            $methods = $this->findCompanyUserNotificationType($company_user, ['payment_failure_all', 'payment_failure', 'payment_failure_user', 'all_notifications']);
 
-            if(!is_string($this->error))
-                $this->error = "Undefined error. Please contact the administrator for further information.";
+            if (! is_string($this->error)) {
+                $this->error = 'Undefined error. Please contact the administrator for further information.';
+            }
 
             //if mail is a method type -fire mail!!
             if (($key = array_search('mail', $methods)) !== false) {
@@ -98,7 +99,6 @@ class PaymentFailureMailer implements ShouldQueue
                 $nmo->settings = $this->settings;
 
                 NinjaMailerJob::dispatch($nmo);
-
             }
         });
 

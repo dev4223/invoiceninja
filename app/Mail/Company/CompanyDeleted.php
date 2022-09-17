@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -29,6 +29,7 @@ class CompanyDeleted extends Mailable
     public $user;
 
     public $settings;
+
     /**
      * Create a new message instance.
      *
@@ -50,7 +51,6 @@ class CompanyDeleted extends Mailable
     public function build()
     {
         App::forgetInstance('translator');
-        App::setLocale($this->account->default_company->getLocale());
         $t = app('translator');
         $t->replace(Ninja::transformTranslations($this->settings));
 

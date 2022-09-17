@@ -44,13 +44,9 @@
                             </div>
                             @endif
 
-
-
                     </div>
 
-
-
-                                @if($quote->invoice_id) 
+                                @if($quote->invoice()->exists())
                                     <div class="mt-5 sm:mt-0 sm:ml-6 flex justify-end">
                                         <div class="inline-flex rounded-md shadow-sm">
                                             <a class="button button-primary bg-primary" href="/client/invoices/{{ $quote->invoice->hashed_id }}">{{ ctrans('texts.view_invoice') }}</a>
@@ -109,7 +105,7 @@
     @endif
 
     @include('portal.ninja2020.components.entity-documents', ['entity' => $quote])
-    @include('portal.ninja2020.components.pdf-viewer', ['entity' => $quote])
+    @include('portal.ninja2020.components.pdf-viewer', ['entity' => $quote, 'invitation' => $invitation])
     @include('portal.ninja2020.invoices.includes.terms', ['entities' => [$quote], 'entity_type' => ctrans('texts.quote')])
     @include('portal.ninja2020.invoices.includes.signature')
 @endsection

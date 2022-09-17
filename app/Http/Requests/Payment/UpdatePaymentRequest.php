@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -36,13 +36,14 @@ class UpdatePaymentRequest extends Request
     public function rules()
     {
         $rules = [
-            'invoices' => ['array', new PaymentAppliedValidAmount, new ValidCreditsPresentRule],
+            'invoices' => ['array', new PaymentAppliedValidAmount, new ValidCreditsPresentRule($this->all())],
             'invoices.*.invoice_id' => 'distinct',
             'documents' => 'mimes:png,ai,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx',
         ];
 
-        if($this->number)
+        if ($this->number) {
             $rules['number'] = Rule::unique('payments')->where('company_id', auth()->user()->company()->id)->ignore($this->payment->id);
+        }
 
         if ($this->input('documents') && is_array($this->input('documents'))) {
             $documents = count($this->input('documents'));
@@ -57,7 +58,7 @@ class UpdatePaymentRequest extends Request
         return $rules;
     }
 
-    protected function prepareForValidation()
+    public function prepareForValidation()
     {
         $input = $this->all();
 
@@ -73,7 +74,17 @@ class UpdatePaymentRequest extends Request
 
         if (isset($input['invoices']) && is_array($input['invoices']) !== false) {
             foreach ($input['invoices'] as $key => $value) {
-                $input['invoices'][$key]['invoice_id'] = $this->decodePrimaryKey($value['invoice_id']);
+                if (array_key_exists('invoice_id', $input['invoices'][$key])) {
+                    $input['invoices'][$key]['invoice_id'] = $this->decodePrimaryKey($value['invoice_id']);
+                }
+            }
+        }
+
+        if (isset($input['credits']) && is_array($input['credits']) !== false) {
+            foreach ($input['credits'] as $key => $value) {
+                if (array_key_exists('credits', $input['credits'][$key])) {
+                    $input['credits'][$key]['credit_id'] = $this->decodePrimaryKey($value['credit_id']);
+                }
             }
         }
         $this->replace($input);

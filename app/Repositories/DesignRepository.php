@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -19,11 +19,9 @@ use Illuminate\Support\Str;
  */
 class DesignRepository extends BaseRepository
 {
-
     public function delete($design) :Design
     {
-
-        $design->name = $design->name . "_deleted_" . Str::random(5);
+        $design->name = $design->name.'_deleted_'.Str::random(5);
 
         parent::delete($design);
 

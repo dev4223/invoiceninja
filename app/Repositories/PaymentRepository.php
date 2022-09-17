@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -66,31 +66,45 @@ class PaymentRepository extends BaseRepository {
 
         //check currencies here and fill the exchange rate data if necessary
         if (! $payment->id) {
-            $this->processExchangeRates($data, $payment);
+            $payment = $this->processExchangeRates($data, $payment);
+
+            /* This is needed here otherwise the ->fill() overwrites anything that exists*/
+            if($payment->exchange_rate != 1)
+                unset($data['exchange_rate']);
 
             $is_existing_payment = false;
-            $client = Client::where('id', $data['client_id'])->withTrashed()->first();
 
-            /*We only update the paid to date ONCE per payment*/
-            if (array_key_exists('invoices', $data) && is_array($data['invoices']) && count($data['invoices']) > 0) {
-                if ($data['amount'] == '') {
-                    $data['amount'] = array_sum(array_column($data['invoices'], 'amount'));
+            \DB::connection(config('database.default'))->transaction(function () use ($data) {
+
+                $client = Client::where('id', $data['client_id'])->withTrashed()->lockForUpdate()->first();
+
+                /*We only update the paid to date ONCE per payment*/
+                if (array_key_exists('invoices', $data) && is_array($data['invoices']) && count($data['invoices']) > 0) {
+                    if ($data['amount'] == '') {
+                        $data['amount'] = array_sum(array_column($data['invoices'], 'amount'));
+                    }
+
+                    $client->service()->updatePaidToDate($data['amount'])->save();
+                    // $client->paid_to_date += $data['amount'];
+                    $client->save();
                 }
 
-                $client->service()->updatePaidToDate($data['amount'])->save();
-            }
-            // elseif($data['amount'] >0){
-            else{
-                //this fixes an edge case with unapplied payments
-                $client->service()->updatePaidToDate($data['amount'])->save();
-            }
+                else{
+                    //this fixes an edge case with unapplied payments
+                    $client->service()->updatePaidToDate($data['amount'])->save();
+                    // $client->paid_to_date += $data['amount'];
+                    $client->save();
+                }
 
-            if (array_key_exists('credits', $data) && is_array($data['credits']) && count($data['credits']) > 0) {
-                $_credit_totals = array_sum(array_column($data['credits'], 'amount'));
+                if (array_key_exists('credits', $data) && is_array($data['credits']) && count($data['credits']) > 0) {
+                    $_credit_totals = array_sum(array_column($data['credits'], 'amount'));
 
-                $client->service()->updatePaidToDate($_credit_totals)->save();
-                
-            }
+                    $client->service()->updatePaidToDate($_credit_totals)->save();
+                    // $client->paid_to_date += $_credit_totals;
+                    $client->save();
+                }
+
+             }, 1);
 
         }
 
@@ -100,7 +114,12 @@ class PaymentRepository extends BaseRepository {
         $payment->status_id = Payment::STATUS_COMPLETED;
 
         if (! $payment->currency_id && $client) {
-            $payment->currency_id = $client->company->settings->currency_id;
+
+            if(property_exists($client->settings, 'currency_id'))
+                $payment->currency_id = $client->settings->currency_id;
+            else    
+                $payment->currency_id = $client->company->settings->currency_id;
+            
         }
 
         $payment->save();
@@ -112,7 +131,8 @@ class PaymentRepository extends BaseRepository {
 
         /*Ensure payment number generated*/
         if (! $payment->number || strlen($payment->number) == 0) {
-            $payment->number = $payment->client->getNextPaymentNumber($payment->client, $payment);
+            // $payment->number = $payment->client->getNextPaymentNumber($payment->client, $payment);
+            $payment->service()->applyNumber();
         }
 
         /*Set local total variables*/
@@ -130,7 +150,8 @@ class PaymentRepository extends BaseRepository {
 
             //todo optimize this into a single query
             foreach ($data['invoices'] as $paid_invoice) {
-                $invoice = Invoice::withTrashed()->whereId($paid_invoice['invoice_id'])->first();
+                // $invoice = Invoice::withTrashed()->whereId($paid_invoice['invoice_id'])->first();
+                $invoice = $invoices->firstWhere('id', $paid_invoice['invoice_id']);
 
                 if ($invoice) {
                     $invoice = $invoice->service()
@@ -148,16 +169,20 @@ class PaymentRepository extends BaseRepository {
         if (array_key_exists('credits', $data) && is_array($data['credits'])) {
             $credit_totals = array_sum(array_column($data['credits'], 'amount'));
 
-            $credits = Credit::whereIn('id', $this->transformKeys(array_column($data['credits'], 'credit_id')))->get();
+            // $credits = Credit::whereIn('id', $this->transformKeys(array_column($data['credits'], 'credit_id')))->get();
+
+            $credits = Credit::whereIn('id', array_column($data['credits'], 'credit_id'))->get();
+
             $payment->credits()->saveMany($credits);
 
             //todo optimize into a single query
             foreach ($data['credits'] as $paid_credit) {
-                $credit = Credit::withTrashed()->find($this->decodePrimaryKey($paid_credit['credit_id']));
-
+                // $credit = Credit::withTrashed()->find($paid_credit['credit_id']);
+                $credit = $credits->firstWhere('id', $paid_credit['credit_id']);
+                
                 if ($credit) {
                     $credit = $credit->service()->markSent()->save();
-                    ApplyCreditPayment::dispatchNow($credit, $payment, $paid_credit['amount'], $credit->company);
+                    (new ApplyCreditPayment($credit, $payment, $paid_credit['amount'], $credit->company))->handle();
                 }
             }
         }
@@ -186,7 +211,7 @@ class PaymentRepository extends BaseRepository {
 
         TransactionLog::dispatch(TransactionEvent::PAYMENT_MADE, $transaction, $payment->company->db);
 
-        return $payment->fresh();
+        return $payment->refresh();
     }
 
     /**
@@ -199,8 +224,9 @@ class PaymentRepository extends BaseRepository {
     public function processExchangeRates($data, $payment)
     {
 
-        if(array_key_exists('exchange_rate', $data) && isset($data['exchange_rate']))
+        if(array_key_exists('exchange_rate', $data) && isset($data['exchange_rate']) && $data['exchange_rate'] != 1){
             return $payment;
+        }
 
         $client = Client::withTrashed()->find($data['client_id']);
 
@@ -212,7 +238,6 @@ class PaymentRepository extends BaseRepository {
             $exchange_rate = new CurrencyApi();
 
             $payment->exchange_rate = $exchange_rate->exchangeRate($client_currency, $company_currency, Carbon::parse($payment->date));
-            // $payment->exchange_currency_id = $client_currency;
             $payment->exchange_currency_id = $company_currency;
             $payment->currency_id = $client_currency;
 
@@ -220,7 +245,6 @@ class PaymentRepository extends BaseRepository {
         }
         
         $payment->currency_id = $company_currency;
-
 
         return $payment;
     }
@@ -237,7 +261,7 @@ class PaymentRepository extends BaseRepository {
         event(new PaymentWasDeleted($payment, $payment->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
 
         return $payment;
-        //return parent::delete($payment);
+
     }
 
     public function restore($payment)

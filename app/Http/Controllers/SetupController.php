@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -32,11 +32,11 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
-use \Illuminate\Support\Facades\DB;
 
 /**
  * Class SetupController.
@@ -49,13 +49,14 @@ class SetupController extends Controller
     {
         $check = SystemHealth::check(false);
 
-        if ($check['system_health'] == true && $check['simple_db_check'] && Schema::hasTable('accounts') && $account = Account::all()->first()) {
+        if ($check['system_health'] == true && $check['simple_db_check'] && Schema::hasTable('accounts') && $account = Account::first()) {
             return redirect('/');
         }
 
-        if(Ninja::isHosted())
+        if (Ninja::isHosted()) {
             return redirect('/');
-        
+        }
+
         return view('setup.index', ['check' => $check]);
     }
 
@@ -139,15 +140,15 @@ class SetupController extends Controller
             Artisan::call('optimize');
             Artisan::call('migrate', ['--force' => true]);
             Artisan::call('db:seed', ['--force' => true]);
-            
+
             Storage::disk('local')->delete('test.pdf');
 
             /* Create the first account. */
             if (Account::count() == 0) {
-                CreateAccount::dispatchNow($request->all(), $request->getClientIp());
+                (new CreateAccount($request->all(), $request->getClientIp()))->handle();
             }
 
-            VersionCheck::dispatchNow();
+            (new VersionCheck())->handle();
 
             $this->buildCache(true);
 
@@ -211,29 +212,31 @@ class SetupController extends Controller
     public function checkPdf(Request $request)
     {
         try {
-            if (config('ninja.pdf_generator') == 'phantom') {
-                return $this->testPhantom();
-            }
 
-            $pdf = new Snappdf();
+            // if (config('ninja.pdf_generator') == 'phantom') {
+            //     return $this->testPhantom();
+            // }
 
-            if (config('ninja.snappdf_chromium_path')) {
-                $pdf->setChromiumPath(config('ninja.snappdf_chromium_path'));
-            }
+            // $pdf = new Snappdf();
 
-            if (config('ninja.snappdf_chromium_arguments')) {
-                $pdf->clearChromiumArguments();
-                $pdf->addChromiumArguments(config('ninja.snappdf_chromium_arguments'));
-            }
+            // if (config('ninja.snappdf_chromium_path')) {
+            //     $pdf->setChromiumPath(config('ninja.snappdf_chromium_path'));
+            // }
 
-            $pdf = $pdf
-                ->setHtml('GENERATING PDFs WORKS! Thank you for using Invoice Ninja!')
-                ->generate();
+            // if (config('ninja.snappdf_chromium_arguments')) {
+            //     $pdf->clearChromiumArguments();
+            //     $pdf->addChromiumArguments(config('ninja.snappdf_chromium_arguments'));
+            // }
 
-            Storage::disk(config('filesystems.default'))->put('test.pdf', $pdf);
-            Storage::disk('local')->put('test.pdf', $pdf);
+            // $pdf = $pdf
+            //     ->setHtml('GENERATING PDFs WORKS! Thank you for using Invoice Ninja!')
+            //     ->generate();
 
-            return response(['url' => Storage::disk('local')->url('test.pdf')], 200);
+            // Storage::disk(config('filesystems.default'))->put('test.pdf', $pdf);
+            // Storage::disk('local')->put('test.pdf', $pdf);
+            return response(['url' => ''], 200);
+
+            // return response(['url' => Storage::disk('local')->url('test.pdf')], 200);
         } catch (Exception $e) {
             nlog($e->getMessage());
 
@@ -261,47 +264,46 @@ class SetupController extends Controller
 
     public function clearCompiledCache()
     {
- 
-       $cacheCompiled = base_path('bootstrap/cache/compiled.php');
+        $cacheCompiled = base_path('bootstrap/cache/compiled.php');
         if (file_exists($cacheCompiled)) {
-            unlink ($cacheCompiled);
+            unlink($cacheCompiled);
         }
 
         $cacheServices = base_path('bootstrap/cache/packages.php');
         if (file_exists($cacheServices)) {
-            unlink ($cacheServices);
+            unlink($cacheServices);
         }
 
         $cacheServices = base_path('bootstrap/cache/services.php');
         if (file_exists($cacheServices)) {
-            unlink ($cacheServices);
+            unlink($cacheServices);
         }
 
         $cacheRoute = base_path('bootstrap/cache/routes-v7.php');
         if (file_exists($cacheRoute)) {
-            unlink ($cacheRoute);
-        }  
+            unlink($cacheRoute);
+        }
     }
 
     public function update()
     {
-
-        if(!request()->has('secret') || (request()->input('secret') != config('ninja.update_secret')) )
+        if (! request()->has('secret') || (request()->input('secret') != config('ninja.update_secret'))) {
             return redirect('/');
+        }
 
         $cacheCompiled = base_path('bootstrap/cache/compiled.php');
         if (file_exists($cacheCompiled)) {
-            unlink ($cacheCompiled);
+            unlink($cacheCompiled);
         }
 
         $cacheServices = base_path('bootstrap/cache/services.php');
         if (file_exists($cacheServices)) {
-            unlink ($cacheServices);
+            unlink($cacheServices);
         }
 
         $cacheRoute = base_path('bootstrap/cache/routes-v7.php');
         if (file_exists($cacheRoute)) {
-            unlink ($cacheRoute);
+            unlink($cacheRoute);
         }
 
         Artisan::call('clear-compiled');
@@ -314,9 +316,8 @@ class SetupController extends Controller
 
         $this->buildCache(true);
 
-        SchedulerCheck::dispatchNow();
-        
-        return redirect('/');
+        (new SchedulerCheck())->handle();
 
+        return redirect('/');
     }
 }

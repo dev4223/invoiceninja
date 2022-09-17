@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -51,7 +51,7 @@ class TaskArchivedActivity implements ShouldQueue
         $fields->user_id = $user_id;
         $fields->company_id = $task->company_id;
         $fields->activity_type_id = Activity::ARCHIVE_TASK;
-        
+
         $this->activity_repo->save($fields, $task, $event->event_vars);
     }
 }

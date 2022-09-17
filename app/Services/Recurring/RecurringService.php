@@ -4,13 +4,14 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Recurring;
 
+use App\Jobs\RecurringInvoice\SendRecurring;
 use App\Jobs\Util\UnlinkFile;
 use App\Models\RecurringInvoice;
 use App\Services\Recurring\GetInvoicePdf;
@@ -87,7 +88,7 @@ class RecurringService
 
         $this->recurring_entity->invitations->each(function ($invitation){
 
-        UnlinkFile::dispatchNow(config('filesystems.default'), $this->recurring_entity->client->recurring_invoice_filepath($invitation) . $this->recurring_entity->numberFormatter().'.pdf');
+        (new UnlinkFile(config('filesystems.default'), $this->recurring_entity->client->recurring_invoice_filepath($invitation) . $this->recurring_entity->numberFormatter().'.pdf'))->handle();
         
         });
 
@@ -106,7 +107,33 @@ class RecurringService
             $this->stop();
         }
         
+        if ($request->has('send_now') && $request->input('send_now') == 'true' && $this->recurring_entity->invoices()->count() == 0) {
+            $this->sendNow();
+
+            return $this;
+        }
+
+        if(isset($this->recurring_entity->client))
+        {
+            $offset = $this->recurring_entity->client->timezone_offset();
+            $this->recurring_entity->next_send_date = Carbon::parse($this->recurring_entity->next_send_date_client)->startOfDay()->addSeconds($offset);
+        }
+
         return $this;
+    }
+
+    public function sendNow()
+    {
+    
+        if($this->recurring_entity instanceof RecurringInvoice && $this->recurring_entity->status_id == RecurringInvoice::STATUS_DRAFT){
+            $this->start()->save();
+            SendRecurring::dispatchSync($this->recurring_entity, $this->recurring_entity->company->db); 
+        }
+
+        $this->recurring_entity = $this->recurring_entity->fresh();
+
+        return $this;
+
     }
 
     public function fillDefaults()

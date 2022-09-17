@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -24,7 +24,6 @@ class ValidSubdomain implements Rule
      * @param mixed $value
      * @return bool
      */
-    
     private $input;
 
     public function __construct($input)
@@ -34,8 +33,9 @@ class ValidSubdomain implements Rule
 
     public function passes($attribute, $value)
     {
-        if(empty($input['subdomain']))
+        if (empty($input['subdomain'])) {
             return true;
+        }
 
         return MultiDB::checkDomainAvailable($input['subdomain']);
     }

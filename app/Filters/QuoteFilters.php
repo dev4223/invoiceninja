@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -93,6 +93,9 @@ class QuoteFilters extends QueryFilters
     public function sort(string $sort) : Builder
     {
         $sort_col = explode('|', $sort);
+
+        if($sort_col[0] == 'valid_until')
+            $sort_col[0] = 'due_date';
 
         return $this->builder->orderBy($sort_col[0], $sort_col[1]);
     }

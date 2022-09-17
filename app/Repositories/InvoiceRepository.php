@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -21,7 +21,6 @@ use App\Utils\Traits\MakesHash;
 class InvoiceRepository extends BaseRepository
 {
     use MakesHash;
-
 
     /**
      * Saves the invoices.
@@ -69,7 +68,6 @@ class InvoiceRepository extends BaseRepository
             return $invoice;
         }
 
-//        $invoice->service()->markDeleted()->handleCancellation()->save();
         $invoice = $invoice->service()->markDeleted()->save();
 
         parent::delete($invoice);
@@ -86,7 +84,7 @@ class InvoiceRepository extends BaseRepository
     public function restore($invoice) :Invoice
     {
         //if we have just archived, only perform a soft restore
-        if (!$invoice->is_deleted) {
+        if (! $invoice->is_deleted) {
             parent::restore($invoice);
 
             return $invoice;

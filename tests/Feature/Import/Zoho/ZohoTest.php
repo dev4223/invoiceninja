@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace Tests\Feature\Import\Zoho;
@@ -22,6 +22,7 @@ use App\Utils\Traits\MakesHash;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Tests\MockAccountData;
 use Tests\TestCase;
@@ -34,11 +35,13 @@ class ZohoTest extends TestCase
 {
     use MakesHash;
     use MockAccountData;
-    use DatabaseTransactions;
+    // use DatabaseTransactions;
 
-    public function setUp(): void
+    protected function setUp(): void
     {
         parent::setUp();
+
+        Session::start();
 
         $this->withoutMiddleware(ThrottleRequests::class);
 
@@ -52,7 +55,7 @@ class ZohoTest extends TestCase
     public function testClientZohoImport()
     {
         $csv = file_get_contents(
-            base_path() . '/tests/Feature/Import/zoho_contacts.csv'
+            base_path().'/tests/Feature/Import/zoho_contacts.csv'
         );
         $hash = Str::random(32);
 
@@ -107,7 +110,7 @@ class ZohoTest extends TestCase
             47 => 'Customer Address ID',
             48 => 'Source',
             49 => 'Reference ID',
-            50 => 'Payment Reminder',       
+            50 => 'Payment Reminder',
         ];
 
         $data = [
@@ -117,7 +120,7 @@ class ZohoTest extends TestCase
             'import_type' => 'zoho',
         ];
 
-        Cache::put($hash . '-client', base64_encode($csv), 360);
+        Cache::put($hash.'-client', base64_encode($csv), 360);
 
         $csv_importer = new Zoho($data, $this->company);
 
@@ -137,15 +140,13 @@ class ZohoTest extends TestCase
         $this->assertInstanceOf(Client::class, $client);
         $this->assertEquals('1', $client->settings->currency_id);
         $this->assertEquals('888-867-5309', $client->phone);
-
-        
     }
 
     public function testInvoiceZohoImport()
     {
         //first import all the clients
         $csv = file_get_contents(
-            base_path() . '/tests/Feature/Import/zoho_contacts.csv'
+            base_path().'/tests/Feature/Import/zoho_contacts.csv'
         );
         $hash = Str::random(32);
 
@@ -200,7 +201,7 @@ class ZohoTest extends TestCase
             47 => 'Customer Address ID',
             48 => 'Source',
             49 => 'Reference ID',
-            50 => 'Payment Reminder',       
+            50 => 'Payment Reminder',
         ];
 
         $data = [
@@ -210,7 +211,7 @@ class ZohoTest extends TestCase
             'import_type' => 'zoho',
         ];
 
-        Cache::put($hash . '-client', base64_encode($csv), 360);
+        Cache::put($hash.'-client', base64_encode($csv), 360);
 
         $csv_importer = new Zoho($data, $this->company);
 
@@ -219,7 +220,7 @@ class ZohoTest extends TestCase
         //now import the invoices
 
         $csv = file_get_contents(
-            base_path() . '/tests/Feature/Import/zoho_invoices.csv'
+            base_path().'/tests/Feature/Import/zoho_invoices.csv'
         );
         $hash = Str::random(32);
 
@@ -306,7 +307,7 @@ class ZohoTest extends TestCase
             79 => 'Shipping Country',
             80 => 'Shipping Code',
             81 => 'Shipping Fax',
-            82 => 'Shipping Phone Number',  
+            82 => 'Shipping Phone Number',
         ];
 
         $data = [
@@ -316,7 +317,7 @@ class ZohoTest extends TestCase
             'import_type' => 'zoho',
         ];
 
-        Cache::put($hash . '-invoice', base64_encode($csv), 360);
+        Cache::put($hash.'-invoice', base64_encode($csv), 360);
 
         $csv_importer = new Zoho($data, $this->company);
 
@@ -324,22 +325,18 @@ class ZohoTest extends TestCase
 
         $base_transformer = new BaseTransformer($this->company);
 
-        $this->assertTrue($base_transformer->hasInvoice("INV-000001"));
-        $this->assertTrue($base_transformer->hasInvoice("INV-000002"));
-        $this->assertTrue($base_transformer->hasInvoice("INV-000003"));
+        $this->assertTrue($base_transformer->hasInvoice('INV-000001'));
+        $this->assertTrue($base_transformer->hasInvoice('INV-000002'));
+        $this->assertTrue($base_transformer->hasInvoice('INV-000003'));
 
-        $invoice_id = $base_transformer->getInvoiceId("INV-000003");
+        $invoice_id = $base_transformer->getInvoiceId('INV-000003');
         $invoice = Invoice::find($invoice_id);
 
-        $this->assertEquals(390 , $invoice->amount);
-        $this->assertEquals(1 , $invoice->status_id);
-        $this->assertEquals(0 , $invoice->balance);
-        $this->assertEquals(4 , count($invoice->line_items));
+        $this->assertEquals(390, $invoice->amount);
+        $this->assertEquals(1, $invoice->status_id);
+        $this->assertEquals(0, $invoice->balance);
+        $this->assertEquals(4, count($invoice->line_items));
 
         $this->assertFalse($invoice->payments()->exists());
-
     }
-
-
 }
-

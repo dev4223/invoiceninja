@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -41,7 +41,8 @@ class TaskStatusRepository extends BaseRepository
 	public function archive($task_status)
 	{
 
-        $task_status = TaskStatus::where('company_id', $task_status->company_id)
+        $task_status = TaskStatus::where('id', $task_status->id)
+                                 ->where('company_id', $task_status->company_id)
                                  ->first();
 
         $new_status = $task_status ? $task_status->id : null;

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -48,7 +48,8 @@ class Ninja
             'White Label: '.'\\n'. // TODO: Implement white label with hasFeature.
             'Server OS: '.php_uname('s').' '.php_uname('r').'\\n'.
             'PHP Version: '.phpversion().'\\n'.
-            'MySQL Version: '.$mysql_version;
+            'MySQL Version: '.$mysql_version.'\\n'.
+            'Version: '.request()->has('version') ? request()->input('version') : 'No Version Supplied.';
 
         return $info;
     }
@@ -113,15 +114,15 @@ class Ninja
 
     public static function eventVars($user_id = null)
     {
+        $ip = '';
 
-            $ip = '';
-            
-            if(request()->hasHeader('Cf-Connecting-Ip'))
-                $ip = request()->header('Cf-Connecting-Ip');
-            elseif(request()->hasHeader('X-Forwarded-For'))
-                $ip = request()->header('X-Forwarded-For');
-            else
-                $ip = request()->ip() ?: ' ';
+        if (request()->hasHeader('Cf-Connecting-Ip')) {
+            $ip = request()->header('Cf-Connecting-Ip');
+        } elseif (request()->hasHeader('X-Forwarded-For')) {
+            $ip = request()->header('X-Forwarded-For');
+        } else {
+            $ip = request()->ip() ?: ' ';
+        }
 
         return [
             'ip' => $ip,
@@ -135,7 +136,7 @@ class Ninja
     {
         $translations = [];
 
-        $trans = (array)$settings->translations;
+        $trans = (array) $settings->translations;
 
         if (count($trans) == 0) {
             return $translations;
@@ -180,29 +181,37 @@ class Ninja
 
     //     return implode('-', $parts);
     // }
-    // 
-    
+    //
+
     /*
      * Available - but not recommended for use
      *
-     * This will guarantee a given string IS the correct format for a 
+     * This will guarantee a given string IS the correct format for a
      * base64 encoded string ,
      * but can't guarantee that it is a base64 encoded string
-     *  
+     *
      */
     public static function isBase64Encoded(string $s) : bool
     {
 
     // Check if there are valid base64 characters
-    if (!preg_match('/^[a-zA-Z0-9\/\r\n+]*={0,2}$/', $s)) return false;
-    // Decode the string in strict mode and check the results
-    $decoded = base64_decode($s, true);
-    if(false === $decoded) return false;
-    // if string returned contains not printable chars
-    if (0 < preg_match('/((?![[:graph:]])(?!\s)(?!\p{L}))./', $decoded, $matched)) return false;
-    // Encode the string again
-    if(base64_encode($decoded) != $s) return false;
-    return true;
+        if (! preg_match('/^[a-zA-Z0-9\/\r\n+]*={0,2}$/', $s)) {
+            return false;
+        }
+        // Decode the string in strict mode and check the results
+        $decoded = base64_decode($s, true);
+        if (false === $decoded) {
+            return false;
+        }
+        // if string returned contains not printable chars
+        if (0 < preg_match('/((?![[:graph:]])(?!\s)(?!\p{L}))./', $decoded, $matched)) {
+            return false;
+        }
+        // Encode the string again
+        if (base64_encode($decoded) != $s) {
+            return false;
+        }
 
+        return true;
     }
 }

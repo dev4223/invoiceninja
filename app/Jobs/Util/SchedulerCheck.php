@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -38,15 +38,12 @@ class SchedulerCheck implements ShouldQueue
     {
         set_time_limit(0);
 
-        if(config('ninja.app_version') != base_path('VERSION.txt'))
-        {
-
-             try {
+        if (config('ninja.app_version') != base_path('VERSION.txt')) {
+            try {
                 Artisan::call('migrate', ['--force' => true]);
             } catch (\Exception $e) {
                 nlog("I wasn't able to migrate the data.");
                 nlog($e->getMessage());
-
             }
 
             try {
@@ -58,7 +55,6 @@ class SchedulerCheck implements ShouldQueue
                 nlog($e->getMessage());
             }
 
-
             try {
                 Artisan::call('view:clear');
             } catch (\Exception $e) {
@@ -66,10 +62,7 @@ class SchedulerCheck implements ShouldQueue
                 nlog($e->getMessage());
             }
 
-
-        VersionCheck::dispatch();
-
+            VersionCheck::dispatch();
         }
-
     }
 }

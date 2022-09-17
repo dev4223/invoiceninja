@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -39,17 +39,19 @@ class UserVerified
      */
     public function handle($request, Closure $next)
     {
-        if(Ninja::isSelfHost())
+        if (Ninja::isSelfHost()) {
             return $next($request);
+        }
 
         $error = [
             'message' => 'Email confirmation required.',
             'errors' => new \stdClass,
         ];
 
-        if ($this->user && !$this->user->isVerified()) 
+        if ($this->user && ! $this->user->isVerified()) {
             return response()->json($error, 403);
-        
+        }
+
         return $next($request);
     }
 }

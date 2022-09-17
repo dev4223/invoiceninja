@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -23,6 +23,7 @@ use App\Http\Requests\CompanyGateway\UpdateCompanyGatewayRequest;
 use App\Jobs\Util\ApplePayDomain;
 use App\Models\Client;
 use App\Models\CompanyGateway;
+use App\PaymentDrivers\Stripe\Jobs\StripeWebhook;
 use App\Repositories\CompanyRepository;
 use App\Transformers\CompanyGatewayTransformer;
 use App\Utils\Traits\MakesHash;
@@ -47,7 +48,6 @@ class CompanyGatewayController extends BaseController
     public $forced_includes = [];
 
     private array $stripe_keys = ['d14dd26a47cecc30fdd65700bfb67b34', 'd14dd26a37cecc30fdd65700bfb55b23'];
-
 
     /**
      * CompanyGatewayController constructor.
@@ -199,8 +199,7 @@ class CompanyGatewayController extends BaseController
         $company_gateway->save();
 
         /*Always ensure at least one fees and limits object is set per gateway*/
-        if(!isset($company_gateway->fees_and_limits)) {
-
+        if (! isset($company_gateway->fees_and_limits)) {
             $gateway_types = $company_gateway->driver(new Client)->gatewayTypes();
 
             $fees_and_limits = new \stdClass;
@@ -211,6 +210,10 @@ class CompanyGatewayController extends BaseController
         }
 
         ApplePayDomain::dispatch($company_gateway, $company_gateway->company->db);
+
+        if (in_array($company_gateway->gateway_key, $this->stripe_keys)) {
+            StripeWebhook::dispatch($company_gateway->company->company_key, $company_gateway->id);
+        }
 
         return $this->itemResponse($company_gateway);
     }
@@ -442,14 +445,12 @@ class CompanyGatewayController extends BaseController
      */
     public function destroy(DestroyCompanyGatewayRequest $request, CompanyGateway $company_gateway)
     {
-
         $company_gateway->driver(new Client)
                          ->disconnect();
 
         $company_gateway->delete();
 
         return $this->itemResponse($company_gateway->fresh());
-        
     }
 
     /**

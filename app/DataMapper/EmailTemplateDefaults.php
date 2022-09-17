@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -61,10 +61,13 @@ class EmailTemplateDefaults
                 break;
             case 'email_template_custom3':
                 return self::emailInvoiceTemplate();
+            case 'email_template_purchase_order':
+                return self::emailPurchaseOrderTemplate();
                 break;
 
             /* Subject */
-
+            case 'email_subject_purchase_order':
+                return self::emailPurchaseOrderSubject();
             case 'email_subject_invoice':
                 return self::emailInvoiceSubject();
                 break;
@@ -152,6 +155,18 @@ class EmailTemplateDefaults
         return ctrans('texts.payment_subject');
     }
 
+    public static function emailPurchaseOrderSubject()
+    {
+        return ctrans('texts.purchase_order_subject', ['number' => '$number', 'account' => '$account']);
+    }
+
+    public static function emailPurchaseOrderTemplate()
+    {
+        $purchase_order_message = '<p>$vendor<br><br>'.self::transformText('purchase_order_message').'</p><div class="center">$view_button</div>';
+
+        return $purchase_order_message;
+    }
+
     public static function emailPaymentTemplate()
     {
         $payment_message = '<p>$client<br><br>'.self::transformText('payment_message').'<br><br>$invoices</p><div class="center">$view_button</div>';
@@ -232,6 +247,6 @@ class EmailTemplateDefaults
     {
         //preformat the string, removing trailing colons.
 
-        return str_replace(':', '$', rtrim( ctrans('texts.'.$string), ":"));
+        return str_replace(':', '$', rtrim(ctrans('texts.'.$string), ':'));
     }
 }

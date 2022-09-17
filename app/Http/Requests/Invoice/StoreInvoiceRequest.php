@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -62,33 +62,42 @@ class StoreInvoiceRequest extends Request
 
         $rules['invitations.*.client_contact_id'] = 'distinct';
 
-        $rules['number'] = ['nullable', Rule::unique('invoices')->where('company_id', auth()->user()->company()->id)];
+        $rules['number'] = ['bail', 'nullable', Rule::unique('invoices')->where('company_id', auth()->user()->company()->id)];
 
-        $rules['project_id'] =  ['bail', 'sometimes', new ValidProjectForClient($this->all())];
+        $rules['project_id'] = ['bail', 'sometimes', new ValidProjectForClient($this->all())];
         $rules['is_amount_discount'] = ['boolean'];
-        
+
         $rules['line_items'] = 'array';
-        $rules['discount']  = 'sometimes|numeric';
+        $rules['discount'] = 'sometimes|numeric';
 
         return $rules;
     }
 
-    protected function prepareForValidation()
+    public function prepareForValidation()
     {
         $input = $this->all();
 
         $input = $this->decodePrimaryKeys($input);
 
-        $input['line_items'] = isset($input['line_items']) ? $this->cleanItems($input['line_items']) : [];
+        if (isset($input['line_items']) && is_array($input['line_items'])) {
+            $input['line_items'] = isset($input['line_items']) ? $this->cleanItems($input['line_items']) : [];
+        }
+
         $input['amount'] = 0;
         $input['balance'] = 0;
-        
-        if(array_key_exists('tax_rate1', $input) && is_null($input['tax_rate1']))
+
+        if (array_key_exists('tax_rate1', $input) && is_null($input['tax_rate1'])) {
             $input['tax_rate1'] = 0;
-        if(array_key_exists('tax_rate2', $input) && is_null($input['tax_rate2']))
+        }
+        if (array_key_exists('tax_rate2', $input) && is_null($input['tax_rate2'])) {
             $input['tax_rate2'] = 0;
-        if(array_key_exists('tax_rate3', $input) && is_null($input['tax_rate3']))
+        }
+        if (array_key_exists('tax_rate3', $input) && is_null($input['tax_rate3'])) {
             $input['tax_rate3'] = 0;
+        }
+        if (array_key_exists('exchange_rate', $input) && is_null($input['exchange_rate'])) {
+            $input['exchange_rate'] = 1;
+        }
 
         $this->replace($input);
     }

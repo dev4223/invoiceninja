@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -38,16 +38,16 @@ class UpdateTaskStatusRequest extends Request
         //     $rules['name'] = Rule::unique('task_statuses')->where('company_id', auth()->user()->company()->id)->ignore($this->task_status->id);
         // }
 
-
         return $rules;
     }
 
-    protected function prepareForValidation()
+    public function prepareForValidation()
     {
         $input = $this->all();
 
-            if(array_key_exists('color', $input) && is_null($input['color']))
-                $input['color'] = '';
+        if (array_key_exists('color', $input) && is_null($input['color'])) {
+            $input['color'] = '';
+        }
 
         $this->replace($input);
     }

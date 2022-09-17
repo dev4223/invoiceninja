@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -26,11 +26,10 @@ class PaymentTerm extends BaseModel
      * @var bool
      */
     public $timestamps = true;
+
     /**
      * @var array
      */
-    protected $dates = ['deleted_at'];
-
     protected $fillable = ['num_days'];
 
     public function getNumDays()

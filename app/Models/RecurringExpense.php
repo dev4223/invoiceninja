@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -63,6 +63,7 @@ class RecurringExpense extends BaseModel
         'last_sent_date',
         'next_send_date',
         'remaining_cycles',
+        'next_send_date_client',
     ];
 
     protected $casts = [
@@ -119,7 +120,43 @@ class RecurringExpense extends BaseModel
 
     public function nextSendDate() :?Carbon
     {
-        if (!$this->next_send_date) {
+        if (! $this->next_send_date) {
+            return null;
+        }
+
+        switch ($this->frequency_id) {
+            case RecurringInvoice::FREQUENCY_DAILY:
+                return Carbon::parse($this->next_send_date)->startOfDay()->addDay();
+            case RecurringInvoice::FREQUENCY_WEEKLY:
+                return Carbon::parse($this->next_send_date)->startOfDay()->addWeek();
+            case RecurringInvoice::FREQUENCY_TWO_WEEKS:
+                return Carbon::parse($this->next_send_date)->startOfDay()->addWeeks(2);
+            case RecurringInvoice::FREQUENCY_FOUR_WEEKS:
+                return Carbon::parse($this->next_send_date)->startOfDay()->addWeeks(4);
+            case RecurringInvoice::FREQUENCY_MONTHLY:
+                return Carbon::parse($this->next_send_date)->startOfDay()->addMonthNoOverflow();
+            case RecurringInvoice::FREQUENCY_TWO_MONTHS:
+                return Carbon::parse($this->next_send_date)->startOfDay()->addMonthsNoOverflow(2);
+            case RecurringInvoice::FREQUENCY_THREE_MONTHS:
+                return Carbon::parse($this->next_send_date)->startOfDay()->addMonthsNoOverflow(3);
+            case RecurringInvoice::FREQUENCY_FOUR_MONTHS:
+                return Carbon::parse($this->next_send_date)->startOfDay()->addMonthsNoOverflow(4);
+            case RecurringInvoice::FREQUENCY_SIX_MONTHS:
+                return Carbon::parse($this->next_send_date)->startOfDay()->addMonthsNoOverflow(6);
+            case RecurringInvoice::FREQUENCY_ANNUALLY:
+                return Carbon::parse($this->next_send_date)->startOfDay()->addYear();
+            case RecurringInvoice::FREQUENCY_TWO_YEARS:
+                return Carbon::parse($this->next_send_date)->startOfDay()->addYears(2);
+            case RecurringInvoice::FREQUENCY_THREE_YEARS:
+                return Carbon::parse($this->next_send_date)->startOfDay()->addYears(3);
+            default:
+                return null;
+        }
+    }
+
+    public function nextSendDateClient() :?Carbon
+    {
+        if (! $this->next_send_date) {
             return null;
         }
 
@@ -170,7 +207,7 @@ class RecurringExpense extends BaseModel
         /* Return early if nothing to send back! */
         if ($this->status_id == RecurringInvoice::STATUS_COMPLETED ||
             $this->remaining_cycles == 0 ||
-            !$this->next_send_date) {
+            ! $this->next_send_date) {
             return [];
         }
 
@@ -183,20 +220,19 @@ class RecurringExpense extends BaseModel
 
         $data = [];
 
-        if (!Carbon::parse($this->next_send_date)) {
+        if (! Carbon::parse($this->next_send_date)) {
             return $data;
         }
 
         $next_send_date = Carbon::parse($this->next_send_date)->copy();
 
-        for ($x=0; $x<$iterations; $x++) {
+        for ($x = 0; $x < $iterations; $x++) {
             // we don't add the days... we calc the day of the month!!
             $this->nextDateByFrequency($next_send_date);
 
             $data[] = [
                 'send_date' => $next_send_date->format('Y-m-d'),
             ];
-
         }
 
         return $data;
@@ -206,8 +242,9 @@ class RecurringExpense extends BaseModel
     {
         $offset = 0;
 
-        if($this->client)
+        if ($this->client) {
             $offset = $this->client->timezone_offset();
+        }
 
         switch ($this->frequency_id) {
             case RecurringInvoice::FREQUENCY_DAILY:

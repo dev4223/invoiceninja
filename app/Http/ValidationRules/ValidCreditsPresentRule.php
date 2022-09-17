@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -21,6 +21,13 @@ use Illuminate\Contracts\Validation\Rule;
 class ValidCreditsPresentRule implements Rule
 {
     use MakesHash;
+
+    private $input;
+
+    public function __construct($input)
+    {
+        $this->input = $input;
+    }
 
     /**
      * @param string $attribute
@@ -44,11 +51,10 @@ class ValidCreditsPresentRule implements Rule
     {
         //todo need to ensure the clients credits are here not random ones!
 
-        if (request()->input('credits') && is_array(request()->input('credits'))) {
-            $credit_collection = Credit::whereIn('id', $this->transformKeys(array_column(request()->input('credits'), 'credit_id')))
-                                       ->count();
+        if (array_key_exists('credits', $this->input) && is_array($this->input['credits']) && count($this->input['credits']) > 0) {
+            $credit_collection = Credit::whereIn('id', array_column($this->input['credits'], 'credit_id'))->count();
 
-            return $credit_collection == count(request()->input('credits'));
+            return $credit_collection == count($this->input['credits']);
         }
 
         return true;

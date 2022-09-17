@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -28,9 +28,7 @@ class ContactAccount
      */
     public function handle($request, Closure $next)
     {
-
-        if(!Ninja::isHosted()) {
-
+        if (! Ninja::isHosted()) {
             $account = Account::first();
 
             session()->put('account_key', $account->key);

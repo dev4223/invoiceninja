@@ -4,11 +4,10 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
-
 
 namespace App\Http\Requests\Setup;
 
@@ -33,15 +32,15 @@ class CheckDatabaseRequest extends Request
      */
     public function rules()
     {
-		if ( config( 'ninja.preconfigured_install' ) ) {
-			return [];
-		}
+        if (config('ninja.preconfigured_install')) {
+            return [];
+        }
 
-		return [
-			'db_host'     => [ 'required' ],
-			'db_port'     => [ 'required' ],
-			'db_database' => [ 'required' ],
-			'db_username' => [ 'required' ],
-		];
-	}
+        return [
+            'db_host'     => ['required'],
+            'db_port'     => ['required'],
+            'db_database' => ['required'],
+            'db_username' => ['required'],
+        ];
+    }
 }

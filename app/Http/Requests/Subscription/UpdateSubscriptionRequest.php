@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -36,7 +36,7 @@ class UpdateSubscriptionRequest extends Request
      */
     public function rules()
     {
-        $rules =  [
+        $rules = [
             'product_ids' => ['sometimes'],
             'recurring_product_ids' => ['sometimes'],
             'assigned_user_id' => ['sometimes'],
@@ -56,15 +56,13 @@ class UpdateSubscriptionRequest extends Request
             'allow_plan_changes' => ['sometimes'],
             'refund_period' => ['sometimes'],
             'webhook_configuration' => ['array'],
-            'name' => ['sometimes', Rule::unique('subscriptions')->where('company_id', auth()->user()->company()->id)->ignore($this->subscription->id)]
+            'name' => ['sometimes', Rule::unique('subscriptions')->where('company_id', auth()->user()->company()->id)->ignore($this->subscription->id)],
         ];
 
         return $this->globalRules($rules);
-
-
     }
 
-    protected function prepareForValidation()
+    public function prepareForValidation()
     {
         $input = $this->all();
 

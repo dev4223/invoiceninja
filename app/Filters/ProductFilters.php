@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class ProductFilters extends QueryFilters
 {
+    protected $with_property = 'product_key';
+
     /**
      * Filter based on search text.
      *
@@ -40,6 +42,15 @@ class ProductFilters extends QueryFilters
                           ->orWhere('products.custom_value3', 'like', '%'.$filter.'%')
                           ->orWhere('products.custom_value4', 'like', '%'.$filter.'%');
         });
+    }
+
+    public function product_key(string $filter = '') : Builder
+    {
+        if (strlen($filter) == 0) {
+            return $this->builder;
+        }
+
+        return  $this->builder->where('product_key', $filter);
     }
 
     /**

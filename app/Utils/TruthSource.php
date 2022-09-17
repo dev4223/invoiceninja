@@ -4,17 +4,15 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Utils;
 
-
 class TruthSource
 {
-
     public $company;
 
     public $user;
@@ -26,26 +24,30 @@ class TruthSource
     public function setCompanyUser($company_user)
     {
         $this->company_user = $company_user;
+
         return $this;
     }
 
-    public function setUser($user){
+    public function setUser($user)
+    {
         $this->user = $user;
+
         return $this;
     }
 
     public function setCompany($company)
     {
         $this->company = $company;
+
         return $this;
     }
 
     public function setCompanyToken($company_token)
     {
         $this->company_token = $company_token;
+
         return $this;
     }
-
 
     public function getCompany()
     {
@@ -66,5 +68,4 @@ class TruthSource
     {
         return $this->company_token;
     }
-
 }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -273,7 +273,6 @@ class ClientGatewayTokenController extends BaseController
      */
     public function update(UpdateClientGatewayTokenRequest $request, ClientGatewayToken $client_gateway_token)
     {
-
         $client_gateway_token = $this->client_gateway_token_repo->save($request->all(), $client_gateway_token);
 
         return $this->itemResponse($client_gateway_token->fresh());
@@ -427,11 +426,8 @@ class ClientGatewayTokenController extends BaseController
      */
     public function destroy(DestroyClientGatewayTokenRequest $request, ClientGatewayToken $client_gateway_token)
     {
+        $this->client_gateway_token_repo->delete($client_gateway_token);
 
-       $this->client_gateway_token_repo->delete($client_gateway_token);
-
-       return $this->itemResponse($client_gateway_token->fresh());
-
+        return $this->itemResponse($client_gateway_token->fresh());
     }
-
 }

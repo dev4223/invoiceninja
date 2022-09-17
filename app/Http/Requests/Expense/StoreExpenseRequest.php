@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -14,6 +14,8 @@ namespace App\Http\Requests\Expense;
 use App\Http\Requests\Request;
 use App\Http\ValidationRules\Expense\UniqueExpenseNumberRule;
 use App\Models\Expense;
+use App\Models\Project;
+use App\Models\PurchaseOrder;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Validation\Rule;
 
@@ -35,16 +37,18 @@ class StoreExpenseRequest extends Request
     {
         $rules = [];
 
-        if ($this->number) 
+        if ($this->number) {
             $rules['number'] = Rule::unique('expenses')->where('company_id', auth()->user()->company()->id);
-        
-        if(!empty($this->client_id))
+        }
+
+        if (! empty($this->client_id)) {
             $rules['client_id'] = 'bail|sometimes|exists:clients,id,company_id,'.auth()->user()->company()->id;
+        }
 
         return $this->globalRules($rules);
     }
 
-    protected function prepareForValidation()
+    public function prepareForValidation()
     {
         $input = $this->all();
 
@@ -55,11 +59,28 @@ class StoreExpenseRequest extends Request
         }
 
         if (! array_key_exists('currency_id', $input) || strlen($input['currency_id']) == 0) {
-            $input['currency_id'] = (string)auth()->user()->company()->settings->currency_id;
+            $input['currency_id'] = (string) auth()->user()->company()->settings->currency_id;
         }
 
-        if(array_key_exists('color', $input) && is_null($input['color']))
+        if (array_key_exists('color', $input) && is_null($input['color'])) {
             $input['color'] = '';
+        }
+
+
+        /* Ensure the project is related */
+        if (array_key_exists('project_id', $input) && isset($input['project_id'])) {
+            $project = Project::withTrashed()->where('id', $input['project_id'])->company()->first();
+
+            if($project){
+                $input['client_id'] = $project->client_id;
+            }
+            else
+            {
+                unset($input['project_id']);
+            }
+
+        }
+
 
         $this->replace($input);
     }
@@ -67,7 +88,7 @@ class StoreExpenseRequest extends Request
     public function messages()
     {
         return [
-            'unique' => ctrans('validation.unique', ['attribute' => 'email']),
+            // 'unique' => ctrans('validation.unique', ['attribute' => 'number']),
         ];
     }
 }

@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -21,10 +21,7 @@ class SubscriptionController extends Controller
 {
     public function index()
     {
-
-        if(Ninja::isHosted()){
-
-
+        if (Ninja::isHosted()) {
             $count = RecurringInvoice::query()
                 ->where('client_id', auth()->guard('contact')->user()->client->id)
                 ->where('company_id', auth()->guard('contact')->user()->client->company_id)
@@ -34,11 +31,10 @@ class SubscriptionController extends Controller
                 ->withTrashed()
                 ->count();
 
-                if($count == 0)
-                    return redirect()->route('client.ninja_contact_login', ['contact_key' => auth()->guard('contact')->user()->contact_key, 'company_key' => auth()->guard('contact')->user()->company->company_key]);
-
+            if ($count == 0) {
+                return redirect()->route('client.ninja_contact_login', ['contact_key' => auth()->guard('contact')->user()->contact_key, 'company_key' => auth()->guard('contact')->user()->company->company_key]);
+            }
         }
-
 
         return render('subscriptions.index');
     }

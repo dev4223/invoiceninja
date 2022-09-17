@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -15,7 +15,6 @@ use Turbo124\Beacon\ExampleMetric\GenericMixedMetric;
 
 class EmailSuccess extends GenericMixedMetric
 {
-
     /**
      * The type of Sample.
      *
@@ -72,8 +71,8 @@ class EmailSuccess extends GenericMixedMetric
      */
     public $string_metric7 = '';
 
-    public function __construct($string_metric7) {
+    public function __construct($string_metric7)
+    {
         $this->string_metric7 = $string_metric7;
     }
-    
 }

@@ -5,7 +5,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license 
  */
 
 class Payment {
@@ -17,12 +17,17 @@ class Payment {
     }
 
     handleMethodSelect(element) {
+
         document.getElementById("company_gateway_id").value =
             element.dataset.companyGatewayId;
         document.getElementById("payment_method_id").value =
             element.dataset.gatewayTypeId;
 
         if (this.shouldDisplaySignature && !this.shouldDisplayTerms) {
+
+            if(this.signaturePad && this.signaturePad.isEmpty())
+                alert("Please sign");
+
             this.displayTerms();
 
             document
@@ -91,10 +96,16 @@ class Payment {
             }
         );
 
+        signaturePad.onEnd = function(){  
+            document.getElementById("signature-next-step").disabled = false;
+        };
+
         this.signaturePad = signaturePad;
     }
 
     handle() {
+        document.getElementById("signature-next-step").disabled = true;
+
         document
             .querySelectorAll(".dropdown-gateway-button")
             .forEach(element => {

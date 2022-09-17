@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -59,24 +59,22 @@ class PaymentAmountsBalanceRule implements Rule
 
         if (request()->input('credits') && is_array(request()->input('credits'))) {
             foreach (request()->input('credits') as $credit) {
-                
-                if(array_key_exists('amount', $credit))
+                if (array_key_exists('amount', $credit)) {
                     $payment_amounts += $credit['amount'];
+                }
             }
         }
 
         if (request()->input('invoices') && is_array(request()->input('invoices'))) {
             foreach (request()->input('invoices') as $invoice) {
- 
-                if(array_key_exists('amount', $invoice))
+                if (array_key_exists('amount', $invoice)) {
                     $invoice_amounts += $invoice['amount'];
+                }
             }
         } else {
             return true;
-        } 
-        
-        return round($payment_amounts,2) >= round($invoice_amounts,2);
+        }
 
+        return round($payment_amounts, 2) >= round($invoice_amounts, 2);
     }
-
 }

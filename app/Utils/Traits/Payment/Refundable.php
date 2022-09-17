@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -28,6 +28,7 @@ trait Refundable
     /**
      * Entry point for processing of refunds.
      * @param array $data
+     * @deprecated ???? 06-09-2022
      * @return Refundable
      * @throws PaymentRefundFailed
      */

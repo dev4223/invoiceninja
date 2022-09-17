@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -48,8 +48,6 @@ class GenerateDeliveryNote
         $this->invoice = $invoice;
 
         $this->contact = $contact;
-
-        // $this->disk = 'public';
 
         $this->disk = $disk ?? config('filesystems.default');
     }
@@ -97,21 +95,20 @@ class GenerateDeliveryNote
 
         // Storage::makeDirectory($this->invoice->client->invoice_filepath(), 0775);
 
-            if(config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja'){
-                $pdf = (new NinjaPdf())->build($maker->getCompiledHTML(true));
-            }
-            else {
-                $pdf = $this->makePdf(null, null, $maker->getCompiledHTML());
-            }
+        if (config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja') {
+            $pdf = (new NinjaPdf())->build($maker->getCompiledHTML(true));
+        } else {
+            $pdf = $this->makePdf(null, null, $maker->getCompiledHTML());
+        }
 
         if (config('ninja.log_pdf_html')) {
             info($maker->getCompiledHTML());
         }
 
-        if(!Storage::disk($this->disk)->exists($this->invoice->client->invoice_filepath($invitation)))
-
+        if (! Storage::disk($this->disk)->exists($this->invoice->client->invoice_filepath($invitation))) {
             Storage::disk($this->disk)->makeDirectory($this->invoice->client->invoice_filepath($invitation), 0775);
-            Storage::disk($this->disk)->put($file_path, $pdf, 'public');
+        }
+        Storage::disk($this->disk)->put($file_path, $pdf, 'public');
 
         return $file_path;
     }

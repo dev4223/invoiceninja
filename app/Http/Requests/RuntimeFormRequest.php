@@ -22,15 +22,7 @@ trait RuntimeFormRequest
         $instance = $validator->getValidatorInstance();
 
         return $instance;
-        // if ($instance->fails()) {
-        //     return $instance->errors();
-        // }
-
-        // $validator->passedValidation();
-
-        // return $validator->all();
     }
-
 
     protected static function getMockedRequestByParameters($paramters)
     {

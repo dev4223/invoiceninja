@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -46,7 +46,11 @@ class InvoiceItemSumInclusive
 
         $this->invoice = $invoice;
 
-        $this->currency = $this->invoice->client->currency();
+        if ($this->invoice->client) {
+            $this->currency = $this->invoice->client->currency();
+        } else {
+            $this->currency = $this->invoice->vendor->currency();
+        }
 
         $this->line_items = [];
     }
@@ -119,24 +123,26 @@ class InvoiceItemSumInclusive
 
         $item_tax += $this->formatValue($item_tax_rate1_total, $this->currency->precision);
 
-        // if($item_tax_rate1_total != 0)     
-        if (strlen($this->item->tax_name1) > 1)     
-            $this->groupTax($this->item->tax_name1, $this->item->tax_rate1, $item_tax_rate1_total);        
+        // if($item_tax_rate1_total != 0)
+        if (strlen($this->item->tax_name1) > 1) {
+            $this->groupTax($this->item->tax_name1, $this->item->tax_rate1, $item_tax_rate1_total);
+        }
 
         $item_tax_rate2_total = $this->calcInclusiveLineTax($this->item->tax_rate2, $amount);
 
         $item_tax += $this->formatValue($item_tax_rate2_total, $this->currency->precision);
 
-        if (strlen($this->item->tax_name2) > 1)   
+        if (strlen($this->item->tax_name2) > 1) {
             $this->groupTax($this->item->tax_name2, $this->item->tax_rate2, $item_tax_rate2_total);
-        
+        }
+
         $item_tax_rate3_total = $this->calcInclusiveLineTax($this->item->tax_rate3, $amount);
 
         $item_tax += $this->formatValue($item_tax_rate3_total, $this->currency->precision);
 
-        if (strlen($this->item->tax_name3) > 1)   
+        if (strlen($this->item->tax_name3) > 1) {
             $this->groupTax($this->item->tax_name3, $this->item->tax_rate3, $item_tax_rate3_total);
-        
+        }
 
         $this->setTotalTaxes($this->formatValue($item_tax, $this->currency->precision));
 
@@ -236,12 +242,12 @@ class InvoiceItemSumInclusive
         $item_tax = 0;
 
         foreach ($this->line_items as $this->item) {
-
-            if($this->sub_total == 0)
+            if ($this->sub_total == 0) {
                 $amount = $this->item->line_total;
-            else
+            } else {
                 $amount = $this->item->line_total - ($this->item->line_total * ($this->invoice->discount / $this->sub_total));
-            
+            }
+
             $item_tax_rate1_total = $this->calcInclusiveLineTax($this->item->tax_rate1, $amount);
 
             $item_tax += $item_tax_rate1_total;

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/paymentninja/paymentninja source repository
  *
- * @copyright Copyright (c) 2021. Payment Ninja LLC (https://paymentninja.com)
+ * @copyright Copyright (c) 2022. Payment Ninja LLC (https://paymentninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -45,30 +45,21 @@ class ApplyNumber extends AbstractService
 
     private function trySaving()
     {
+        $x = 1;
 
-        $x=1;
-
-        do{
-
-            try{
-
+        do {
+            try {
                 $this->payment->number = $this->getNextPaymentNumber($this->client, $this->payment);
                 $this->payment->saveQuietly();
 
                 $this->completed = false;
-                
-
-            }
-            catch(QueryException $e){
-
+            } catch (QueryException $e) {
                 $x++;
 
-                if($x>10)
+                if ($x > 50) {
                     $this->completed = false;
+                }
             }
-        
-        }
-        while($this->completed);
-
+        } while ($this->completed);
     }
 }

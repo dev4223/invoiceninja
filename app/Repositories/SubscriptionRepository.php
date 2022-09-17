@@ -5,13 +5,12 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Repositories;
-
 
 use App\DataMapper\ClientSettings;
 use App\DataMapper\InvoiceItem;
@@ -28,10 +27,12 @@ class SubscriptionRepository extends BaseRepository
 {
     use CleanLineItems;
 
+    public int $quantity = 1;
+
     public function save($data, Subscription $subscription): ?Subscription
     {
         $subscription->fill($data);
-        
+
         $calculated_prices = $this->calculatePrice($subscription);
 
         $subscription->price = $calculated_prices['price'];
@@ -45,25 +46,25 @@ class SubscriptionRepository extends BaseRepository
     private function calculatePrice($subscription) :array
     {
 
-		// DB::beginTransaction();
+        // DB::beginTransaction();
         DB::connection(config('database.default'))->beginTransaction();
-		$data = [];
+        $data = [];
 
         $client = Client::factory()->create([
-                'user_id' => $subscription->user_id,
-                'company_id' => $subscription->company_id,
-                'group_settings_id' => $subscription->group_id,
-                'country_id' => $subscription->company->settings->country_id,
-                'settings' => ClientSettings::defaults(),
-            ]);
+            'user_id' => $subscription->user_id,
+            'company_id' => $subscription->company_id,
+            'group_settings_id' => $subscription->group_id,
+            'country_id' => $subscription->company->settings->country_id,
+            'settings' => ClientSettings::defaults(),
+        ]);
 
         $contact = ClientContact::factory()->create([
-                'user_id' => $subscription->user_id,
-                'company_id' => $subscription->company_id,
-                'client_id' => $client->id,
-                'is_primary' => 1,
-                'send_email' => true,
-            ]);
+            'user_id' => $subscription->user_id,
+            'company_id' => $subscription->company_id,
+            'client_id' => $client->id,
+            'is_primary' => 1,
+            'send_email' => true,
+        ]);
 
         $invoice = InvoiceFactory::create($subscription->company_id, $subscription->user_id);
         $invoice->client_id = $client->id;
@@ -71,10 +72,10 @@ class SubscriptionRepository extends BaseRepository
         $invoice->save();
 
         $invitation = InvoiceInvitation::factory()->create([
-                    'user_id' => $subscription->user_id,
-                    'company_id' => $subscription->company_id,
-                    'invoice_id' => $invoice->id,
-                    'client_contact_id' => $contact->id,
+            'user_id' => $subscription->user_id,
+            'company_id' => $subscription->company_id,
+            'invoice_id' => $invoice->id,
+            'client_contact_id' => $contact->id,
         ]);
 
         $invoice->setRelation('invitations', $invitation);
@@ -84,7 +85,7 @@ class SubscriptionRepository extends BaseRepository
         $invoice->line_items = $this->generateLineItems($subscription);
 
         $data['price'] = $invoice->calc()->getTotal();
-        
+
         $invoice->discount = $subscription->promo_discount;
         $invoice->is_amount_discount = $subscription->is_amount_discount;
 
@@ -92,7 +93,7 @@ class SubscriptionRepository extends BaseRepository
 
         // DB::rollBack();
         DB::connection(config('database.default'))->rollBack();
-        
+
         return $data;
     }
 
@@ -100,34 +101,30 @@ class SubscriptionRepository extends BaseRepository
     {
         $multiplier = $is_credit ? -1 : 1;
 
-    	$line_items = [];
+        $line_items = [];
 
-        if(!$is_recurring)
-        {
-            foreach($subscription->service()->products() as $product)
-            {
-                $line_items[] = (array)$this->makeLineItem($product, $multiplier);
+        if (! $is_recurring) {
+            foreach ($subscription->service()->products() as $product) {
+                $line_items[] = (array) $this->makeLineItem($product, $multiplier);
             }
         }
-        
-        foreach($subscription->service()->recurring_products() as $product)
-        {
-            $line_items[] = (array)$this->makeLineItem($product, $multiplier);
+
+        foreach ($subscription->service()->recurring_products() as $product) {
+            $line_items[] = (array) $this->makeLineItem($product, $multiplier);
         }
 
-    	$line_items = $this->cleanItems($line_items);
+        $line_items = $this->cleanItems($line_items);
 
         return $line_items;
-
     }
 
     private function makeLineItem($product, $multiplier)
     {
         $item = new InvoiceItem;
-        $item->quantity = $product->quantity;
+        $item->quantity = $this->quantity;
         $item->product_key = $product->product_key;
         $item->notes = $product->notes;
-        $item->cost = $product->price*$multiplier;
+        $item->cost = $product->price * $multiplier;
         $item->tax_rate1 = $product->tax_rate1 ?: 0;
         $item->tax_name1 = $product->tax_name1 ?: '';
         $item->tax_rate2 = $product->tax_rate2 ?: 0;

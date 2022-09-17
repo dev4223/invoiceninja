@@ -4,7 +4,7 @@
  *
  * @link https://github.com/quoteninja/quoteninja source repository
  *
- * @copyright Copyright (c) 2021. Quote Ninja LLC (https://quoteninja.com)
+ * @copyright Copyright (c) 2022. Quote Ninja LLC (https://quoteninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -24,7 +24,6 @@ class ConvertableQuoteRule implements Rule
 
     public function __construct()
     {
-
     }
 
     /**
@@ -54,14 +53,12 @@ class ConvertableQuoteRule implements Rule
 
         $quotes = Quote::withTrashed()->whereIn('id', $this->transformKeys($ids))->company()->get();
 
-        foreach($quotes as $quote){
-
-            if(!$quote->service()->isConvertable())
+        foreach ($quotes as $quote) {
+            if (! $quote->service()->isConvertable()) {
                 return false;
-
+            }
         }
 
         return true;
-
     }
 }

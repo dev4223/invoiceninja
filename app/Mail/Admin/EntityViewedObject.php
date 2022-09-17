@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -13,8 +13,8 @@ namespace App\Mail\Admin;
 
 use App\Utils\Ninja;
 use App\Utils\Number;
-use stdClass;
 use Illuminate\Support\Facades\App;
+use stdClass;
 
 class EntityViewedObject
 {
@@ -41,9 +41,9 @@ class EntityViewedObject
 
     public function build()
     {
-
-        if(!$this->entity)
+        if (! $this->entity) {
             return;
+        }
 
         App::forgetInstance('translator');
         /* Init a new copy of the translator*/
@@ -65,7 +65,13 @@ class EntityViewedObject
 
     private function getAmount()
     {
-        return Number::formatMoney($this->entity->amount, $this->entity->client);
+        if ($this->entity->client) {
+            $currency_entity = $this->entity->client;
+        } else {
+            $currency_entity = $this->company;
+        }
+
+        return Number::formatMoney($this->entity->amount, $currency_entity);
     }
 
     private function getSubject()
@@ -74,15 +80,19 @@ class EntityViewedObject
             ctrans(
                 "texts.notification_{$this->entity_type}_viewed_subject",
                 [
-                        'client' => $this->contact->present()->name(),
-                        'invoice' => $this->entity->number,
-                    ]
+                    'client' => $this->contact->present()->name(),
+                    'invoice' => $this->entity->number,
+                ]
             );
     }
 
     private function getData()
     {
-        $settings = $this->entity->client->getMergedSettings();
+        if ($this->entity->client) {
+            $settings = $this->entity->client->getMergedSettings();
+        } else {
+            $settings = $this->company->settings;
+        }
 
         $data = [
             'title' => $this->getSubject(),

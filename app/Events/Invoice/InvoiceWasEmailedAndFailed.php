@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,7 +12,6 @@
 namespace App\Events\Invoice;
 
 use App\Models\Company;
-use App\Models\InvoiceInvitation;
 use Illuminate\Queue\SerializesModels;
 
 /**
@@ -35,12 +34,12 @@ class InvoiceWasEmailedAndFailed
     /**
      * Create a new event instance.
      *
-     * @param InvoiceInvitation $invitation
+     * @param $invitation
      * @param Company $company
      * @param string $errors
      * @param array $event_vars
      */
-    public function __construct(InvoiceInvitation $invitation, Company $company, string $message, string $template, array $event_vars)
+    public function __construct($invitation, Company $company, string $message, string $template, array $event_vars)
     {
         $this->invitation = $invitation;
 

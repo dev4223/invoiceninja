@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -34,7 +34,7 @@ class CreateInvitations extends AbstractService
     {
         $contacts = $this->credit->client->contacts;
 
-        if($contacts->count() == 0){
+        if ($contacts->count() == 0) {
             $this->createBlankContact();
 
             $this->credit->refresh();
@@ -59,33 +59,31 @@ class CreateInvitations extends AbstractService
             }
         });
 
-        if($this->credit->invitations()->count() == 0) {
-            
-            if($contacts->count() == 0){
+        if ($this->credit->invitations()->count() == 0) {
+            if ($contacts->count() == 0) {
                 $contact = $this->createBlankContact();
-            }
-            else{
+            } else {
                 $contact = $contacts->first();
 
-                    $invitation = CreditInvitation::where('company_id', $this->credit->company_id)
+                $invitation = CreditInvitation::where('company_id', $this->credit->company_id)
                                 ->where('client_contact_id', $contact->id)
                                 ->where('credit_id', $this->credit->id)
                                 ->withTrashed()
                                 ->first();
 
-                    if($invitation){
-                        $invitation->restore();
-                        return $this->credit;
-                    }
+                if ($invitation) {
+                    $invitation->restore();
+
+                    return $this->credit;
+                }
             }
 
-                $ii = CreditInvitationFactory::create($this->credit->company_id, $this->credit->user_id);
-                $ii->key = $this->createDbHash($this->credit->company->db);
-                $ii->credit_id = $this->credit->id;
-                $ii->client_contact_id = $contact->id;
-                $ii->save();
+            $ii = CreditInvitationFactory::create($this->credit->company_id, $this->credit->user_id);
+            $ii->key = $this->createDbHash($this->credit->company->db);
+            $ii->credit_id = $this->credit->id;
+            $ii->client_contact_id = $contact->id;
+            $ii->save();
         }
-
 
         return $this->credit;
     }

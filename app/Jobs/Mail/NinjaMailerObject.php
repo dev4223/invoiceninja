@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -16,7 +16,6 @@ namespace App\Jobs\Mail;
  */
 class NinjaMailerObject
 {
-
     public $mailable;
 
     public $company;
@@ -30,12 +29,11 @@ class NinjaMailerObject
     public $transport; //not yet used
 
     /* Variable for cascading notifications */
-    public $entity_string = FALSE;
+    public $entity_string = false;
 
-    public $invitation = FALSE;
+    public $invitation = false;
 
-    public $template = FALSE;
+    public $template = false;
 
-    public $entity = FALSE;
-    
+    public $entity = false;
 }

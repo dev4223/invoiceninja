@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -38,22 +38,18 @@ class CreditCard
 
     public function authorizeView($data)
     {
-
     }
 
     public function authorizeRequest($request)
     {
-
     }
 
     public function paymentView($data)
     {
-    
     }
 
     public function processPaymentResponse($request)
     {
-        
     }
 
     /* This method is stubbed ready to go - you just need to harvest the equivalent 'transaction_reference' */
@@ -70,7 +66,6 @@ class CreditCard
         $payment = $this->driver_class->createPayment($payment_record, Payment::STATUS_COMPLETED);
 
         return redirect()->route('client.payments.show', ['payment' => $this->encodePrimaryKey($payment->id)]);
-
     }
 
     private function processUnsuccessfulPayment($response)
@@ -90,9 +85,7 @@ class CreditCard
         ];
 
         return $this->driver_class->processUnsuccessfulTransaction($data);
-
     }
-
 
     /* Helpers */
 
@@ -102,11 +95,7 @@ class CreditCard
       Some considerations after a succesful transaction include:
 
       Logging of events: success +/- failure
-      Recording a payment 
+      Recording a payment
       Notifications
      */
-
-
-
-
 }

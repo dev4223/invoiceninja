@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -29,6 +29,11 @@ use Illuminate\View\View;
 class PaymentMethodController extends Controller
 {
     use MakesDates;
+
+    public function __construct()
+    {
+        $this->middleware('throttle:10,1')->only('store');
+    }
 
     /**
      * Display a listing of the resource.
@@ -92,8 +97,6 @@ class PaymentMethodController extends Controller
 
     public function verify(ClientGatewayToken $payment_method)
     {
-//        $gateway = $this->getClientGateway();
-
         return $payment_method->gateway
             ->driver(auth()->user()->client)
             ->setPaymentMethod(request()->query('method'))
@@ -118,24 +121,18 @@ class PaymentMethodController extends Controller
      */
     public function destroy(ClientGatewayToken $payment_method)
     {
-
-        if($payment_method->gateway()->exists()){
-
+        if ($payment_method->gateway()->exists()) {
             $payment_method->gateway
                 ->driver(auth()->user()->client)
                 ->setPaymentMethod(request()->query('method'))
                 ->detach($payment_method);
-
         }
 
         try {
-
             event(new MethodDeleted($payment_method, auth()->guard('contact')->user()->company, Ninja::eventVars(auth()->guard('contact')->user()->id)));
-            
+
             $payment_method->delete();
-
         } catch (Exception $e) {
-
             nlog($e->getMessage());
 
             return back();

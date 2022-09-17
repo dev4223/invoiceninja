@@ -6,8 +6,9 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
+
 namespace Database\Factories;
 
 use App\Models\RecurringInvoice;
@@ -15,13 +16,6 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 
 class RecurringInvoiceFactory extends Factory
 {
-    /**
-     * The name of the factory's corresponding model.
-     *
-     * @var string
-     */
-    protected $model = RecurringInvoice::class;
-
     /**
      * Define the model's default state.
      *
@@ -51,6 +45,7 @@ class RecurringInvoiceFactory extends Factory
             'frequency_id' => RecurringInvoice::FREQUENCY_MONTHLY,
             'last_sent_date' => now()->subMonth(),
             'next_send_date' => now()->addMonthNoOverflow(),
+            'next_send_date_client' => now()->addMonthNoOverflow(),
             'remaining_cycles' => $this->faker->numberBetween(1, 10),
             'amount' => $this->faker->randomFloat(2, $min = 1, $max = 1000), // 48.8932
 

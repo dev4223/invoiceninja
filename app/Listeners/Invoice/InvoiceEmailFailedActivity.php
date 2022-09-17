@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -22,7 +22,7 @@ class InvoiceEmailFailedActivity implements ShouldQueue
     protected $activity_repo;
 
     public $delay = 5;
-    
+
     /**
      * Create the event listener.
      *
@@ -43,8 +43,9 @@ class InvoiceEmailFailedActivity implements ShouldQueue
     {
         MultiDB::setDb($event->company->db);
 
-        if(strpos($event->message, 'shared/public') !== false)
-            $event->message = "Unable to open attachment file for reading"; 
+        if (strpos($event->message, 'shared/public') !== false) {
+            $event->message = 'Unable to open attachment file for reading';
+        }
 
         $fields = new stdClass;
 

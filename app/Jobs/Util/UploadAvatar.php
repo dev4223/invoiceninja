@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -43,9 +43,6 @@ class UploadAvatar implements ShouldQueue
         $file_png = imagepng($im, sys_get_temp_dir().'/'.$tmp_file);
 
         $path = Storage::putFile($this->directory, new File(sys_get_temp_dir().'/'.$tmp_file));
-
-        // info($path);
-        // info($tmp_file);
 
         $url = Storage::url($path);
 

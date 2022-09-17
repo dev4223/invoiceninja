@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -18,7 +18,7 @@ class ShowRecurringInvoiceRequest extends Request
 {
     public function authorize() : bool
     {
-        return auth()->guard('contact')->user()->client->id === $this->recurring_invoice->client_id
+        return auth()->guard('contact')->user()->client->id == $this->recurring_invoice->client_id
             && auth()->guard('contact')->user()->company->enabled_modules & PortalComposer::MODULE_RECURRING_INVOICES;
     }
 

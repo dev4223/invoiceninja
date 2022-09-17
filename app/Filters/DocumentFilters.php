@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -19,7 +19,6 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class DocumentFilters extends QueryFilters
 {
-
     /**
      * Filter based on search text.
      *
@@ -39,9 +38,7 @@ class DocumentFilters extends QueryFilters
     /* If client ID passed to this entity, simply return */
     public function client_id(string $client_id = '') :Builder
     {
-        
         return $this->builder;
-        
     }
 
     /**

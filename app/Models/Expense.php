@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -56,6 +56,7 @@ class Expense extends BaseModel
         'tax_amount3',
         'uses_inclusive_taxes',
         'calculate_tax_by_amount',
+        'purchase_order_id',
     ];
 
     protected $casts = [
@@ -102,6 +103,11 @@ class Expense extends BaseModel
         return $this->belongsTo(Client::class);
     }
 
+    public function purchase_order()
+    {
+        return $this->hasOne(PurchaseOrder::class);
+    }
+
     public function translate_entity()
     {
         return ctrans('texts.expense');
@@ -114,7 +120,7 @@ class Expense extends BaseModel
 
     public function category()
     {
-        return $this->belongsTo(ExpenseCategory::class);
+        return $this->belongsTo(ExpenseCategory::class)->withTrashed();
     }
 
     public function payment_type()
@@ -125,5 +131,5 @@ class Expense extends BaseModel
     public function project()
     {
         return $this->belongsTo(Project::class);
-    }    
+    }
 }

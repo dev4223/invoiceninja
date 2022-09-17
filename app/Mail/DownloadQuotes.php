@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -37,7 +37,6 @@ class DownloadQuotes extends Mailable
      */
     public function build()
     {
-
         App::setLocale($this->company->getLocale());
 
         return $this->from(config('mail.from.address'), config('mail.from.name'))

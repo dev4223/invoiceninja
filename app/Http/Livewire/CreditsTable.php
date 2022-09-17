@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -34,16 +34,15 @@ class CreditsTable extends Component
 
     public function render()
     {
-
         $query = Credit::query()
-            ->where('client_id', auth()->guard('contact')->user()->client->id)
+            ->where('client_id', auth()->guard('contact')->user()->client_id)
             ->where('company_id', $this->company->id)
             ->where('status_id', '<>', Credit::STATUS_DRAFT)
             ->where('is_deleted', 0)
-            ->where(function ($query){
+            ->where(function ($query) {
                 $query->whereDate('due_date', '>=', now())
                       ->orWhereNull('due_date');
-                      //->orWhere('due_date', '=', '');
+                //->orWhere('due_date', '=', '');
             })
             ->orderBy($this->sort_field, $this->sort_asc ? 'asc' : 'desc')
             ->withTrashed()

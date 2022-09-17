@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -39,9 +39,7 @@ class MarkSent
         $this->quote->markInvitationsSent();
 
         if ($this->quote->due_date != '' || $this->quote->client->getSetting('valid_until') == '') {
-            
-        }
-        else{
+        } else {
             $this->quote->due_date = Carbon::parse($this->quote->date)->addDays($this->quote->client->getSetting('valid_until'));
         }
 

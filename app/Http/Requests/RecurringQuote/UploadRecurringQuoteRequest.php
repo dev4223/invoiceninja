@@ -4,7 +4,7 @@
  *
  * @link https://github.com/paymentninja/paymentninja source repository
  *
- * @copyright Copyright (c) 2021. Quote Ninja LLC (https://paymentninja.com)
+ * @copyright Copyright (c) 2022. Quote Ninja LLC (https://paymentninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -27,13 +27,12 @@ class UploadRecurringQuoteRequest extends Request
 
     public function rules()
     {
+        $rules = [];
 
-    	$rules = [];
-
-		if($this->input('documents'))
+        if ($this->input('documents')) {
             $rules['documents'] = 'file|mimes:csv,png,ai,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:2000000';
+        }
 
-    	return $rules;
-
+        return $rules;
     }
 }

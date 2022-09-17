@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -271,7 +271,7 @@ class ProjectController extends BaseController
         if ($request->has('documents')) {
             $this->saveDocuments($request->input('documents'), $project);
         }
-        
+
         return $this->itemResponse($project->fresh());
     }
 
@@ -370,7 +370,7 @@ class ProjectController extends BaseController
             $project->number = $this->getNextProjectNumber($project);
             $project->save();
         }
-        
+
         if ($request->has('documents')) {
             $this->saveDocuments($request->input('documents'), $project);
         }
@@ -559,14 +559,14 @@ class ProjectController extends BaseController
      */
     public function upload(UploadProjectRequest $request, Project $project)
     {
-
-        if(!$this->checkFeature(Account::FEATURE_DOCUMENTS))
+        if (! $this->checkFeature(Account::FEATURE_DOCUMENTS)) {
             return $this->featureFailure();
-        
-        if ($request->has('documents')) 
+        }
+
+        if ($request->has('documents')) {
             $this->saveDocuments($request->file('documents'), $project);
+        }
 
         return $this->itemResponse($project->fresh());
-
-    }  
+    }
 }

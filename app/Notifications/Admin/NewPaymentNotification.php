@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -23,7 +23,6 @@ use Illuminate\Queue\SerializesModels;
 
 class NewPaymentNotification extends Notification
 {
-
     /**
      * Create a new notification instance.
      *
@@ -102,8 +101,8 @@ class NewPaymentNotification extends Notification
                 ->content(ctrans(
                     'texts.notification_payment_paid',
                     ['amount' => $amount,
-                    'client' => $this->payment->client->present()->name(),
-                    'invoice' => $invoice_texts, ]
+                        'client' => $this->payment->client->present()->name(),
+                        'invoice' => $invoice_texts, ]
                 ));
     }
 }

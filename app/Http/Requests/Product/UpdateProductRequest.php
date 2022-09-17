@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -44,11 +44,14 @@ class UpdateProductRequest extends Request
         $rules['cost'] = 'numeric';
         $rules['price'] = 'numeric';
         $rules['quantity'] = 'numeric';
+        $rules['in_stock_quantity'] = 'sometimes|numeric';
+        $rules['stock_notification_threshold'] = 'sometimes|numeric';
+        $rules['stock_notification'] = 'sometimes|bool';
 
         return $rules;
     }
 
-    protected function prepareForValidation()
+    public function prepareForValidation()
     {
         $input = $this->all();
 
@@ -58,6 +61,11 @@ class UpdateProductRequest extends Request
 
         if (array_key_exists('assigned_user_id', $input) && is_string($input['assigned_user_id'])) {
             $input['assigned_user_id'] = $this->decodePrimaryKey($input['assigned_user_id']);
+        }
+
+        if (array_key_exists('in_stock_quantity', $input) && request()->has('update_in_stock_quantity') && request()->input('update_in_stock_quantity') == 'true') {
+        } elseif (array_key_exists('in_stock_quantity', $input)) {
+            unset($input['in_stock_quantity']);
         }
 
         $this->replace($input);

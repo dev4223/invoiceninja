@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -38,7 +38,7 @@ class VendorFilters extends QueryFilters
         return  $this->builder->where(function ($query) use ($filter) {
             $query->where('vendors.name', 'like', '%'.$filter.'%')
                           ->orWhere('vendors.id_number', 'like', '%'.$filter.'%')
-                          ->orWhereHas('contacts', function ($query) use($filter){
+                          ->orWhereHas('contacts', function ($query) use ($filter) {
                               $query->where('vendor_contacts.first_name', 'like', '%'.$filter.'%');
                               $query->orWhere('vendor_contacts.last_name', 'like', '%'.$filter.'%');
                               $query->orWhere('vendor_contacts.email', 'like', '%'.$filter.'%');

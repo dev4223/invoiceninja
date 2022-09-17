@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -45,12 +45,10 @@ class StoreClientGatewayTokenRequest extends Request
             'meta' => 'required',
         ];
 
-
         return $this->globalRules($rules);
-    
     }
 
-    protected function prepareForValidation()
+    public function prepareForValidation()
     {
         $input = $this->all();
 
@@ -64,5 +62,4 @@ class StoreClientGatewayTokenRequest extends Request
         return [
         ];
     }
-
 }

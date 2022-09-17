@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -19,7 +19,6 @@ use Illuminate\Http\Request;
  */
 class AppleController extends BaseController
 {
-
     public function __construct()
     {
     }
@@ -62,7 +61,6 @@ class AppleController extends BaseController
     {
 
         //store transaction_id in accounts table for future reference.
-        
     }
 
     /**
@@ -101,7 +99,5 @@ class AppleController extends BaseController
      */
     public function process_webhook(Request $request)
     {
-
     }
-
 }

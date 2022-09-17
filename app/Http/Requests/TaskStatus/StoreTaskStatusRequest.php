@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -28,12 +28,13 @@ class StoreTaskStatusRequest extends Request
         return auth()->user()->isAdmin();
     }
 
-    protected function prepareForValidation()
+    public function prepareForValidation()
     {
         $input = $this->all();
 
-            if(array_key_exists('color', $input) && is_null($input['color']))
-                $input['color'] = '';
+        if (array_key_exists('color', $input) && is_null($input['color'])) {
+            $input['color'] = '';
+        }
 
         $this->replace($input);
     }
@@ -42,7 +43,7 @@ class StoreTaskStatusRequest extends Request
     {
         $rules = [];
 
-        $rules['name'] ='required|unique:task_statuses,name,null,null,company_id,'.auth()->user()->companyId();
+        $rules['name'] = 'required|unique:task_statuses,name,null,null,company_id,'.auth()->user()->companyId();
 
         return $rules;
     }

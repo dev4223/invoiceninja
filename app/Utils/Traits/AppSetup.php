@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -15,10 +15,10 @@ namespace App\Utils\Traits;
 use App\DataMapper\EmailTemplateDefaults;
 use App\Utils\Ninja;
 use App\Utils\SystemHealth;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Artisan;
 
 trait AppSetup
 {
@@ -38,10 +38,10 @@ trait AppSetup
         $cached_tables = config('ninja.cached_tables');
 
         foreach ($cached_tables as $name => $class) {
-            if (!Cache::has($name) || $force) {
+            if (! Cache::has($name) || $force) {
 
                 // check that the table exists in case the migration is pending
-                if (!Schema::hasTable((new $class())->getTable())) {
+                if (! Schema::hasTable((new $class())->getTable())) {
                     continue;
                 }
                 if ($name == 'payment_terms') {
@@ -62,9 +62,7 @@ trait AppSetup
 
         /*Build template cache*/
         $this->buildTemplates();
-        
     }
-
 
     private function buildTemplates($name = 'templates')
     {
@@ -111,6 +109,10 @@ trait AppSetup
                 'subject' => EmailTemplateDefaults::emailCreditSubject(),
                 'body' => EmailTemplateDefaults::emailCreditTemplate(),
             ],
+            'purchase_order' => [
+                'subject' => EmailTemplateDefaults::emailPurchaseOrderSubject(),
+                'body' => EmailTemplateDefaults::emailPurchaseOrderTemplate(),
+            ],
         ];
 
         Cache::forever($name, $data);
@@ -135,10 +137,10 @@ trait AppSetup
         $words_count = count(explode(' ', trim($value)));
 
         if (is_null($position)) {
-            $words_count > 1 ? $env[] = "{$property}=" . '"' . $value . '"' . "\n" : $env[] = "{$property}=" . $value . "\n";
+            $words_count > 1 ? $env[] = "{$property}=".'"'.$value.'"'."\n" : $env[] = "{$property}=".$value."\n";
         } else {
-            $env[$position] = "{$property}=" . '"' . $value . '"' . "\n"; // If value of variable is more than one word, surround with quotes.
-        } 
+            $env[$position] = "{$property}=".'"'.$value.'"'."\n"; // If value of variable is more than one word, surround with quotes.
+        }
 
         try {
             file_put_contents(base_path('.env'), $env);

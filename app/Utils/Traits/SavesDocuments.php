@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -19,7 +19,6 @@ trait SavesDocuments
 {
     public function saveDocuments($document_array, $entity, $is_public = true)
     {
-
         if ($entity instanceof Company) {
             $account = $entity->account;
             $company = $entity;
@@ -34,8 +33,11 @@ trait SavesDocuments
             return false;
         }
 
+        if(!is_array($document_array))
+            return;
+
         foreach ($document_array as $document) {
-            $document = UploadFile::dispatchNow(
+            $document = (new UploadFile(
                 $document,
                 UploadFile::DOCUMENT,
                 $user,
@@ -43,9 +45,8 @@ trait SavesDocuments
                 $entity,
                 null,
                 $is_public
-            );
+            ))->handle();
         }
-
     }
 
     public function saveDocument($document, $entity, $is_public = true)
@@ -64,7 +65,7 @@ trait SavesDocuments
             return false;
         }
 
-        $document = UploadFile::dispatchNow(
+        $document = (new UploadFile(
             $document,
             UploadFile::DOCUMENT,
             $user,
@@ -72,6 +73,6 @@ trait SavesDocuments
             $entity,
             null,
             $is_public
-        );
+        ))->handle();
     }
 }

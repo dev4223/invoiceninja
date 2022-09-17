@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -481,7 +481,7 @@ class ProductController extends BaseController
         return $this->listResponse(Product::withTrashed()->whereIn('id', $this->transformKeys($ids)));
     }
 
-/**
+    /**
      * Update the specified resource in storage.
      *
      * @param UploadProductRequest $request
@@ -534,14 +534,14 @@ class ProductController extends BaseController
      */
     public function upload(UploadProductRequest $request, Product $product)
     {
-
-        if(!$this->checkFeature(Account::FEATURE_DOCUMENTS))
+        if (! $this->checkFeature(Account::FEATURE_DOCUMENTS)) {
             return $this->featureFailure();
-        
-        if ($request->has('documents')) 
+        }
+
+        if ($request->has('documents')) {
             $this->saveDocuments($request->file('documents'), $product);
+        }
 
         return $this->itemResponse($product->fresh());
-
-    }  
+    }
 }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -57,10 +57,9 @@ class InvoiceTransformer extends EntityTransformer
         return $this->includeItem($invoice->client, $transformer, Client::class);
     }
 
-
     public function includePayments(Invoice $invoice)
     {
-        $transformer = new PaymentTransformer( $this->serializer);
+        $transformer = new PaymentTransformer($this->serializer);
 
         return $this->includeCollection($invoice->payments, $transformer, Payment::class);
     }
@@ -86,7 +85,6 @@ class InvoiceTransformer extends EntityTransformer
 
         return $this->includeCollection($invoice->activities, $transformer, Activity::class);
     }
-
 
     public function transform(Invoice $invoice)
     {

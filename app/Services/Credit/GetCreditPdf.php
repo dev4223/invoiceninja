@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -44,8 +44,7 @@ class GetCreditPdf extends AbstractService
         // $disk = 'public';
         $disk = config('filesystems.default');
 
-        $file_path = CreateEntityPdf::dispatchNow($this->invitation);
-
+        $file_path = (new CreateEntityPdf($this->invitation))->handle();
         return $file_path;
     }
 }

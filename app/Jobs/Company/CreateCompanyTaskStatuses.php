@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -46,12 +46,12 @@ class CreateCompanyTaskStatuses
      */
     public function handle()
     {
-
         MultiDB::setDb($this->company->db);
-        
-        if(TaskStatus::where('company_id', $this->company->id)->count() > 0)
+
+        if (TaskStatus::where('company_id', $this->company->id)->count() > 0) {
             return;
-        
+        }
+
         App::forgetInstance('translator');
         $t = app('translator');
         App::setLocale($this->company->locale());

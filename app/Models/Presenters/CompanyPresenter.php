@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -13,6 +13,7 @@ namespace App\Models\Presenters;
 
 use App\Models\Country;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Class CompanyPresenter.
@@ -46,6 +47,24 @@ class CompanyPresenter extends EntityPresenter
 
     }
 
+    public function logoDocker($settings = null)
+    {
+        
+        if (! $settings) {
+            $settings = $this->entity->settings;
+        }
+
+        $basename = basename($this->settings->company_logo);
+
+        $logo = Storage::get("{$this->company_key}/{$basename}");
+
+        if(!$logo)
+            return $this->logo($settings);
+
+        return "data:image/png;base64, ". base64_encode($logo);
+
+    }
+
     /**
      * Test for using base64 encoding
      */
@@ -56,7 +75,7 @@ class CompanyPresenter extends EntityPresenter
         }
 
         if(config('ninja.is_docker') || config('ninja.local_download'))
-            return $this->logo($settings);
+            return $this->logoDocker($settings);
 
         $context_options =array(
             "ssl"=>array(
@@ -124,6 +143,26 @@ class CompanyPresenter extends EntityPresenter
         } else {
             return false;
         }
+    }
+
+    public function address1()
+    {
+        return $this->entity->settings->address1;
+    }
+
+    public function address2()
+    {
+        return $this->entity->settings->address2;
+    }
+
+    public function qr_iban()
+    {
+        return $this->entity->getSetting('qr_iban');
+    }
+
+    public function besr_id()
+    {
+        return $this->entity->getSetting('besr_id');
     }
 
     public function getSpcQrCode($client_currency, $invoice_number, $balance_due_raw, $user_iban)

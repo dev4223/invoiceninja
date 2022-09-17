@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -47,14 +47,16 @@ class InvitationViewedListener implements ShouldQueue
         $entity_name = lcfirst(class_basename($event->entity));
         $invitation = $event->invitation;
 
-        if($entity_name == 'recurringInvoice')
+        if ($entity_name == 'recurringInvoice') {
             return;
+        } elseif ($entity_name == 'purchaseOrder') {
+            $entity_name = 'purchase_order';
+        }
 
         $nmo = new NinjaMailerObject;
-        $nmo->mailable = new NinjaMailer( (new EntityViewedObject($invitation, $entity_name))->build() );
+        $nmo->mailable = new NinjaMailer((new EntityViewedObject($invitation, $entity_name))->build());
         $nmo->company = $invitation->company;
         $nmo->settings = $invitation->company->settings;
-
 
         foreach ($invitation->company->company_users as $company_user) {
             $entity_viewed = "{$entity_name}_viewed";
@@ -67,10 +69,7 @@ class InvitationViewedListener implements ShouldQueue
 
                 $nmo->to_user = $company_user->user;
                 NinjaMailerJob::dispatch($nmo);
-
             }
-
         }
-
     }
 }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -22,7 +22,6 @@ use Illuminate\Support\Facades\Gate;
  */
 class ClientFilters extends QueryFilters
 {
-
     /**
      * Filter by name.
      *
@@ -57,8 +56,9 @@ class ClientFilters extends QueryFilters
     {
         $parts = explode(':', $balance);
 
-        if(!is_array($parts))
+        if (! is_array($parts)) {
             return $this->builder;
+        }
 
         return $this->builder->whereBetween('balance', [$parts[0], $parts[1]]);
     }
@@ -70,7 +70,6 @@ class ClientFilters extends QueryFilters
         $this->builder->whereHas('contacts', function ($query) use ($email) {
             $query->where('email', $email);
         });
-
     }
 
     public function client_id(string $client_id = '') :Builder
@@ -80,7 +79,6 @@ class ClientFilters extends QueryFilters
         }
 
         return $this->builder->where('id', $this->decodePrimaryKey($client_id));
-        
     }
 
     public function id_number(string $id_number = ''):Builder
@@ -109,10 +107,10 @@ class ClientFilters extends QueryFilters
         return  $this->builder->where(function ($query) use ($filter) {
             $query->where('clients.name', 'like', '%'.$filter.'%')
                           ->orWhere('clients.id_number', 'like', '%'.$filter.'%')
-                          ->orWhereHas('contacts', function ($query) use($filter){
-                            $query->where('first_name', 'like', '%'.$filter.'%');
-                            $query->orWhere('last_name', 'like', '%'.$filter.'%');
-                            $query->orWhere('email', 'like', '%'.$filter.'%');
+                          ->orWhereHas('contacts', function ($query) use ($filter) {
+                              $query->where('first_name', 'like', '%'.$filter.'%');
+                              $query->orWhere('last_name', 'like', '%'.$filter.'%');
+                              $query->orWhere('email', 'like', '%'.$filter.'%');
                           })
                           ->orWhere('clients.custom_value1', 'like', '%'.$filter.'%')
                           ->orWhere('clients.custom_value2', 'like', '%'.$filter.'%')
@@ -170,6 +168,9 @@ class ClientFilters extends QueryFilters
     {
         $sort_col = explode('|', $sort);
 
+        if($sort_col[0] == 'display_name')
+            $sort_col[0] = 'name';
+        
         return $this->builder->orderBy($sort_col[0], $sort_col[1]);
     }
 

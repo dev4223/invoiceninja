@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -51,7 +51,7 @@ class SubscriptionArchivedActivity implements ShouldQueue
         $fields->user_id = $user_id;
         $fields->company_id = $subscription->company_id;
         $fields->activity_type_id = Activity::ARCHIVE_SUBSCRIPTION;
-        
+
         $this->activity_repo->save($fields, $subscription, $event->event_vars);
     }
 }

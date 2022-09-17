@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -44,7 +44,6 @@ class UpdateUserLastLogin implements ShouldQueue
      */
     public function handle($event)
     {
-        
         MultiDB::setDb($event->company->db);
 
         $user = $event->user;
@@ -54,15 +53,14 @@ class UpdateUserLastLogin implements ShouldQueue
         $event_vars = $event->event_vars;
         $ip = array_key_exists('ip', $event->event_vars) ? $event->event_vars['ip'] : 'IP address not resolved';
 
-        if($user->ip != $ip)
-        {
+        if ($user->ip != $ip) {
             $nmo = new NinjaMailerObject;
             $nmo->mailable = new UserLoggedIn($user, $user->account->companies->first(), $ip);
             $nmo->company = $user->account->companies->first();
             $nmo->settings = $user->account->companies->first()->settings;
             $nmo->to_user = $user;
-            NinjaMailerJob::dispatch($nmo);
-        
+            NinjaMailerJob::dispatch($nmo, true);
+
             $user->ip = $ip;
             $user->save();
         }
@@ -77,6 +75,5 @@ class UpdateUserLastLogin implements ShouldQueue
             null,
             $event->company,
         );
-
     }
 }

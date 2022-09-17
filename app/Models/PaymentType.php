@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -18,7 +18,7 @@ class PaymentType extends StaticModel
      */
     public $timestamps = false;
 
-    const CREDIT = 1;
+    const CREDIT = 32;
     const ACH = 4;
     const VISA = 5;
     const MASTERCARD = 6;

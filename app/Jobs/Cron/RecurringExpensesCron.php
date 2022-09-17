@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -25,7 +25,7 @@ class RecurringExpensesCron
     use GeneratesCounter;
 
     public $tries = 1;
-    
+
     /**
      * Create a new job instance.
      *
@@ -43,12 +43,10 @@ class RecurringExpensesCron
     public function handle() : void
     {
         /* Get all expenses where the send date is less than NOW + 30 minutes() */
-        nlog("Sending recurring expenses ".Carbon::now()->format('Y-m-d h:i:s'));
+        nlog('Sending recurring expenses '.Carbon::now()->format('Y-m-d h:i:s'));
 
         if (! config('ninja.db.multi_db_enabled')) {
-
             $this->getRecurringExpenses();
-
         } else {
             //multiDB environment, need to
             foreach (MultiDB::$dbs as $db) {
@@ -67,21 +65,19 @@ class RecurringExpensesCron
                                                     ->where('status_id', RecurringInvoice::STATUS_ACTIVE)
                                                     ->where('remaining_cycles', '!=', '0')
                                                     ->whereHas('company', function ($query) {
-                                                         $query->where('is_disabled',0);
+                                                        $query->where('is_disabled', 0);
                                                     })
                                                     ->with('company')
                                                     ->cursor();
 
-        nlog(now()->format('Y-m-d') . ' Generating Recurring Expenses. Count = '.$recurring_expenses->count());
+        nlog(now()->format('Y-m-d').' Generating Recurring Expenses. Count = '.$recurring_expenses->count());
 
         $recurring_expenses->each(function ($recurring_expense, $key) {
-            nlog("Current date = " . now()->format("Y-m-d") . " Recurring date = " .$recurring_expense->next_send_date);
+            nlog('Current date = '.now()->format('Y-m-d').' Recurring date = '.$recurring_expense->next_send_date);
 
-            if (!$recurring_expense->company->is_disabled) {
+            if (! $recurring_expense->company->is_disabled) {
                 $this->generateExpense($recurring_expense);
             }
-
-
         });
     }
 
@@ -94,8 +90,9 @@ class RecurringExpensesCron
         $expense->save();
 
         $recurring_expense->next_send_date = $recurring_expense->nextSendDate();
+        $recurring_expense->next_send_date_client = $recurring_expense->next_send_date;
+
         $recurring_expense->remaining_cycles = $recurring_expense->remainingCycles();
         $recurring_expense->save();
     }
-
 }

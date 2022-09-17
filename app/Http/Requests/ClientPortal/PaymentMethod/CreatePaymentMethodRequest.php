@@ -4,9 +4,9 @@ namespace App\Http\Requests\ClientPortal\PaymentMethod;
 
 use App\Http\Requests\Request;
 use App\Models\Client;
-use Illuminate\Foundation\Http\FormRequest;
 use function auth;
 use function collect;
+use Illuminate\Foundation\Http\FormRequest;
 
 class CreatePaymentMethodRequest extends FormRequest
 {
@@ -22,7 +22,7 @@ class CreatePaymentMethodRequest extends FormRequest
 
         $available_methods = [];
 
-        collect($client->service()->getPaymentMethods(1))
+        collect($client->service()->getPaymentMethods(-1))
             ->filter(function ($method) use (&$available_methods) {
                 $available_methods[] = $method['gateway_type_id'];
             });

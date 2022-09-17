@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -34,17 +34,16 @@ class CreditController extends Controller
 
         $data = [
             'credit' => $credit,
-            'key' => $invitation ? $invitation->key : false
+            'key' => $invitation ? $invitation->key : false,
+            'invitation' => $invitation
         ];
 
-            if ($invitation && auth()->guard('contact') && ! request()->has('silent') && ! $invitation->viewed_date) {
+        if ($invitation && auth()->guard('contact') && ! request()->has('silent') && ! $invitation->viewed_date) {
+            $invitation->markViewed();
 
-                $invitation->markViewed();
-
-                event(new InvitationWasViewed($credit, $invitation, $credit->company, Ninja::eventVars()));
-                event(new CreditWasViewed($invitation, $invitation->company, Ninja::eventVars()));
-            
-            }
+            event(new InvitationWasViewed($credit, $invitation, $credit->company, Ninja::eventVars()));
+            event(new CreditWasViewed($invitation, $invitation->company, Ninja::eventVars()));
+        }
 
         if ($request->query('mode') === 'fullscreen') {
             return render('credits.show-fullscreen', $data);
