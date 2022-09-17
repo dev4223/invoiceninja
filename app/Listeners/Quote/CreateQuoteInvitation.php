@@ -4,7 +4,7 @@
  *
  * @link https://github.com/creditninja/creditninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://creditninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://creditninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -20,9 +20,9 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 class CreateQuoteInvitation implements ShouldQueue
 {
     use MakesHash;
-    
+
     public $delay = 5;
-    
+
     /**
      * Handle the event.
      *

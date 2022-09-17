@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -37,7 +37,6 @@ use Illuminate\Queue\SerializesModels;
 class TransactionLog implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
 
     private array $payload;
 
@@ -76,7 +75,6 @@ class TransactionLog implements ShouldQueue
         $this->db = $db;
         $this->event = $event;
         $this->data = $data;
-
     }
 
     /**
@@ -91,11 +89,10 @@ class TransactionLog implements ShouldQueue
 
         $this->setTransformer();
 
-        $this->payload =  $this->event_transformer->transform($this->data);
+        $this->payload = $this->event_transformer->transform($this->data);
 
         $this->persist();
     }
-
 
     private function setTransformer()
     {
@@ -105,7 +102,6 @@ class TransactionLog implements ShouldQueue
 
         return $this;
     }
-
 
     private function persist()
     {

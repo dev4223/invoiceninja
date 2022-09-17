@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -22,6 +22,7 @@ use App\Models\ClientContact;
 use App\Models\CreditInvitation;
 use App\Models\InvoiceInvitation;
 use App\Models\Payment;
+use App\Models\PurchaseOrderInvitation;
 use App\Models\QuoteInvitation;
 use App\Services\ClientPortal\InstantPayment;
 use App\Utils\CurlUtils;
@@ -41,7 +42,7 @@ class InvitationController extends Controller
     use MakesDates;
 
     public function router(string $entity, string $invitation_key)
-    {   
+    {
         Auth::logout();
 
         return $this->genericRouter($entity, $invitation_key);
@@ -79,15 +80,14 @@ class InvitationController extends Controller
 
         $entity_obj = 'App\Models\\'.ucfirst(Str::camel($entity)).'Invitation';
 
-        $invitation = $entity_obj::where('key', $invitation_key)
-                                    ->whereHas($entity, function ($query) {
-                                         $query->where('is_deleted',0);
-                                    })
+        $invitation = $entity_obj::withTrashed()
+                                    ->with($entity)
+                                    ->where('key', $invitation_key)
                                     ->with('contact.client')
-                                    ->first();
+                                    ->firstOrFail();
 
-        if(!$invitation)
-            return abort(404,'The resource is no longer available.');
+        if($invitation->{$entity}->is_deleted)
+            return $this->render('generic.not_available', ['account' => $invitation->company->account, 'company' => $invitation->company]);
 
         /* 12/01/2022 Clean up an edge case where if the contact is trashed, restore if a invitation comes back. */
         if($invitation->contact->trashed())
@@ -119,7 +119,6 @@ class InvitationController extends Controller
             return redirect()->route('client.login');
 
         } else {
-            nlog("else - default - login contact");
             request()->session()->invalidate();
             auth()->guard('contact')->loginUsingId($client_contact->id, true);
         }
@@ -128,9 +127,11 @@ class InvitationController extends Controller
         if (auth()->guard('contact')->user() && ! request()->has('silent') && ! $invitation->viewed_date) {
             $invitation->markViewed();
 
-            event(new InvitationWasViewed($invitation->{$entity}, $invitation, $invitation->{$entity}->company, Ninja::eventVars()));
+            if(!session()->get('is_silent'))
+                event(new InvitationWasViewed($invitation->{$entity}, $invitation, $invitation->{$entity}->company, Ninja::eventVars()));
 
-            $this->fireEntityViewedEvent($invitation, $entity);
+            if(!session()->get('is_silent'))
+                $this->fireEntityViewedEvent($invitation, $entity);
         }
         else{
             $is_silent = 'true';
@@ -165,6 +166,8 @@ class InvitationController extends Controller
     public function routerForDownload(string $entity, string $invitation_key)
     {
 
+        set_time_limit(45);
+
         if(Ninja::isHosted())
             return $this->returnRawPdf($entity, $invitation_key);
 
@@ -181,7 +184,8 @@ class InvitationController extends Controller
 
         $entity_obj = 'App\Models\\'.ucfirst(Str::camel($entity)).'Invitation';
 
-        $invitation = $entity_obj::where('key', $invitation_key)
+        $invitation = $entity_obj::withTrashed()
+                                    ->where('key', $invitation_key)
                                     ->with('contact.client')
                                     ->firstOrFail();
 
@@ -189,9 +193,8 @@ class InvitationController extends Controller
             return response()->json(["message" => "no record found"], 400);
 
         $file_name = $invitation->{$entity}->numberFormatter().'.pdf';
-        nlog($file_name);
 
-        $file = CreateRawPdf::dispatchNow($invitation, $invitation->company->db);
+        $file = (new CreateRawPdf($invitation, $invitation->company->db))->handle();
 
         $headers = ['Content-Type' => 'application/pdf'];
 
@@ -201,7 +204,7 @@ class InvitationController extends Controller
         return response()->streamDownload(function () use($file) {
                 echo $file;
         },  $file_name, $headers);
-        
+
     }
 
     public function routerForIframe(string $entity, string $client_hash, string $invitation_key)
@@ -224,17 +227,21 @@ class InvitationController extends Controller
 
     public function payInvoice(Request $request, string $invitation_key)
     {
-        $invitation = InvoiceInvitation::where('key', $invitation_key)
+        $invitation = InvoiceInvitation::withTrashed()
+                                    ->where('key', $invitation_key)
                                     ->with('contact.client')
                                     ->firstOrFail();
+
+        if($invitation->contact->trashed())
+            $invitation->contact->restore();
         
         auth()->guard('contact')->loginUsingId($invitation->contact->id, true);
-
+        
         $invoice = $invitation->invoice;
 
         if($invoice->partial > 0)
             $amount = round($invoice->partial, (int)$invoice->client->currency()->precision);
-        else 
+        else
             $amount = round($invoice->balance, (int)$invoice->client->currency()->precision);
 
         $gateways = $invitation->contact->client->service()->getPaymentMethods($amount);
@@ -276,6 +283,10 @@ class InvitationController extends Controller
             $invite->contact->save();
         }elseif($entity == 'credit'){
             $invite = CreditInvitation::withTrashed()->where('key', $invitation_key)->first();
+            $invite->contact->send_email = false;
+            $invite->contact->save();
+        }elseif($entity == 'purchase_order'){
+            $invite = PurchaseOrderInvitation::withTrashed()->where('key', $invitation_key)->first();
             $invite->contact->send_email = false;
             $invite->contact->save();
         }

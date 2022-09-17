@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -85,7 +85,7 @@ trait QuoteEmailBuilder
             //$data = Parsedown::instance()->line($data);
 
             $converter = new CommonMarkConverter([
-                 'html_input' => 'allow',
+                'html_input' => 'allow',
                 'allow_unsafe_links' => true,
             ]);
 

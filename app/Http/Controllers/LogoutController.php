@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -14,8 +14,8 @@ namespace App\Http\Controllers;
 use App\Models\CompanyToken;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use stdClass;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class LogoutController extends BaseController
 {
@@ -60,15 +60,14 @@ class LogoutController extends BaseController
     public function index(Request $request)
     {
         $ct = CompanyToken::with('company.tokens')
-                    ->whereRaw('BINARY `token`= ?', [$request->header('X-API-TOKEN')])
+                    ->where('token', $request->header('X-API-TOKEN'))
                     ->first();
 
-                    $ct->company
+        $ct->company
                     ->tokens()
                     ->where('is_system', true)
                     ->forceDelete();
 
         return response()->json(['message' => 'All tokens deleted'], 200);
     }
-
 }

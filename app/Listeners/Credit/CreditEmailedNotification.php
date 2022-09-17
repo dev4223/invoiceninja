@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -45,7 +45,7 @@ class CreditEmailedNotification implements ShouldQueue
         $credit->saveQuietly();
 
         $nmo = new NinjaMailerObject;
-        $nmo->mailable = new NinjaMailer( (new EntitySentObject($event->invitation, 'credit', $event->template))->build() );
+        $nmo->mailable = new NinjaMailer((new EntitySentObject($event->invitation, 'credit', $event->template))->build());
         $nmo->company = $credit->company;
         $nmo->settings = $credit->company->settings;
 
@@ -57,7 +57,7 @@ class CreditEmailedNotification implements ShouldQueue
             $methods = $this->findUserNotificationTypes($event->invitation, $company_user, 'credit', ['all_notifications', 'credit_sent', 'credit_sent_all']);
 
             if (($key = array_search('mail', $methods)) !== false) {
-            // if (($key = array_search('mail', $methods))) {
+                // if (($key = array_search('mail', $methods))) {
                 unset($methods[$key]);
 
                 $nmo->to_user = $user;

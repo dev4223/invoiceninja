@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -42,38 +42,6 @@ class InvoiceInvitation extends BaseModel
     {
         return self::class;
     }
-
-    // public function getSignatureDateAttribute($value)
-    // {
-    //     if (!$value) {
-    //         return (new Carbon($value))->format('Y-m-d');
-    //     }
-    //     return $value;
-    // }
-
-    // public function getSentDateAttribute($value)
-    // {
-    //     if (!$value) {
-    //         return (new Carbon($value))->format('Y-m-d');
-    //     }
-    //     return $value;
-    // }
-
-    // public function getViewedDateAttribute($value)
-    // {
-    //     if (!$value) {
-    //         return (new Carbon($value))->format('Y-m-d');
-    //     }
-    //     return $value;
-    // }
-
-    // public function getOpenedDateAttribute($value)
-    // {
-    //     if (!$value) {
-    //         return (new Carbon($value))->format('Y-m-d');
-    //     }
-    //     return $value;
-    // }
 
     public function entityType()
     {
@@ -144,7 +112,7 @@ class InvoiceInvitation extends BaseModel
 
         if (! Storage::exists($this->invoice->client->invoice_filepath($this).$this->invoice->numberFormatter().'.pdf')) {
             event(new InvoiceWasUpdated($this->invoice, $this->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
-            CreateEntityPdf::dispatchNow($this);
+            (new CreateEntityPdf($this))->handle();
         }
 
         return $storage_path;

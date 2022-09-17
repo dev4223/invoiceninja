@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -55,7 +55,7 @@ trait SettingsSaver
             elseif (substr($key, -3) == '_id' || substr($key, -14) == 'number_counter' || ($key == 'payment_terms' && strlen($settings->{$key}) >= 1) || ($key == 'valid_until' && strlen($settings->{$key}) >= 1)) {    
                 $value = 'integer';
 
-                if($key == 'gmail_sending_user_id')
+                if($key == 'gmail_sending_user_id' || $key == 'besr_id')
                     $value = 'string';
 
                 if (! property_exists($settings, $key)) {

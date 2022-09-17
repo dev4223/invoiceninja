@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -63,7 +63,6 @@ class ValidRefundableRequest implements Rule
             }
         }
 
-
         foreach ($request_invoices as $request_invoice) {
             $this->checkInvoiceIsPaymentable($request_invoice, $payment);
         }
@@ -79,8 +78,9 @@ class ValidRefundableRequest implements Rule
     {
         $invoice = Invoice::whereId($invoice['invoice_id'])->whereCompanyId($payment->company_id)->withTrashed()->first();
 
-        if(!$invoice){
-            $this->error_msg = "Invoice not found for refund";
+        if (! $invoice) {
+            $this->error_msg = 'Invoice not found for refund';
+
             return false;
         }
 
@@ -158,7 +158,7 @@ class ValidRefundableRequest implements Rule
                 if ($request_credit['amount'] > $refundable_amount) {
                     $credit = $paymentable;
 
-                    $this->error_msg = ctrans('texts.max_refundable_credit',['credit' => $credit->hashed_id, 'amount' => $refundable_amount]);
+                    $this->error_msg = ctrans('texts.max_refundable_credit', ['credit' => $credit->hashed_id, 'amount' => $refundable_amount]);
 
                     return false;
                 }

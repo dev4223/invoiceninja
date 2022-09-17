@@ -4,13 +4,14 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Factory;
 
+use App\Models\CompanyUser;
 use App\Models\User;
 
 class UserFactory
@@ -28,7 +29,7 @@ class UserFactory
         $user->failed_logins = 0;
         $user->signature = '';
         $user->theme_id = 0;
-        
+
         return $user;
     }
 }

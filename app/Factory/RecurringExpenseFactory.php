@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -47,7 +47,7 @@ class RecurringExpenseFactory
         $recurring_expense->custom_value4 = '';
         $recurring_expense->uses_inclusive_taxes = true;
         $recurring_expense->calculate_tax_by_amount = true;
-        
+
         return $recurring_expense;
     }
 }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -63,7 +63,7 @@ class ProfileController extends Controller
 
         //update avatar if needed
         if ($request->file('logo')) {
-            $path = UploadAvatar::dispatchNow($request->file('logo'), auth()->user()->client->client_hash);
+            $path = (new UploadAvatar($request->file('logo'), auth()->user()->client->client_hash))->handle();
 
             if ($path) {
                 $client->logo = $path;

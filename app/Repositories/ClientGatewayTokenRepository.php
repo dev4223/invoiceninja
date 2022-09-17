@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -18,14 +18,11 @@ use App\Models\ClientGatewayToken;
  */
 class ClientGatewayTokenRepository extends BaseRepository
 {
+    public function save(array $data, ClientGatewayToken $client_gateway_token) :ClientGatewayToken
+    {
+        $client_gateway_token->fill($data);
+        $client_gateway_token->save();
 
-	public function save(array $data, ClientGatewayToken $client_gateway_token) :ClientGatewayToken
-	{
-
-		$client_gateway_token->fill($data);
-		$client_gateway_token->save();
-
-		return $client_gateway_token->fresh();		
-	}
-
+        return $client_gateway_token->fresh();
+    }
 }

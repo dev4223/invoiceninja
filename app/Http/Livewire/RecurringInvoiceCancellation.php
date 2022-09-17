@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -24,7 +24,7 @@ class RecurringInvoiceCancellation extends Component
     public $invoice;
 
     public $company;
-    
+
     public function mount()
     {
         MultiDB::setDb($this->company->db);
@@ -43,6 +43,4 @@ class RecurringInvoiceCancellation extends Component
 
         return redirect()->route('client.recurring_invoices.request_cancellation', ['recurring_invoice' => $this->invoice->hashed_id]);
     }
-
-
 }

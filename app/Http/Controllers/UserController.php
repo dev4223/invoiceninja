@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -158,7 +158,7 @@ class UserController extends BaseController
      */
     public function create(CreateUserRequest $request)
     {
-        $user = UserFactory::create(auth()->user()->account->id);
+        $user = UserFactory::create(auth()->user()->account_id);
 
         return $this->itemResponse($user);
     }
@@ -210,7 +210,7 @@ class UserController extends BaseController
 
         $user_agent = request()->input('token_name') ?: request()->server('HTTP_USER_AGENT');
 
-        $ct = CreateCompanyToken::dispatchNow($company, $user, $user_agent);
+        $ct = (new CreateCompanyToken($company, $user, $user_agent))->handle();
 
         event(new UserWasCreated($user, auth()->user(), $company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
 
@@ -396,7 +396,7 @@ class UserController extends BaseController
             UserEmailChanged::dispatch($new_user, json_decode($old_user), auth()->user()->company());
         }
 
-        $user->company_users()->update(["permissions_updated_at" => now()]);        
+       // $user->company_users()->update(["permissions_updated_at" => now()]);        
 
         event(new UserWasUpdated($user, auth()->user(), auth()->user()->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
 

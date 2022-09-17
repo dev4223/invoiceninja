@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -26,6 +26,7 @@ use App\Models\Company;
 use App\Models\CreditInvitation;
 use App\Models\InvoiceInvitation;
 use App\Models\Payment;
+use App\Models\PurchaseOrderInvitation;
 use App\Models\QuoteInvitation;
 use App\Models\RecurringInvoiceInvitation;
 use App\Models\SystemLog;
@@ -216,12 +217,12 @@ class ProcessPostmarkWebhook implements ShouldQueue
             $this->request['MessageID']
         );
 
-        LightLogs::create($bounce)->queue();
+        LightLogs::create($bounce)->batch();
 
         SystemLogger::dispatch($this->request, SystemLog::CATEGORY_MAIL, SystemLog::EVENT_MAIL_BOUNCED, SystemLog::TYPE_WEBHOOK_RESPONSE, $this->invitation->contact->client, $this->invitation->company);
 
-        if(config('ninja.notification.slack'))
-            $this->invitation->company->notification(new EmailBounceNotification($this->invitation->company->account))->ninja();
+        // if(config('ninja.notification.slack'))
+            // $this->invitation->company->notification(new EmailBounceNotification($this->invitation->company->account))->ninja();
 
     }
 
@@ -262,7 +263,7 @@ class ProcessPostmarkWebhook implements ShouldQueue
             $this->request['MessageID']
         );
 
-        LightLogs::create($spam)->queue();
+        LightLogs::create($spam)->batch();
 
         SystemLogger::dispatch($this->request, SystemLog::CATEGORY_MAIL, SystemLog::EVENT_MAIL_SPAM_COMPLAINT, SystemLog::TYPE_WEBHOOK_RESPONSE, $this->invitation->contact->client, $this->invitation->company);
 
@@ -282,6 +283,8 @@ class ProcessPostmarkWebhook implements ShouldQueue
         elseif($invitation = RecurringInvoiceInvitation::where('message_id', $message_id)->first())
             return $invitation;
         elseif($invitation = CreditInvitation::where('message_id', $message_id)->first())
+            return $invitation;
+        elseif($invitation = PurchaseOrderInvitation::where('message_id', $message_id)->first())
             return $invitation;
         else
             return $invitation;

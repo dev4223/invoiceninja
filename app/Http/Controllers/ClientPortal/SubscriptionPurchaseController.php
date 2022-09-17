@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -25,7 +25,7 @@ class SubscriptionPurchaseController extends Controller
     public function index(Subscription $subscription, Request $request)
     {
         /* Make sure the contact is logged into the correct company for this subscription */
-        if(auth()->guard('contact')->user() && auth()->guard('contact')->user()->company_id != $subscription->company_id){
+        if (auth()->guard('contact')->user() && auth()->guard('contact')->user()->company_id != $subscription->company_id) {
             auth()->guard('contact')->logout();
             $request->session()->invalidate();
         }

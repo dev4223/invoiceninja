@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -19,7 +19,6 @@ use App\Utils\Ninja;
  */
 class DocumentRepository extends BaseRepository
 {
-
     public function delete($document)
     {
         $document->deleteFile();
@@ -28,18 +27,15 @@ class DocumentRepository extends BaseRepository
 
     public function restore($document)
     {
-        return;
+
         // if (! $document->trashed()) {
         //     return;
         // }
 
         // $document->restore();
-
     }
 
     public function archive($document)
     {
-        return;
     }
-
 }

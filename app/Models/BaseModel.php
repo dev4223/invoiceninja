@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -202,6 +202,11 @@ class BaseModel extends Model
         $formatted_number = preg_replace('/\s+/', '_', $formatted_number);
 
         return $formatted_number;
+    }
+
+    public function translate_entity()
+    {
+        return ctrans('texts.item');
     }
 
 }

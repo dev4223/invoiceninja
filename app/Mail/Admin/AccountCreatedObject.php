@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -16,23 +16,18 @@ use Illuminate\Support\Facades\App;
 
 class AccountCreatedObject
 {
-
     public $user;
 
     public $company;
 
-    /**
-     *
-     */
     public function __construct($user, $company)
     {
         $this->user = $user;
-    	$this->company = $company;
+        $this->company = $company;
     }
 
     public function build()
     {
-
         App::forgetInstance('translator');
         /* Init a new copy of the translator*/
         $t = app('translator');
@@ -50,7 +45,6 @@ class AccountCreatedObject
             'settings' => $this->company->settings,
             'logo' => $this->company->present()->logo(),
         ];
-
 
         $mail_obj = new \stdClass;
         $mail_obj->subject = ctrans('texts.new_signup');

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -38,14 +38,17 @@ class StoreProductRequest extends Request
             $rules['documents'] = 'file|mimes:png,ai,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
         }
 
-        $rules['cost'] = 'numeric';
-        $rules['price'] = 'numeric';
-        $rules['quantity'] = 'numeric';
+        $rules['cost'] = 'sometimes|numeric';
+        $rules['price'] = 'sometimes|numeric';
+        $rules['quantity'] = 'sometimes|numeric';
+        $rules['in_stock_quantity'] = 'sometimes|numeric';
+        $rules['stock_notification_threshold'] = 'sometimes|numeric';
+        $rules['stock_notification'] = 'sometimes|bool';
 
         return $rules;
     }
 
-    protected function prepareForValidation()
+    public function prepareForValidation()
     {
         $input = $this->all();
 

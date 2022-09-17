@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -24,7 +24,7 @@ class CompanyUserTransformer extends EntityTransformer
      */
     protected $defaultIncludes = [
         // 'user',
-     ];
+    ];
 
     /**
      * @var array
@@ -42,8 +42,8 @@ class CompanyUserTransformer extends EntityTransformer
 
         return [
             'permissions' => $company_user->permissions ?: '',
-            'notifications' => (object) $company_user->notifications ?: $blank_obj,
-            'settings' => (object) $company_user->settings ?: $blank_obj,
+            'notifications' => $company_user->notifications ? (object) $company_user->notifications : $blank_obj,
+            'settings' =>  $company_user->settings ? (object) $company_user->settings : $blank_obj,
             'is_owner' => (bool) $company_user->is_owner,
             'is_admin' => (bool) $company_user->is_admin,
             'is_locked' => (bool) $company_user->is_locked,

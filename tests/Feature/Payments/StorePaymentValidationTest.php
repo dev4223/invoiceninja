@@ -6,8 +6,9 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
+
 namespace Tests\Feature\Payments;
 
 use App\DataMapper\ClientSettings;
@@ -43,7 +44,7 @@ class StorePaymentValidationTest extends TestCase
     use MockAccountData;
     use WithoutEvents;
 
-    public function setUp() :void
+    protected function setUp() :void
     {
         parent::setUp();
 
@@ -55,17 +56,79 @@ class StorePaymentValidationTest extends TestCase
 
         $this->makeTestData();
 
-
         $this->withoutMiddleware(
             ThrottleRequests::class
         );
     }
 
+    public function testNumericParse()
+    {
+        $this->assertFalse(is_numeric('2760.0,139.14'));
+    }
+
+    public function testNoAmountGiven()
+    {
+        $data = [
+            // 'amount' => 0,
+            'client_id' => $this->client->hashed_id,
+            'invoices' => [
+                [
+                    'invoice_id' => $this->invoice->hashed_id,
+                    'amount' => 10,
+                ],
+            ],
+            'credits' => [
+                [
+                    'credit_id' => $this->credit->hashed_id,
+                    'amount' => 5,
+                ],
+            ],
+            'date' => '2019/12/12',
+        ];
+
+        $response = false;
+
+        try {
+            $response = $this->withHeaders([
+                'X-API-SECRET' => config('ninja.api_secret'),
+                'X-API-TOKEN' => $this->token,
+            ])->post('/api/v1/payments/', $data);
+        } catch (ValidationException $e) {
+            $message = json_decode($e->validator->getMessageBag(), 1);
+            nlog($e->validator->getMessageBag());
+        }
+
+        $response->assertStatus(200);
+    }
+
+    public function testInValidPaymentAmount()
+    {
+        $data = [
+            'amount' => '10,33',
+            'client_id' => $this->client->hashed_id,
+            'invoices' => [
+            ],
+            'date' => '2019/12/12',
+        ];
+
+        $response = false;
+
+        try {
+            $response = $this->withHeaders([
+                'X-API-SECRET' => config('ninja.api_secret'),
+                'X-API-TOKEN' => $this->token,
+            ])->post('/api/v1/payments/', $data);
+        } catch (ValidationException $e) {
+            $message = json_decode($e->validator->getMessageBag(), 1);
+            nlog($e->validator->getMessageBag());
+        }
+
+        $response->assertStatus(302);
+    }
 
     public function testValidPayment()
     {
-
-       $data = [
+        $data = [
             'amount' => 0,
             'client_id' => $this->client->hashed_id,
             'invoices' => [
@@ -77,23 +140,20 @@ class StorePaymentValidationTest extends TestCase
 
         try {
             $response = $this->withHeaders([
-            'X-API-SECRET' => config('ninja.api_secret'),
-            'X-API-TOKEN' => $this->token,
-        ])->post('/api/v1/payments/', $data);
+                'X-API-SECRET' => config('ninja.api_secret'),
+                'X-API-TOKEN' => $this->token,
+            ])->post('/api/v1/payments/', $data);
         } catch (ValidationException $e) {
             $message = json_decode($e->validator->getMessageBag(), 1);
             nlog($e->validator->getMessageBag());
         }
 
         $response->assertStatus(200);
-
     }
-
 
     public function testValidPaymentWithAmount()
     {
-
-       $data = [
+        $data = [
             'amount' => 0,
             'client_id' => $this->client->hashed_id,
             'invoices' => [
@@ -105,8 +165,8 @@ class StorePaymentValidationTest extends TestCase
             'credits' => [
                 [
                     'credit_id' => $this->credit->hashed_id,
-                    'amount' => 5
-                ]
+                    'amount' => 5,
+                ],
             ],
             'date' => '2019/12/12',
         ];
@@ -115,23 +175,20 @@ class StorePaymentValidationTest extends TestCase
 
         try {
             $response = $this->withHeaders([
-            'X-API-SECRET' => config('ninja.api_secret'),
-            'X-API-TOKEN' => $this->token,
-        ])->post('/api/v1/payments/', $data);
+                'X-API-SECRET' => config('ninja.api_secret'),
+                'X-API-TOKEN' => $this->token,
+            ])->post('/api/v1/payments/', $data);
         } catch (ValidationException $e) {
             $message = json_decode($e->validator->getMessageBag(), 1);
             nlog($e->validator->getMessageBag());
         }
 
         $response->assertStatus(200);
-
     }
 
     public function testValidPaymentWithInvalidData()
     {
-
-        
-       $data = [
+        $data = [
             'amount' => 0,
             'client_id' => $this->client->hashed_id,
             'invoices' => [
@@ -142,26 +199,21 @@ class StorePaymentValidationTest extends TestCase
             'credits' => [
                 [
                     'credit_id' => $this->credit->hashed_id,
-                    'amount' => 5
-                ]
+                    'amount' => 5,
+                ],
             ],
             'date' => '2019/12/12',
         ];
 
         $response = false;
 
-        try{
+        try {
             $response = $this->withHeaders([
                 'X-API-SECRET' => config('ninja.api_secret'),
                 'X-API-TOKEN' => $this->token,
             ])->post('/api/v1/payments/', $data);
-        }catch(ValidationException $e){
+        } catch (ValidationException $e) {
             $response->assertStatus(302);
         }
-
     }
-
-
-
 }
-

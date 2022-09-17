@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -37,11 +37,11 @@ class ApplyNumber
         switch ($this->client->getSetting('counter_number_applied')) {
             case 'when_saved':
                 $quote = $this->trySaving($quote);
-                // $quote->number = $this->getNextQuoteNumber($this->client, $quote);
+                    // $quote->number = $this->getNextQuoteNumber($this->client, $quote);
                 break;
             case 'when_sent':
                 if ($quote->status_id == Quote::STATUS_SENT) {
-                $quote = $this->trySaving($quote);
+                    $quote = $this->trySaving($quote);
                     // $quote->number = $this->getNextQuoteNumber($this->client, $quote);
                 }
                 break;
@@ -56,30 +56,22 @@ class ApplyNumber
 
     private function trySaving($quote)
     {
+        $x = 1;
 
-        $x=1;
-
-        do{
-
-            try{
-
+        do {
+            try {
                 $quote->number = $this->getNextQuoteNumber($this->client, $quote);
                 $quote->saveQuietly();
 
                 $this->completed = false;
-                
-
-            }
-            catch(QueryException $e){
-
+            } catch (QueryException $e) {
                 $x++;
 
-                if($x>10)
+                if ($x > 50) {
                     $this->completed = false;
+                }
             }
-        
-        }
-        while($this->completed);
+        } while ($this->completed);
 
         return $quote;
     }

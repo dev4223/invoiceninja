@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -22,7 +22,5 @@ use App\Models\TransactionEvent;
  */
 class InvoicePaymentTransaction extends BaseTransaction implements TransactionInterface
 {
-    
-    public $event_id = TransactionEvent::INVOICE_PAYMENT_APPLIED; 
-
+    public $event_id = TransactionEvent::INVOICE_PAYMENT_APPLIED;
 }

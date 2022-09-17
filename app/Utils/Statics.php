@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -70,11 +70,10 @@ class Statics
         $data = [];
 
         foreach (config('ninja.cached_tables') as $name => $class) {
-            
-            if (!Cache::has($name)) {
+            if (! Cache::has($name)) {
 
                 // check that the table exists in case the migration is pending
-                if (!Schema::hasTable((new $class())->getTable())) {
+                if (! Schema::hasTable((new $class())->getTable())) {
                     continue;
                 }
                 if ($name == 'payment_terms') {

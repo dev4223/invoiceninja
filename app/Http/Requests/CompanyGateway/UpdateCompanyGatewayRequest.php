@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -39,7 +39,7 @@ class UpdateCompanyGatewayRequest extends Request
         return $rules;
     }
 
-    protected function prepareForValidation()
+    public function prepareForValidation()
     {
         $input = $this->all();
 
@@ -61,8 +61,9 @@ class UpdateCompanyGatewayRequest extends Request
             $input['fees_and_limits'] = $this->cleanFeesAndLimits($input['fees_and_limits']);
         }
 
-        if (isset($input['token_billing']) && $input['token_billing'] == 'disabled') 
+        if (isset($input['token_billing']) && $input['token_billing'] == 'disabled') {
             $input['token_billing'] = 'off';
+        }
 
         $this->replace($input);
     }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -28,23 +28,36 @@ class Backup extends BaseModel
 
     public function storeRemotely(?string $html, Client $client)
     {
-
-        if(!$html || strlen($html) == 0)
+        if (! $html || strlen($html) == 0) {
             return;
+        }
 
-        $path = $client->backup_path() . "/";
-        $filename = now()->format('Y_m_d'). "_" . md5(time()) . ".html";
-        $file_path = $path . $filename;
+        $path = $client->backup_path().'/';
+        $filename = now()->format('Y_m_d').'_'.md5(time()).'.html';
+        $file_path = $path.$filename;
 
         Storage::disk(config('filesystems.default'))->makeDirectory($path, 0775);
-    
+
         Storage::disk(config('filesystems.default'))->put($file_path, $html);
 
-        if(Storage::disk(config('filesystems.default'))->exists($file_path)){
+        if (Storage::disk(config('filesystems.default'))->exists($file_path)) {
             $this->html_backup = '';
             $this->filename = $file_path;
             $this->save();
         }
+    }
 
+    public function deleteFile()
+    {
+        nlog('deleting => '.$this->filename);
+
+        if(!$this->filename)
+            return;
+
+        try {
+            Storage::disk(config('filesystems.default'))->delete($this->filename);
+        } catch (\Exception $e) {
+            nlog('BACKUPEXCEPTION deleting backup file with error '.$e->getMessage());
+        }
     }
 }

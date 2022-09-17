@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -22,7 +22,7 @@ class UpdateAutoBilling extends Component
     public function updateAutoBilling(): void
     {
         if ($this->invoice->auto_bill == 'optin' || $this->invoice->auto_bill == 'optout') {
-            $this->invoice->auto_bill_enabled = !$this->invoice->auto_bill_enabled;
+            $this->invoice->auto_bill_enabled = ! $this->invoice->auto_bill_enabled;
             $this->invoice->saveQuietly();
         }
     }

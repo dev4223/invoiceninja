@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Credit Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Credit Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -36,7 +36,6 @@ class TriggeredActions extends AbstractService
 
     public function run()
     {
-
         if ($this->request->has('send_email') && $this->request->input('send_email') == 'true') {
             $this->credit = $this->credit->service()->markSent()->save();
             $this->sendEmail();
@@ -46,13 +45,11 @@ class TriggeredActions extends AbstractService
             $this->credit = $this->credit->service()->markSent()->save();
         }
 
-        
         return $this->credit;
     }
 
     private function sendEmail()
     {
-
         $reminder_template = $this->credit->calculateTemplate('credit');
 
         $this->credit->invitations->load('contact.client.country', 'credit.client.country', 'credit.company')->each(function ($invitation) use ($reminder_template) {

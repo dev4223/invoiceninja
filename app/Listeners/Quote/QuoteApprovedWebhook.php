@@ -4,7 +4,7 @@
  *
  * @link https://github.com/quoteninja/quoteninja source repository
  *
- * @copyright Copyright (c) 2021. Quote Ninja LLC (https://quoteninja.com)
+ * @copyright Copyright (c) 2022. Quote Ninja LLC (https://quoteninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -19,7 +19,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 class QuoteApprovedWebhook implements ShouldQueue
 {
     public $delay = 5;
-    
+
     public function __construct()
     {
     }
@@ -43,6 +43,5 @@ class QuoteApprovedWebhook implements ShouldQueue
         if ($subscriptions) {
             WebhookHandler::dispatch(Webhook::EVENT_APPROVE_QUOTE, $quote, $quote->company);
         }
-
     }
 }

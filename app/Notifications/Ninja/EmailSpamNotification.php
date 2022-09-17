@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -20,15 +20,13 @@ use Illuminate\Notifications\Notification;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class EmailSpamNotification extends Notification 
+class EmailSpamNotification extends Notification
 {
-
     /**
      * Create a new notification instance.
      *
      * @return void
      */
-
     protected $account;
 
     public function __construct($account)
@@ -72,7 +70,6 @@ class EmailSpamNotification extends Notification
 
     public function toSlack($notifiable)
     {
-
         $content = "Email SPAM notification for Account {$this->account->key} \n";
 
         $owner = $this->account->companies()->first()->owner();

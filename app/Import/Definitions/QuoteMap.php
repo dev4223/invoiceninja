@@ -4,7 +4,7 @@
  *
  * @link https://github.com/quoteninja/quoteninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://quoteninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://quoteninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -26,7 +26,7 @@ class QuoteMap
             7 => 'quote.date',
             8 => 'quote.due_date',
             9 => 'quote.terms',
-			10 => 'quote.status',
+            10 => 'quote.status',
             11 => 'quote.public_notes',
             12 => 'quote.is_sent',
             13 => 'quote.private_notes',
@@ -87,7 +87,7 @@ class QuoteMap
             7 => 'texts.date',
             8 => 'texts.due_date',
             9 => 'texts.terms',
-			10 => 'texts.status',
+            10 => 'texts.status',
             11 => 'texts.public_notes',
             12 => 'texts.sent',
             13 => 'texts.private_notes',

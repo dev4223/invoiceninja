@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -37,7 +37,6 @@ class EntityPaidObject
 
     public function build()
     {
-
         App::forgetInstance('translator');
         /* Init a new copy of the translator*/
         $t = app('translator');
@@ -94,9 +93,9 @@ class EntityPaidObject
             'content' => ctrans(
                 'texts.notification_payment_paid',
                 ['amount' => $amount,
-                'client' => $this->payment->client->present()->name(),
-                'invoice' => $invoice_texts,
-            ]
+                    'client' => $this->payment->client->present()->name(),
+                    'invoice' => $invoice_texts,
+                ]
             ),
             'url' => config('ninja.app_url'),
             'button' => ctrans('texts.view_payment'),
@@ -114,7 +113,7 @@ class EntityPaidObject
         $html_variables = (new PaymentEmailEngine($this->payment, $this->payment->client->primary_contact()->first()))->makeValues();
 
         $signature = str_replace(array_keys($html_variables), array_values($html_variables), $settings->email_signature);
-        
+
         return $signature;
     }
 }

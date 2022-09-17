@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -33,27 +33,45 @@ class Payment extends BaseModel
     use SoftDeletes;
     use Refundable;
     use Inviteable;
-    
+
     const STATUS_PENDING = 1;
+
     const STATUS_CANCELLED = 2;
+
     const STATUS_FAILED = 3;
+
     const STATUS_COMPLETED = 4;
+
     const STATUS_PARTIALLY_REFUNDED = 5;
+
     const STATUS_REFUNDED = 6;
 
     const TYPE_CREDIT_CARD = 1;
+
     const TYPE_BANK_TRANSFER = 2;
+
     const TYPE_PAYPAL = 3;
+
     const TYPE_CRYPTO = 4;
+
     const TYPE_DWOLLA = 5;
+
     const TYPE_CUSTOM1 = 6;
+
     const TYPE_ALIPAY = 7;
+
     const TYPE_SOFORT = 8;
+
     const TYPE_SEPA = 9;
+
     const TYPE_GOCARDLESS = 10;
+
     const TYPE_APPLE_PAY = 11;
+
     const TYPE_CUSTOM2 = 12;
+
     const TYPE_CUSTOM3 = 13;
+
     const TYPE_TOKEN = 'token';
 
     protected $fillable = [
@@ -150,13 +168,33 @@ class Payment extends BaseModel
         return $this->belongsTo(PaymentType::class);
     }
 
+    public function currency()
+    {
+        return $this->belongsTo(Currency::class);
+    }
+
+    public function exchange_currency()
+    {
+        return $this->belongsTo(Currency::class, 'exchange_currency_id', 'id');
+    }
+
+    public function vendor()
+    {
+        return $this->belongsTo(Vendor::class);
+    }
+
+    public function project()
+    {
+        return $this->belongsTo(Project::class);
+    }
+
     public function translatedType()
     {
-        if(!$this->type)
+        if (! $this->type) {
             return '';
+        }
 
         return ctrans('texts.payment_type_'.$this->type->name);
-
     }
 
     public function gateway_type()
@@ -192,7 +230,7 @@ class Payment extends BaseModel
                 return '<h6><span class="badge badge-secondary">'.ctrans('texts.payment_status_1').'</span></h6>';
                 break;
             case self::STATUS_CANCELLED:
-                return '<h6><span class="badge badge-warning">'.ctrans('texts.payment_status_2').'</span></h6>';
+                return '<h6><span class="badge badge-warning text-white">'.ctrans('texts.payment_status_2').'</span></h6>';
                 break;
             case self::STATUS_FAILED:
                 return '<h6><span class="badge badge-danger">'.ctrans('texts.payment_status_3').'</span></h6>';
@@ -208,6 +246,33 @@ class Payment extends BaseModel
                 break;
             default:
                 // code...
+                break;
+        }
+    }
+
+    public static function stringStatus(int $status)
+    {
+        switch ($status) {
+            case self::STATUS_PENDING:
+                return ctrans('texts.payment_status_1');
+                break;
+            case self::STATUS_CANCELLED:
+                return ctrans('texts.payment_status_2');
+                break;
+            case self::STATUS_FAILED:
+                return ctrans('texts.payment_status_3');
+                break;
+            case self::STATUS_COMPLETED:
+                return ctrans('texts.payment_status_4');
+                break;
+            case self::STATUS_PARTIALLY_REFUNDED:
+                return ctrans('texts.payment_status_5');
+                break;
+            case self::STATUS_REFUNDED:
+                return ctrans('texts.payment_status_6');
+                break;
+            default:
+                return '';
                 break;
         }
     }
@@ -309,17 +374,13 @@ class Payment extends BaseModel
 
     public function getLink() :string
     {
-
-        if(Ninja::isHosted()){
+        if (Ninja::isHosted()) {
             $domain = isset($this->company->portal_domain) ? $this->company->portal_domain : $this->company->domain();
-        }
-        else
+        } else {
             $domain = config('ninja.app_url');
+        }
 
-        return $domain.'/client/payment/'. $this->client->contacts()->first()->contact_key .'/'. $this->hashed_id."?next=/client/payments/".$this->hashed_id;
-
-        
-
+        return $domain.'/client/payment/'.$this->client->contacts()->first()->contact_key.'/'.$this->hashed_id.'?next=/client/payments/'.$this->hashed_id;
     }
 
     public function transaction_event()
@@ -327,10 +388,10 @@ class Payment extends BaseModel
         $payment = $this->fresh();
 
         return [
-            'payment_id' => $payment->id, 
-            'payment_amount' => $payment->amount ?: 0, 
-            'payment_applied' => $payment->applied ?: 0, 
-            'payment_refunded' => $payment->refunded ?: 0, 
+            'payment_id' => $payment->id,
+            'payment_amount' => $payment->amount ?: 0,
+            'payment_applied' => $payment->applied ?: 0,
+            'payment_refunded' => $payment->refunded ?: 0,
             'payment_status' => $payment->status_id ?: 1,
             'paymentables' => $payment->paymentables->toArray(),
             'payment_request' => request() ? request()->all() : [],

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -70,7 +70,7 @@ class SendTestEmails extends Command
         $user = User::factory()->create([
             'account_id' => $account->id,
             'confirmation_code' => '123',
-            'email' => $faker->safeEmail,
+            'email' => $faker->safeEmail(),
             'first_name' => 'John',
             'last_name' => 'Doe',
         ]);
@@ -96,6 +96,6 @@ class SendTestEmails extends Command
         $nmo->settings = $user->account->companies()->first()->settings;
         $nmo->to_user = $user;
 
-        NinjaMailerJob::dispatchNow($nmo);
+        (new NinjaMailerJob($nmo))->handle();
     }
 }

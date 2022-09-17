@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -22,7 +22,7 @@ use Illuminate\Http\Request;
 abstract class QueryFilters
 {
     use MakesHash;
-    
+
     /**
      * active status.
      */
@@ -53,6 +53,13 @@ abstract class QueryFilters
     protected $builder;
 
     /**
+     * The "with" filter property column.
+     * 
+     * var string
+     */
+    protected $with_property = 'id';
+
+    /**
      * Create a new QueryFilters instance.
      *
      * @param Request $request
@@ -81,7 +88,7 @@ abstract class QueryFilters
                 continue;
             }
 
-            if (strlen($value)) {
+            if (is_string($value) && strlen($value)) {
                 $this->$name($value);
             } else {
                 $this->$name();
@@ -168,7 +175,7 @@ abstract class QueryFilters
 
     public function created_at($value)
     {
-        $created_at = $value ? (int)$value : 0;
+        $created_at = $value ? (int) $value : 0;
 
         $created_at = date('Y-m-d H:i:s', $value);
 
@@ -177,11 +184,11 @@ abstract class QueryFilters
 
     public function is_deleted($value)
     {
-        if($value == 'true')
+        if ($value == 'true') {
             return $this->builder->where('is_deleted', $value)->withTrashed();
+        }
 
         return $this->builder->where('is_deleted', $value);
-
     }
 
     public function client_id(string $client_id = '') :Builder
@@ -191,20 +198,14 @@ abstract class QueryFilters
         }
 
         return $this->builder->where('client_id', $this->decodePrimaryKey($client_id));
-        
     }
 
     public function filter_deleted_clients($value)
     {
-
-        if($value == 'true'){
-
+        if ($value == 'true') {
             return $this->builder->whereHas('client', function (Builder $query) {
-
-              $query->where('is_deleted', 0);
-              
+                $query->where('is_deleted', 0);
             });
-
         }
 
         return $this->builder;
@@ -212,11 +213,8 @@ abstract class QueryFilters
 
     public function with_trashed($value)
     {
-
-        if($value == 'false'){
-
+        if ($value == 'false') {
             return $this->builder->where('is_deleted', 0);
-
         }
 
         // if($value == 'true'){
@@ -226,6 +224,12 @@ abstract class QueryFilters
         // }
 
         return $this->builder;
+    }
 
+    public function with(string $value): Builder
+    {
+        return $this->builder
+            ->orWhere($this->with_property, $value)
+            ->orderByRaw("{$this->with_property} = ? DESC", [$value]);
     }
 }

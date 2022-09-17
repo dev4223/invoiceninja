@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -69,8 +69,9 @@ class TranslationsExport extends Command
         'sv',
         'th',
         'tr_TR',
-        'zh_TW'
+        'zh_TW',
     ];
+
     /**
      * Create a new command instance.
      *
@@ -88,19 +89,14 @@ class TranslationsExport extends Command
      */
     public function handle()
     {
-
         Storage::makeDirectory(storage_path('lang'));
 
-        foreach($this->langs as $lang)
-        {
+        foreach ($this->langs as $lang) {
             Storage::makeDirectory(storage_path("lang/{$lang}"));
 
-            $translations = Lang::getLoader()->load($lang,'texts');
+            $translations = Lang::getLoader()->load($lang, 'texts');
 
             Storage::put(storage_path("lang/{$lang}/{$lang}.json"), json_encode(Arr::dot($translations), JSON_UNESCAPED_UNICODE));
-
         }
-
     }
-
 }

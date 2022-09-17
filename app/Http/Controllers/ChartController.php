@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -18,7 +18,6 @@ use Illuminate\Http\Response;
 
 class ChartController extends BaseController
 {
-
     public function __construct()
     {
         parent::__construct();
@@ -81,5 +80,4 @@ class ChartController extends BaseController
 
         return response()->json($cs->chart_summary($request->input('start_date'), $request->input('end_date')), 200);
     }
-
 }

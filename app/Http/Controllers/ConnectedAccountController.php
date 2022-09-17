@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -22,6 +22,7 @@ use Google_Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Microsoft\Graph\Model;
 
 class ConnectedAccountController extends BaseController
 {
@@ -30,7 +31,7 @@ class ConnectedAccountController extends BaseController
     protected $entity_type = User::class;
 
     protected $entity_transformer = UserTransformer::class;
-    
+
     public function __construct()
     {
         parent::__construct();
@@ -81,38 +82,41 @@ class ConnectedAccountController extends BaseController
             return $this->handleGoogleOauth();
         }
 
+        if ($request->input('provider') == 'microsoft') {
+            return $this->handleMicrosoftOauth($request);
+        }
+
         return response()
         ->json(['message' => 'Provider not supported'], 400)
         ->header('X-App-Version', config('ninja.app_version'))
         ->header('X-Api-Version', config('ninja.minimum_client_version'));
     }
 
-    private function handleGoogleOauth()
+    private function handleMicrosoftOauth($request)
     {
-        $user = false;
+        nlog($request->all());
 
-        $google = new Google();
+        if(!$request->has('access_token'))
+            return response()->json(['message' => 'No access_token parameter found!'], 400);
 
-        $user = $google->getTokenResponse(request()->input('id_token'));
+        $graph = new \Microsoft\Graph\Graph();
+        $graph->setAccessToken($request->input('access_token'));
 
-        if ($user) {
-            
-            $client = new Google_Client();
-            $client->setClientId(config('ninja.auth.google.client_id'));
-            $client->setClientSecret(config('ninja.auth.google.client_secret'));
-            $client->setRedirectUri(config('ninja.app_url'));
-            $refresh_token = '';
-            $token = '';
+        $user = $graph->createRequest("GET", "/me")
+                      ->setReturnType(Model\User::class)
+                      ->execute();
 
-            $email = $google->harvestEmail($user);
+        if($user){
+
+            $email = $user->getMail() ?: $user->getUserPrincipalName();
 
             if(auth()->user()->email != $email && MultiDB::checkUserEmailExists($email))
                 return response()->json(['message' => ctrans('texts.email_already_register')], 400);
 
             $connected_account = [
                 'email' => $email,
-                'oauth_user_id' => $google->harvestSubField($user),
-                'oauth_provider_id' => 'google',
+                'oauth_user_id' => $user->getId(),
+                'oauth_provider_id' => 'microsoft',
                 'email_verified_at' =>now()
             ];
 
@@ -130,13 +134,55 @@ class ConnectedAccountController extends BaseController
         ->json(['message' => ctrans('texts.invalid_credentials')], 401)
         ->header('X-App-Version', config('ninja.app_version'))
         ->header('X-Api-Version', config('ninja.minimum_client_version'));
+
     }
 
+    private function handleGoogleOauth()
+    {
+        $user = false;
 
+        $google = new Google();
+
+        $user = $google->getTokenResponse(request()->input('id_token'));
+
+        if ($user) {
+            $client = new Google_Client();
+            $client->setClientId(config('ninja.auth.google.client_id'));
+            $client->setClientSecret(config('ninja.auth.google.client_secret'));
+            $client->setRedirectUri(config('ninja.app_url'));
+            $refresh_token = '';
+            $token = '';
+
+            $email = $google->harvestEmail($user);
+
+            if (auth()->user()->email != $email && MultiDB::checkUserEmailExists($email)) {
+                return response()->json(['message' => ctrans('texts.email_already_register')], 400);
+            }
+
+            $connected_account = [
+                'email' => $email,
+                'oauth_user_id' => $google->harvestSubField($user),
+                'oauth_provider_id' => 'google',
+                'email_verified_at' =>now(),
+            ];
+
+            auth()->user()->update($connected_account);
+            auth()->user()->email_verified_at = now();
+            auth()->user()->save();
+
+            $this->setLoginCache(auth()->user());
+
+            return $this->itemResponse(auth()->user());
+        }
+
+        return response()
+        ->json(['message' => ctrans('texts.invalid_credentials')], 401)
+        ->header('X-App-Version', config('ninja.app_version'))
+        ->header('X-Api-Version', config('ninja.minimum_client_version'));
+    }
 
     public function handleGmailOauth(Request $request)
     {
-
         $user = false;
 
         $google = new Google();
@@ -144,7 +190,6 @@ class ConnectedAccountController extends BaseController
         $user = $google->getTokenResponse($request->input('id_token'));
 
         if ($user) {
-            
             $client = new Google_Client();
             $client->setClientId(config('ninja.auth.google.client_id'));
             $client->setClientSecret(config('ninja.auth.google.client_secret'));
@@ -163,27 +208,26 @@ class ConnectedAccountController extends BaseController
                 'oauth_user_token' => $token,
                 'oauth_user_refresh_token' => $refresh_token,
                 'oauth_provider_id' => 'google',
-                'email_verified_at' =>now()
+                'email_verified_at' =>now(),
             ];
 
-            if(auth()->user()->email != $google->harvestEmail($user))
+            if (auth()->user()->email != $google->harvestEmail($user)) {
                 return response()->json(['message' => 'Primary Email differs to OAuth email. Emails must match.'], 400);
+            }
 
             auth()->user()->update($connected_account);
             auth()->user()->email_verified_at = now();
             auth()->user()->save();
-            
+
             $this->activateGmail(auth()->user());
 
             return $this->itemResponse(auth()->user());
-
         }
 
         return response()
         ->json(['message' => ctrans('texts.invalid_credentials')], 401)
         ->header('X-App-Version', config('ninja.app_version'))
         ->header('X-Api-Version', config('ninja.minimum_client_version'));
-
     }
 
     private function activateGmail(User $user)
@@ -191,13 +235,12 @@ class ConnectedAccountController extends BaseController
         $company = $user->company();
         $settings = $company->settings;
 
-        if($settings->email_sending_method == 'default')
-        {
+        if ($settings->email_sending_method == 'default') {
             $settings->email_sending_method = 'gmail';
-            $settings->gmail_sending_user_id = (string)$user->hashed_id;
+            $settings->gmail_sending_user_id = (string) $user->hashed_id;
 
             $company->settings = $settings;
             $company->save();
-        }    
+        }
     }
 }

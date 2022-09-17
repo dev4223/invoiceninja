@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -29,6 +29,7 @@ use App\Models\Payment;
 use App\Models\PaymentTerm;
 use App\Models\Product;
 use App\Models\Project;
+use App\Models\PurchaseOrder;
 use App\Models\Quote;
 use App\Models\RecurringExpense;
 use App\Models\RecurringInvoice;
@@ -39,6 +40,7 @@ use App\Models\TaskStatus;
 use App\Models\TaxRate;
 use App\Models\User;
 use App\Models\Webhook;
+use App\Transformers\PurchaseOrderTransformer;
 use App\Transformers\RecurringExpenseTransformer;
 use App\Utils\Traits\MakesHash;
 use stdClass;
@@ -95,6 +97,7 @@ class CompanyTransformer extends EntityTransformer
         'task_statuses',
         'subscriptions',
         'recurring_expenses',
+        'purchase_orders',
     ];
 
     /**
@@ -151,14 +154,14 @@ class CompanyTransformer extends EntityTransformer
             'invoice_task_documents' => (bool) $company->invoice_task_documents,
             'show_tasks_table' => (bool) $company->show_tasks_table,
             'use_credits_payment' => 'always', // @deprecate 1-2-2021
-            'default_task_is_date_based' => (bool)$company->default_task_is_date_based,
-            'enable_product_discount' => (bool)$company->enable_product_discount,
-            'calculate_expense_tax_by_amount' =>(bool)$company->calculate_expense_tax_by_amount,
+            'default_task_is_date_based' => (bool) $company->default_task_is_date_based,
+            'enable_product_discount' => (bool) $company->enable_product_discount,
+            'calculate_expense_tax_by_amount' =>(bool) $company->calculate_expense_tax_by_amount,
             'hide_empty_columns_on_pdf' => false, // @deprecate 1-2-2021
-            'expense_inclusive_taxes' => (bool)$company->expense_inclusive_taxes,
-            'expense_amount_is_pretax' =>(bool)true, //@deprecate 1-2-2021
-            'oauth_password_required' => (bool)$company->oauth_password_required,
-            'session_timeout' => (int)$company->session_timeout,
+            'expense_inclusive_taxes' => (bool) $company->expense_inclusive_taxes,
+            'expense_amount_is_pretax' =>(bool) true, //@deprecate 1-2-2021
+            'oauth_password_required' => (bool) $company->oauth_password_required,
+            'session_timeout' => (int) $company->session_timeout,
             'default_password_timeout' => (int) $company->default_password_timeout,
             'invoice_task_datelog' => (bool) $company->invoice_task_datelog,
             'show_task_end_date' => (bool) $company->show_task_end_date,
@@ -168,6 +171,15 @@ class CompanyTransformer extends EntityTransformer
             'client_registration_fields' => (array) $company->client_registration_fields,
             'convert_rate_to_client' => (bool) $company->convert_rate_to_client,
             'markdown_email_enabled' => (bool) $company->markdown_email_enabled,
+            'stop_on_unpaid_recurring' => (bool) $company->stop_on_unpaid_recurring,
+            'use_quote_terms_on_conversion' => (bool) $company->use_quote_terms_on_conversion,
+            'stock_notification' => (bool) $company->stock_notification,
+            'inventory_notification_threshold' => (int) $company->inventory_notification_threshold,
+            'track_inventory' => (bool) $company->track_inventory,
+            'enable_applying_payments' => (bool) $company->enable_applying_payments,
+            'enabled_expense_tax_rates' => (int) $company->enabled_expense_tax_rates,
+            'invoice_task_project' => (bool) $company->invoice_task_project,
+            'report_include_deleted' => (bool) $company->report_include_deleted,
         ];
     }
 
@@ -233,6 +245,7 @@ class CompanyTransformer extends EntityTransformer
 
         $users = $company->users->map(function ($user) use ($company) {
             $user->company_id = $company->id;
+
             return $user;
         });
 
@@ -384,5 +397,12 @@ class CompanyTransformer extends EntityTransformer
         $transformer = new SubscriptionTransformer($this->serializer);
 
         return $this->includeCollection($company->subscriptions, $transformer, Subscription::class);
+    }
+
+    public function includePurchaseOrders(Company $company)
+    {
+        $transformer = new PurchaseOrderTransformer($this->serializer);
+
+        return $this->includeCollection($company->purchase_orders, $transformer, PurchaseOrder::class);
     }
 }

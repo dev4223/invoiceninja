@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -52,8 +52,7 @@ class TokenController extends BaseController
 
         $this->token_repo = $token_repo;
 
-        $this->middleware('password_protected')->only(['store','update']);
-
+        $this->middleware('password_protected')->only(['store', 'update']);
     }
 
     /**
@@ -484,7 +483,6 @@ class TokenController extends BaseController
      */
     public function bulk()
     {
-
         $this->entity_transformer = CompanyTokenHashedTransformer::class;
 
         $action = request()->input('action');

@@ -4,15 +4,15 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Middleware;
 
-use Fideloper\Proxy\TrustProxies as Middleware;
 use Illuminate\Contracts\Config\Repository;
+use Illuminate\Http\Middleware\TrustProxies as Middleware;
 use Illuminate\Http\Request;
 
 class TrustProxies extends Middleware
@@ -46,8 +46,8 @@ class TrustProxies extends Middleware
      */
     public function __construct(Repository $config)
     {
-        parent::__construct($config);
-    
+        // parent::__construct($config);
+
         if (config('ninja.trusted_proxies')) {
             $this->proxies = config('ninja.trusted_proxies');
         }

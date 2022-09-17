@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -13,87 +13,86 @@ namespace App\DataMapper;
 
 class ClientRegistrationFields
 {
-
     public static function generate()
     {
-        $data = 
+        $data =
         [
             [
                 'key' => 'first_name',
-                'required' => true
+                'required' => true,
             ],
             [
                 'key' => 'last_name',
-                'required' => true
+                'required' => true,
             ],
             [
                 'key' => 'email',
-                'required' => true
+                'required' => true,
             ],
             [
                 'key' => 'phone',
-                'required' => false
+                'required' => false,
             ],
             [
                 'key' => 'password',
-                'required' => true
-            ], 
+                'required' => true,
+            ],
             [
                 'key' => 'name',
-                'required' => false
+                'required' => false,
             ],
             [
                 'key' => 'website',
-                'required' => false
+                'required' => false,
             ],
             [
                 'key' => 'address1',
-                'required' => false
+                'required' => false,
             ],
             [
                 'key' => 'address2',
-                'required' => false
+                'required' => false,
             ],
             [
                 'key' => 'city',
-                'required' => false
+                'required' => false,
             ],
             [
                 'key' => 'state',
-                'required' => false
+                'required' => false,
             ],
             [
                 'key' => 'postal_code',
-                'required' => false
-            ],            
+                'required' => false,
+            ],
             [
                 'key' => 'country_id',
-                'required' => false
-            ],            
+                'required' => false,
+            ],
             [
                 'key' => 'custom_value1',
-                'required' => false
-            ],            
+                'required' => false,
+            ],
             [
                 'key' => 'custom_value2',
-                'required' => false
+                'required' => false,
             ],
             [
                 'key' => 'custom_value3',
-                'required' => false
-            ],            
+                'required' => false,
+            ],
             [
                 'key' => 'custom_value4',
-                'required' => false
-            ],                       
+                'required' => false,
+            ],
             [
                 'key' => 'public_notes',
-                'required' => false
-            ],   
+                'required' => false,
+            ],
             [
                 'key' => 'vat_number',
-                'required' => false
-            ],          
+                'required' => false,
+            ],
         ];
 
         return $data;

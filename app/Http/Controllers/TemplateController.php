@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -92,7 +92,7 @@ class TemplateController extends BaseController
         $subject = request()->has('subject') ? request()->input('subject') : '';
         $body = request()->has('body') ? request()->input('body') : '';
         $template = request()->has('template') ? request()->input('template') : '';
-        
+
         $data = (new TemplateEngine($body, $subject, $entity, $entity_id, $template))->build();
 
         return response()->json($data, 200);

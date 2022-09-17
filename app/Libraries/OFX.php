@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -18,9 +18,13 @@ use SimpleXMLElement;
 class OFX
 {
     public $bank;
+
     public $request;
+
     public $response;
+
     public $responseHeader;
+
     public $responseBody;
 
     public function __construct($bank, $request)
@@ -73,9 +77,13 @@ class Finance
 class Bank
 {
     public $logins; // array of class User
+
     public $finance; // the Finance object that hold this Bank object
+
     public $fid;
+
     public $org;
+
     public $url;
 
     public function __construct($finance, $fid, $url, $org)
@@ -90,10 +98,15 @@ class Bank
 class Login
 {
     public $accounts;
+
     public $bank;
+
     public $id;
+
     public $pass;
+
     public $ofxVersion;
+
     public $appVersion;
 
     public function __construct($bank, $id, $pass)
@@ -156,12 +169,19 @@ class Login
 class Account
 {
     public $login;
+
     public $id;
+
     public $type;
+
     public $subType;
+
     public $bankId;
+
     public $ledgerBalance;
+
     public $availableBalance;
+
     public $response;
 
     public function __construct($login, $id, $type, $subType = null, $bankId = null)

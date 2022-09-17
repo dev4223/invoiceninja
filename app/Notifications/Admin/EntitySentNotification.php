@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -24,7 +24,6 @@ use Illuminate\Queue\SerializesModels;
 //@deprecated
 class EntitySentNotification extends Notification
 {
-    
     /**
      * Create a new notification instance.
      *
@@ -102,17 +101,17 @@ class EntitySentNotification extends Notification
                     ->content(trans(
                         "texts.notification_{$this->entity_name}_sent_subject",
                         [
-                        'amount' => $amount,
-                        'client' => $this->contact->client->present()->name(),
-                        'invoice' => $this->entity->number,
-                    ]
+                            'amount' => $amount,
+                            'client' => $this->contact->client->present()->name(),
+                            'invoice' => $this->entity->number,
+                        ]
                     ))
                     ->attachment(function ($attachment) use ($amount) {
                         $attachment->title(ctrans('texts.invoice_number_placeholder', ['invoice' => $this->entity->number]), $this->invitation->getAdminLink())
                                    ->fields([
-                                        ctrans('texts.client') => $this->contact->client->present()->name(),
-                                        ctrans('texts.amount') => $amount,
-                                    ]);
+                                       ctrans('texts.client') => $this->contact->client->present()->name(),
+                                       ctrans('texts.amount') => $amount,
+                                   ]);
                     });
     }
 }

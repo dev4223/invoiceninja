@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -21,16 +21,15 @@ class UserPresenter extends EntityPresenter
      */
     public function name()
     {
+        if (! $this->entity) {
+            return 'No User Object Available';
+        }
 
-        if(!$this->entity)
-            return "No User Object Available";
-        
         $first_name = isset($this->entity->first_name) ? $this->entity->first_name : '';
         $last_name = isset($this->entity->last_name) ? $this->entity->last_name : '';
 
         return $first_name.' '.$last_name;
     }
-
 
     public function getDisplayName()
     {

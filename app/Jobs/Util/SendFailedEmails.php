@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -63,7 +63,7 @@ class SendFailedEmails implements ShouldQueue
             $invitation = $job_meta_array['entity_name']::where('key', $job_meta_array['invitation_key'])->with('contact')->first();
 
             if ($invitation->invoice) {
-                if (!$invitation->contact->trashed() && $invitation->contact->send_email && $invitation->contact->email) {
+                if (! $invitation->contact->trashed() && $invitation->contact->send_email && $invitation->contact->email) {
                     EmailEntity::dispatch($invitation, $invitation->company, $job_meta_array['reminder_template']);
                 }
             }

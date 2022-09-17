@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -62,13 +62,13 @@ class ACH implements MethodInterface
             ],
         ]);
 
-        if ($result->success && optional($result->paymentMethod)->verified) {
+        if ($result->success && $result->paymentMethod?->verified) {
             $account = $result->paymentMethod;
 
             try {
                 $payment_meta = new \stdClass;
-                $payment_meta->brand = (string)$account->bankName;
-                $payment_meta->last4 = (string)$account->last4;
+                $payment_meta->brand = (string) $account->bankName;
+                $payment_meta->last4 = (string) $account->last4;
                 $payment_meta->type = GatewayType::BANK_TRANSFER;
                 $payment_meta->state = 'authorized';
 
@@ -117,7 +117,7 @@ class ACH implements MethodInterface
             'amount' => $this->braintree->payment_hash->data->amount_with_fee,
             'paymentMethodToken' => $token->token,
             'options' => [
-                'submitForSettlement' => true
+                'submitForSettlement' => true,
             ],
         ]);
 
@@ -158,7 +158,7 @@ class ACH implements MethodInterface
     private function processUnsuccessfulPayment($response)
     {
         $this->braintree->sendFailureMail($response->transaction->additionalProcessorResponse);
-        
+
         $message = [
             'server_response' => $response,
             'data' => $this->braintree->payment_hash->data,

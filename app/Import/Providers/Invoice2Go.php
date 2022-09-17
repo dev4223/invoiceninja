@@ -4,10 +4,11 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
+
 namespace App\Import\Providers;
 
 use App\Factory\ClientFactory;
@@ -39,14 +40,14 @@ class Invoice2Go extends BaseImport
 
         //collate any errors
 
-        $this->finalizeImport();
+        // $this->finalizeImport();
     }
 
-
-    public function invoice() {
+    public function invoice()
+    {
 
         //make sure we update and create products with wave
-        $initial_update_products_value = $this->company->update_products; 
+        $initial_update_products_value = $this->company->update_products;
         $this->company->update_products = true;
 
         $this->company->save();
@@ -59,6 +60,7 @@ class Invoice2Go extends BaseImport
 
         if (empty($data)) {
             $this->entity_count['invoices'] = 0;
+
             return;
         }
 
@@ -76,9 +78,6 @@ class Invoice2Go extends BaseImport
         $this->entity_count['invoices'] = $invoice_count;
 
         $this->company->update_products = $initial_update_products_value;
-        $this->company->save();    
-
+        $this->company->save();
     }
-
-
 }

@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -20,7 +20,6 @@ use Illuminate\Support\Facades\App;
 
 class DownloadBackup extends Mailable
 {
-
     public $file_path;
 
     public $company;
@@ -38,13 +37,13 @@ class DownloadBackup extends Mailable
     public function build()
     {
         App::setLocale($this->company->getLocale());
-        
+
         $company = Company::where('company_key', $this->company->company_key)->first();
 
         return $this->from(config('mail.from.address'), config('mail.from.name'))
             ->subject(ctrans('texts.download_backup_subject', ['company' => $company->present()->name()]))
-            ->text('email.admin.download_files_text',[
-               'url' => $this->file_path,
+            ->text('email.admin.download_files_text', [
+                'url' => $this->file_path,
             ])
             ->view('email.admin.download_files', [
                 'url' => $this->file_path,

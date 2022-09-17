@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -72,7 +72,7 @@ class Statement
             'template' => $template->elements([
                 'client' => $this->client,
                 'entity' => $this->entity,
-                'pdf_variables' => (array)$this->entity->company->settings->pdf_variables,
+                'pdf_variables' => (array) $this->entity->company->settings->pdf_variables,
                 '$product' => $this->getDesign()->design->product,
                 'variables' => $variables,
                 'invoices' => $this->getInvoices(),
@@ -107,7 +107,6 @@ class Statement
         if ($this->rollback) {
             \DB::connection(config('database.default'))->rollBack();
         }
-
 
         return $pdf;
     }
@@ -220,12 +219,14 @@ class Statement
     protected function getInvoices(): \Illuminate\Support\LazyCollection
     {
         return Invoice::withTrashed()
+            ->with('payments.type')
             ->where('is_deleted', false)
             ->where('company_id', $this->client->company_id)
             ->where('client_id', $this->client->id)
             ->whereIn('status_id', $this->invoiceStatuses())
             ->whereBetween('date', [Carbon::parse($this->options['start_date']), Carbon::parse($this->options['end_date'])])
             ->orderBy('due_date', 'ASC')
+            ->orderBy('date', 'ASC')
             ->cursor();
     }
 
@@ -233,20 +234,21 @@ class Statement
     {
         $status = 'all';
 
-        if(array_key_exists('status', $this->options))
+        if (array_key_exists('status', $this->options)) {
             $status = $this->options['status'];
+        }
 
         switch ($status) {
             case 'all':
                 return [Invoice::STATUS_SENT, Invoice::STATUS_PARTIAL, Invoice::STATUS_PAID];
                 break;
             case 'paid':
-                return [Invoice::STATUS_PARTIAL, Invoice::STATUS_PAID];
+                return [Invoice::STATUS_PAID];
                 break;
             case 'unpaid':
-                return [Invoice::STATUS_SENT];
+                return [Invoice::STATUS_SENT, Invoice::STATUS_PARTIAL];
                 break;
-            
+
             default:
                 return [Invoice::STATUS_SENT, Invoice::STATUS_PARTIAL, Invoice::STATUS_PAID];
                 break;
@@ -261,7 +263,7 @@ class Statement
     protected function getPayments(): \Illuminate\Support\LazyCollection
     {
         return Payment::withTrashed()
-            ->with('client.country','invoices')
+            ->with('client.country', 'invoices')
             ->where('is_deleted', false)
             ->where('company_id', $this->client->company_id)
             ->where('client_id', $this->client->id)
@@ -340,26 +342,32 @@ class Statement
             case '30':
                 $ranges[0] = now()->startOfDay();
                 $ranges[1] = now()->startOfDay()->subDays(30);
+
                 return $ranges;
             case '60':
                 $ranges[0] = now()->startOfDay()->subDays(30);
                 $ranges[1] = now()->startOfDay()->subDays(60);
+
                 return $ranges;
             case '90':
                 $ranges[0] = now()->startOfDay()->subDays(60);
                 $ranges[1] = now()->startOfDay()->subDays(90);
+
                 return $ranges;
             case '120':
                 $ranges[0] = now()->startOfDay()->subDays(90);
                 $ranges[1] = now()->startOfDay()->subDays(120);
+
                 return $ranges;
             case '120+':
                 $ranges[0] = now()->startOfDay()->subDays(120);
                 $ranges[1] = now()->startOfDay()->subYears(20);
+
                 return $ranges;
             default:
                 $ranges[0] = now()->startOfDay()->subDays(0);
                 $ranges[1] = now()->subDays(30);
+
                 return $ranges;
         }
     }
@@ -373,7 +381,7 @@ class Statement
     {
         $id = 1;
 
-        if (!empty($this->client->getSetting('entity_design_id'))) {
+        if (! empty($this->client->getSetting('entity_design_id'))) {
             $id = (int) $this->client->getSetting('entity_design_id');
         }
 

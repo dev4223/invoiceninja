@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -16,15 +16,12 @@ use Illuminate\Support\Facades\App;
 
 class ResetPasswordObject
 {
-
     public $user;
 
     public $token;
 
     public $company;
-    /**
-     *
-     */
+
     public function __construct($token, $user, $company)
     {
         $this->token = $token;
@@ -34,7 +31,6 @@ class ResetPasswordObject
 
     public function build()
     {
-
         App::forgetInstance('translator');
         /* Init a new copy of the translator*/
         $t = app('translator');

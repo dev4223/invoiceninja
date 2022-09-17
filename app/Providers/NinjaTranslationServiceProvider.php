@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -35,7 +35,6 @@ class NinjaTranslationServiceProvider extends TranslationServiceProvider
 
         //this is not octane safe
         $this->app->singleton('translator', function ($app) {
-
             $loader = $app['translation.loader'];
             $locale = $app['config']['app.locale'];
 
@@ -44,8 +43,6 @@ class NinjaTranslationServiceProvider extends TranslationServiceProvider
             $trans->setFallback($app['config']['app.fallback_locale']);
 
             return $trans;
-
         });
     }
-
 }

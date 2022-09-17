@@ -1,11 +1,11 @@
 <?php
 
 /**
- * Entity Ninja (https://entityninja.com).
+ * Invoice Ninja (https://entityninja.com).
  *
- * @link https://github.com/entityninja/entityninja source repository
+ * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Entity Ninja LLC (https://entityninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -34,6 +34,8 @@ use App\Utils\PhantomJS\Phantom;
 use App\Utils\Traits\MakesHash;
 use App\Utils\Traits\MakesInvoiceHtml;
 use App\Utils\Traits\NumberFormatter;
+use App\Utils\Traits\Pdf\PageNumbering;
+use App\Utils\Traits\Pdf\PDF;
 use App\Utils\Traits\Pdf\PdfMaker;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -43,10 +45,11 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Storage;
+use setasign\Fpdi\PdfParser\StreamReader;
 
 class CreateEntityPdf implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, NumberFormatter, MakesInvoiceHtml, PdfMaker, MakesHash;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, NumberFormatter, MakesInvoiceHtml, PdfMaker, MakesHash, PageNumbering;
 
     public $entity;
 
@@ -67,7 +70,7 @@ class CreateEntityPdf implements ShouldQueue
      *
      * @param $invitation
      */
-    public function __construct($invitation, $disk = 'public')
+    public function __construct($invitation, $disk = null)
     {
         $this->invitation = $invitation;
 
@@ -95,9 +98,8 @@ class CreateEntityPdf implements ShouldQueue
 
         $this->client = $invitation->contact->client;
         $this->client->load('company');
-        
-        $this->disk = Ninja::isHosted() ? config('filesystems.default') : $disk;
 
+        $this->disk = $disk ?? config('filesystems.default');
     }
 
     public function handle()
@@ -142,15 +144,16 @@ class CreateEntityPdf implements ShouldQueue
         $design = Design::find($entity_design_id);
 
         /* Catch all in case migration doesn't pass back a valid design */
-        if(!$design)
+        if (! $design) {
             $design = Design::find(2);
+        }
 
         $html = new HtmlEngine($this->invitation);
 
         if ($design->is_custom) {
             $options = [
-            'custom_partials' => json_decode(json_encode($design->design), true)
-          ];
+                'custom_partials' => json_decode(json_encode($design->design), true),
+            ];
             $template = new PdfMakerDesign(PdfDesignModel::CUSTOM, $options);
         } else {
             $template = new PdfMakerDesign(strtolower($design->name));
@@ -183,14 +186,23 @@ class CreateEntityPdf implements ShouldQueue
         $pdf = null;
 
         try {
-
-            if(config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja'){
+            if (config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja') {
                 $pdf = (new NinjaPdf())->build($maker->getCompiledHTML(true));
-            }
-            else {
-                $pdf = $this->makePdf(null, null, $maker->getCompiledHTML(true));
-            }
 
+                $numbered_pdf = $this->pageNumbering($pdf, $this->company);
+
+                if ($numbered_pdf) {
+                    $pdf = $numbered_pdf;
+                }
+            } else {
+                $pdf = $this->makePdf(null, null, $maker->getCompiledHTML(true));
+
+                $numbered_pdf = $this->pageNumbering($pdf, $this->company);
+
+                if ($numbered_pdf) {
+                    $pdf = $numbered_pdf;
+                }
+            }
         } catch (\Exception $e) {
             nlog(print_r($e->getMessage(), 1));
         }
@@ -200,20 +212,14 @@ class CreateEntityPdf implements ShouldQueue
         }
 
         if ($pdf) {
-
-            try{
-                
-                if(!Storage::disk($this->disk)->exists($path))
-
+            try {
+                if (! Storage::disk($this->disk)->exists($path)) {
                     Storage::disk($this->disk)->makeDirectory($path, 0775);
-                    Storage::disk($this->disk)->put($file_path, $pdf, 'public');
+                }
 
-            }
-            catch(\Exception $e)
-            {
-
+                Storage::disk($this->disk)->put($file_path, $pdf, 'public');
+            } catch (\Exception $e) {
                 throw new FilePermissionsFailure($e->getMessage());
-
             }
         }
 
@@ -222,7 +228,5 @@ class CreateEntityPdf implements ShouldQueue
 
     public function failed($e)
     {
-
     }
-    
 }

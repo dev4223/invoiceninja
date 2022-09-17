@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -44,6 +44,8 @@ class InvoiceSum
 
     private $gross_sub_total;
 
+    private $precision;
+
     /**
      * Constructs the object with Invoice and Settings object.
      *
@@ -53,8 +55,11 @@ class InvoiceSum
     {
         $this->invoice = $invoice;
 
-        // if(!$this->invoice->relationLoaded('client'))
-        //     $this->invoice->load('client');
+        if ($this->invoice->client) {
+            $this->precision = $this->invoice->client->currency()->precision;
+        } else {
+            $this->precision = $this->invoice->vendor->currency()->precision;
+        }
 
         $this->tax_map = new Collection;
     }
@@ -81,7 +86,7 @@ class InvoiceSum
         $this->total = $this->invoice_items->getSubTotal();
         $this->setSubTotal($this->invoice_items->getSubTotal());
         $this->setGrossSubTotal($this->invoice_items->getGrossSubTotal());
-        
+
         return $this;
     }
 
@@ -97,16 +102,12 @@ class InvoiceSum
     private function calculateCustomValues()
     {
 
-        // $this->total_taxes += $this->valuerTax($this->invoice->custom_surcharge1, $this->invoice->custom_surcharge_tax1);
         $this->total_custom_values += $this->valuer($this->invoice->custom_surcharge1);
 
-        // $this->total_taxes += $this->valuerTax($this->invoice->custom_surcharge2, $this->invoice->custom_surcharge_tax2);
         $this->total_custom_values += $this->valuer($this->invoice->custom_surcharge2);
 
-        // $this->total_taxes += $this->valuerTax($this->invoice->custom_surcharge3, $this->invoice->custom_surcharge_tax3);
         $this->total_custom_values += $this->valuer($this->invoice->custom_surcharge3);
 
-        // $this->total_taxes += $this->valuerTax($this->invoice->custom_surcharge4, $this->invoice->custom_surcharge_tax4);
         $this->total_custom_values += $this->valuer($this->invoice->custom_surcharge4);
 
         $this->total += $this->total_custom_values;
@@ -116,8 +117,7 @@ class InvoiceSum
 
     private function calculateInvoiceTaxes()
     {
-
-        if (strlen($this->invoice->tax_name1) > 1) {
+        if (is_string($this->invoice->tax_name1) && strlen($this->invoice->tax_name1) > 1) {
             $tax = $this->taxer($this->total, $this->invoice->tax_rate1);
             $tax += $this->getSurchargeTaxTotalForKey($this->invoice->tax_name1, $this->invoice->tax_rate1);
 
@@ -125,7 +125,7 @@ class InvoiceSum
             $this->total_tax_map[] = ['name' => $this->invoice->tax_name1.' '.floatval($this->invoice->tax_rate1).'%', 'total' => $tax];
         }
 
-        if (strlen($this->invoice->tax_name2) > 1) {
+        if (is_string($this->invoice->tax_name2) && strlen($this->invoice->tax_name2) > 1) {
             $tax = $this->taxer($this->total, $this->invoice->tax_rate2);
             $tax += $this->getSurchargeTaxTotalForKey($this->invoice->tax_name2, $this->invoice->tax_rate2);
 
@@ -133,14 +133,14 @@ class InvoiceSum
             $this->total_tax_map[] = ['name' => $this->invoice->tax_name2.' '.floatval($this->invoice->tax_rate2).'%', 'total' => $tax];
         }
 
-        if (strlen($this->invoice->tax_name3) > 1) {
+        if (is_string($this->invoice->tax_name3) && strlen($this->invoice->tax_name3) > 1) {
             $tax = $this->taxer($this->total, $this->invoice->tax_rate3);
             $tax += $this->getSurchargeTaxTotalForKey($this->invoice->tax_name3, $this->invoice->tax_rate3);
 
             $this->total_taxes += $tax;
             $this->total_tax_map[] = ['name' => $this->invoice->tax_name3.' '.floatval($this->invoice->tax_rate3).'%', 'total' => $tax];
         }
-        
+
         return $this;
     }
 
@@ -151,7 +151,7 @@ class InvoiceSum
      */
     private function calculateBalance()
     {
-        //$this->invoice->balance = $this->balance($this->getTotal(), $this->invoice);
+
         $this->setCalculatedAttributes();
 
         return $this;
@@ -170,22 +170,6 @@ class InvoiceSum
     {
         $this->total += $this->total_taxes;
 
-        // if (is_numeric($this->invoice->custom_value1)) {
-        //     $this->total += $this->invoice->custom_value1;
-        // }
-
-        // if (is_numeric($this->invoice->custom_value2)) {
-        //     $this->total += $this->invoice->custom_value2;
-        // }
-
-        // if (is_numeric($this->invoice->custom_value3)) {
-        //     $this->total += $this->invoice->custom_value3;
-        // }
-
-        // if (is_numeric($this->invoice->custom_value4)) {
-        //     $this->total += $this->invoice->custom_value4;
-        // }
-
         return $this;
     }
 
@@ -196,6 +180,7 @@ class InvoiceSum
     public function getTempEntity()
     {
         $this->setCalculatedAttributes();
+
         return $this->invoice;
     }
 
@@ -224,11 +209,19 @@ class InvoiceSum
         return $this->invoice;
     }
 
+    public function getPurchaseOrder()
+    {
+        $this->setCalculatedAttributes();
+        $this->invoice->saveQuietly();
+
+        return $this->invoice;
+    }
+
     public function getRecurringInvoice()
     {
-        $this->invoice->amount = $this->formatValue($this->getTotal(), $this->invoice->client->currency()->precision);
+        $this->invoice->amount = $this->formatValue($this->getTotal(), $this->precision);
         $this->invoice->total_taxes = $this->getTotalTaxes();
-        $this->invoice->balance = $this->formatValue($this->getTotal(), $this->invoice->client->currency()->precision);
+        $this->invoice->balance = $this->formatValue($this->getTotal(), $this->precision);
 
         $this->invoice->saveQuietly();
 
@@ -247,13 +240,13 @@ class InvoiceSum
             if ($this->invoice->amount != $this->invoice->balance) {
                 $paid_to_date = $this->invoice->amount - $this->invoice->balance;
 
-                $this->invoice->balance = $this->formatValue($this->getTotal(), $this->invoice->client->currency()->precision) - $paid_to_date;
+                $this->invoice->balance = $this->formatValue($this->getTotal(), $this->precision) - $paid_to_date;
             } else {
-                $this->invoice->balance = $this->formatValue($this->getTotal(), $this->invoice->client->currency()->precision);
+                $this->invoice->balance = $this->formatValue($this->getTotal(), $this->precision);
             }
         }
         /* Set new calculated total */
-        $this->invoice->amount = $this->formatValue($this->getTotal(), $this->invoice->client->currency()->precision);
+        $this->invoice->amount = $this->formatValue($this->getTotal(), $this->precision);
 
         $this->invoice->total_taxes = $this->getTotalTaxes();
 
@@ -337,37 +330,29 @@ class InvoiceSum
 
     private function getSurchargeTaxTotalForKey($key, $rate)
     {
-
         $tax_component = 0;
 
-        if($this->invoice->custom_surcharge_tax1)
-        {
+        if ($this->invoice->custom_surcharge_tax1) {
             $tax_component += round($this->invoice->custom_surcharge1 * ($rate / 100), 2);
         }
 
-        if($this->invoice->custom_surcharge_tax2)
-        {
+        if ($this->invoice->custom_surcharge_tax2) {
             $tax_component += round($this->invoice->custom_surcharge2 * ($rate / 100), 2);
         }
 
-        if($this->invoice->custom_surcharge_tax3)
-        {
+        if ($this->invoice->custom_surcharge_tax3) {
             $tax_component += round($this->invoice->custom_surcharge3 * ($rate / 100), 2);
         }
 
-        if($this->invoice->custom_surcharge_tax4)
-        {
+        if ($this->invoice->custom_surcharge_tax4) {
             $tax_component += round($this->invoice->custom_surcharge4 * ($rate / 100), 2);
         }
-        
+
         return $tax_component;
-     
     }
 
-
-
     public function getTaxMap()
-    {        
+    {
         return $this->tax_map;
     }
 

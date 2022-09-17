@@ -6,22 +6,19 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license
  */
+
 namespace Database\Factories;
 
 use App\DataMapper\CompanySettings;
 use App\Models\Company;
+use App\Utils\Traits\MakesHash;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class CompanyFactory extends Factory
 {
-    /**
-     * The name of the factory's corresponding model.
-     *
-     * @var string
-     */
-    protected $model = Company::class;
+    use MakesHash;
 
     /**
      * Define the model's default state.
@@ -31,28 +28,17 @@ class CompanyFactory extends Factory
     public function definition()
     {
         return [
-            //'name' => $this->faker->name,
+            //'name' => $this->faker->name(),
             'company_key' => strtolower(\Illuminate\Support\Str::random(config('ninja.key_length'))),
-            'ip' => $this->faker->ipv4,
+            'ip' => $this->faker->ipv4(),
             'db' => config('database.default'),
             'settings' => CompanySettings::defaults(),
             'is_large' => false,
-            'default_password_timeout' => 30*60000,
+            'default_password_timeout' => 30 * 60000,
             'enabled_modules' => config('ninja.enabled_modules'),
             'custom_fields' => (object) [
-                //'invoice1' => 'Custom Date|date',
-                // 'invoice2' => '2|switch',
-                // 'invoice3' => '3|',
-                // 'invoice4' => '4',
-                // 'client1'=>'1',
-                // 'client2'=>'2',
-                // 'client3'=>'3|date',
-                // 'client4'=>'4|switch',
-                // 'company1'=>'1|date',
-                // 'company2'=>'2|switch',
-                // 'company3'=>'3',
-                // 'company4'=>'4',
             ],
+            'company_key' => $this->createHash(),
         ];
     }
 }

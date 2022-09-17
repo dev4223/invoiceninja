@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -31,9 +31,9 @@ use App\Repositories\CreditRepository;
 use App\Repositories\InvoiceRepository;
 use App\Repositories\QuoteRepository;
 use App\Repositories\RecurringInvoiceRepository;
+use App\Services\PdfMaker\Design;
 use App\Services\PdfMaker\Design as PdfDesignModel;
 use App\Services\PdfMaker\Design as PdfMakerDesign;
-use App\Services\PdfMaker\Design;
 use App\Services\PdfMaker\PdfMaker;
 use App\Utils\HostedPDF\NinjaPdf;
 use App\Utils\HtmlEngine;
@@ -41,6 +41,7 @@ use App\Utils\Ninja;
 use App\Utils\PhantomJS\Phantom;
 use App\Utils\Traits\MakesHash;
 use App\Utils\Traits\MakesInvoiceHtml;
+use App\Utils\Traits\Pdf\PageNumbering;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
@@ -51,6 +52,7 @@ class PreviewController extends BaseController
 {
     use MakesHash;
     use MakesInvoiceHtml;
+    use PageNumbering;
 
     public function __construct()
     {
@@ -97,7 +99,6 @@ class PreviewController extends BaseController
             ! empty(request()->input('entity')) &&
             ! empty(request()->input('entity_id')) &&
             request()->has('body')) {
-            
             $design_object = json_decode(json_encode(request()->input('design')));
 
             if (! is_object($design_object)) {
@@ -155,14 +156,22 @@ class PreviewController extends BaseController
             if (config('ninja.phantomjs_pdf_generation') || config('ninja.pdf_generator') == 'phantom') {
                 return (new Phantom)->convertHtmlToPdf($maker->getCompiledHTML(true));
             }
-            
-            if(config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja'){
-                return (new NinjaPdf())->build($maker->getCompiledHTML(true));
+
+            if (config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja') {
+                $pdf = (new NinjaPdf())->build($maker->getCompiledHTML(true));
+
+                $numbered_pdf = $this->pageNumbering($pdf, auth()->user()->company());
+
+                if ($numbered_pdf) {
+                    $pdf = $numbered_pdf;
+                }
+
+                return $pdf;
             }
 
             //else
-            $file_path = PreviewPdf::dispatchNow($maker->getCompiledHTML(true), auth()->user()->company());
 
+            $file_path = (new PreviewPdf($maker->getCompiledHTML(true), auth()->user()->company()))->handle();
             return response()->download($file_path, basename($file_path), ['Cache-Control:' => 'no-cache'])->deleteFileAfterSend(true);
         }
 
@@ -175,48 +184,42 @@ class PreviewController extends BaseController
 
         MultiDB::setDb($company->db);
 
-        if($request->input('entity') == 'quote'){
+        if ($request->input('entity') == 'quote') {
             $repo = new QuoteRepository();
             $entity_obj = QuoteFactory::create($company->id, auth()->user()->id);
             $class = Quote::class;
-
-        }
-        elseif($request->input('entity') == 'credit'){
+        } elseif ($request->input('entity') == 'credit') {
             $repo = new CreditRepository();
             $entity_obj = CreditFactory::create($company->id, auth()->user()->id);
             $class = Credit::class;
-        }
-        elseif($request->input('entity') == 'recurring_invoice'){
+        } elseif ($request->input('entity') == 'recurring_invoice') {
             $repo = new RecurringInvoiceRepository();
             $entity_obj = RecurringInvoiceFactory::create($company->id, auth()->user()->id);
             $class = RecurringInvoice::class;
-        }
-        else { //assume it is either an invoice or a null object
+        } else { //assume it is either an invoice or a null object
             $repo = new InvoiceRepository();
             $entity_obj = InvoiceFactory::create($company->id, auth()->user()->id);
             $class = Invoice::class;
-        }            
+        }
 
         try {
-
             DB::connection(config('database.default'))->beginTransaction();
 
-            if($request->has('entity_id')){
-
+            if ($request->has('entity_id')) {
                 $entity_obj = $class::on(config('database.default'))
                                     ->with('client.company')
                                     ->where('id', $this->decodePrimaryKey($request->input('entity_id')))
                                     ->where('company_id', $company->id)
                                     ->withTrashed()
                                     ->first();
-
             }
 
             $entity_obj = $repo->save($request->all(), $entity_obj);
 
-            if(!$request->has('entity_id'))
+            if (! $request->has('entity_id')) {
                 $entity_obj->service()->fillDefaults()->save();
-                
+            }
+
             App::forgetInstance('translator');
             $t = app('translator');
             App::setLocale($entity_obj->client->locale());
@@ -227,13 +230,14 @@ class PreviewController extends BaseController
             $design = \App\Models\Design::find($entity_obj->design_id);
 
             /* Catch all in case migration doesn't pass back a valid design */
-            if(!$design)
+            if (! $design) {
                 $design = \App\Models\Design::find(2);
+            }
 
             if ($design->is_custom) {
                 $options = [
-                'custom_partials' => json_decode(json_encode($design->design), true)
-              ];
+                    'custom_partials' => json_decode(json_encode($design->design), true),
+                ];
                 $template = new PdfMakerDesign(PdfDesignModel::CUSTOM, $options);
             } else {
                 $template = new PdfMakerDesign(strtolower($design->name));
@@ -257,7 +261,6 @@ class PreviewController extends BaseController
                 'process_markdown' => $entity_obj->client->company->markdown_enabled,
             ];
 
-
             $maker = new PdfMaker($state);
 
             $maker
@@ -270,14 +273,13 @@ class PreviewController extends BaseController
                 return $maker->getCompiledHTML();
             }
 
-
         }
         catch(\Exception $e){
-
+            nlog($e->getMessage());
             DB::connection(config('database.default'))->rollBack();
+
             return;
         }
-
 
             //if phantom js...... inject here..
             if (config('ninja.phantomjs_pdf_generation') || config('ninja.pdf_generator') == 'phantom') {
@@ -285,25 +287,32 @@ class PreviewController extends BaseController
             }
             
             if(config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja'){
-                return (new NinjaPdf())->build($maker->getCompiledHTML(true));
+                $pdf = (new NinjaPdf())->build($maker->getCompiledHTML(true));
+
+                $numbered_pdf = $this->pageNumbering($pdf, auth()->user()->company());
+
+
+            $numbered_pdf = $this->pageNumbering($pdf, auth()->user()->company());
+
+            if ($numbered_pdf) {
+                $pdf = $numbered_pdf;
             }
 
-            $file_path = PreviewPdf::dispatchNow($maker->getCompiledHTML(true), $company);
+            return $pdf;
+        }
 
+        $file_path = (new PreviewPdf($maker->getCompiledHTML(true), $company))->handle();
 
-            if(Ninja::isHosted())
-            {
-                LightLogs::create(new LivePreview())
+        if (Ninja::isHosted()) {
+            LightLogs::create(new LivePreview())
                          ->increment()
-                         ->queue();
-            }
-
+                         ->batch();
+        }
 
         $response = Response::make($file_path, 200);
         $response->header('Content-Type', 'application/pdf');
 
         return $response;
-
     }
 
     private function blankEntity()
@@ -315,8 +324,9 @@ class PreviewController extends BaseController
         $invitation = InvoiceInvitation::where('company_id', auth()->user()->company()->id)->orderBy('id', 'desc')->first();
 
         /* If we don't have a valid invitation in the system - create a mock using transactions */
-        if(!$invitation)
+        if (! $invitation) {
             return $this->mockEntity();
+        }
 
         $design_object = json_decode(json_encode(request()->input('design')));
 
@@ -353,51 +363,57 @@ class PreviewController extends BaseController
             return (new Phantom)->convertHtmlToPdf($maker->getCompiledHTML(true));
         }
 
-        if(config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja'){
-            return (new NinjaPdf())->build($maker->getCompiledHTML(true));
+        if (config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja') {
+            $pdf = (new NinjaPdf())->build($maker->getCompiledHTML(true));
+
+            $numbered_pdf = $this->pageNumbering($pdf, auth()->user()->company());
+
+            if ($numbered_pdf) {
+                $pdf = $numbered_pdf;
+            }
+
+            return $pdf;
         }
-            
-        $file_path = PreviewPdf::dispatchNow($maker->getCompiledHTML(true), auth()->user()->company());
+
+        $file_path = (new PreviewPdf($maker->getCompiledHTML(true), auth()->user()->company()))->handle();
 
         $response = Response::make($file_path, 200);
         $response->header('Content-Type', 'application/pdf');
 
         return $response;
-
     }
 
     private function mockEntity()
     {
-
         DB::connection(auth()->user()->company()->db)->beginTransaction();
 
         $client = Client::factory()->create([
-                'user_id' => auth()->user()->id,
-                'company_id' => auth()->user()->company()->id,
-            ]);
+            'user_id' => auth()->user()->id,
+            'company_id' => auth()->user()->company()->id,
+        ]);
 
         $contact = ClientContact::factory()->create([
-                'user_id' => auth()->user()->id,
-                'company_id' => auth()->user()->company()->id,
-                'client_id' => $client->id,
-                'is_primary' => 1,
-                'send_email' => true,
-            ]);
+            'user_id' => auth()->user()->id,
+            'company_id' => auth()->user()->company()->id,
+            'client_id' => $client->id,
+            'is_primary' => 1,
+            'send_email' => true,
+        ]);
 
         $invoice = Invoice::factory()->create([
-                    'user_id' => auth()->user()->id,
-                    'company_id' => auth()->user()->company()->id,
-                    'client_id' => $client->id,
-                    'terms' => 'Sample Terms',
-                    'footer' => 'Sample Footer',
-                    'public_notes' => 'Sample Public Notes',
-                ]);
+            'user_id' => auth()->user()->id,
+            'company_id' => auth()->user()->company()->id,
+            'client_id' => $client->id,
+            'terms' => 'Sample Terms',
+            'footer' => 'Sample Footer',
+            'public_notes' => 'Sample Public Notes',
+        ]);
 
         $invitation = InvoiceInvitation::factory()->create([
-                    'user_id' => auth()->user()->id,
-                    'company_id' => auth()->user()->company()->id,
-                    'invoice_id' => $invoice->id,
-                    'client_contact_id' => $contact->id,
+            'user_id' => auth()->user()->id,
+            'company_id' => auth()->user()->company()->id,
+            'invoice_id' => $invoice->id,
+            'client_contact_id' => $contact->id,
         ]);
 
         $invoice->setRelation('invitations', $invitation);
@@ -442,11 +458,20 @@ class PreviewController extends BaseController
             return (new Phantom)->convertHtmlToPdf($maker->getCompiledHTML(true));
         }
 
-        if(config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja'){
-            return (new NinjaPdf())->build($maker->getCompiledHTML(true));
+        if (config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja') {
+            $pdf = (new NinjaPdf())->build($maker->getCompiledHTML(true));
+
+            $numbered_pdf = $this->pageNumbering($pdf, auth()->user()->company());
+
+            if ($numbered_pdf) {
+                $pdf = $numbered_pdf;
+            }
+
+            return $pdf;
         }
-            
-        $file_path = PreviewPdf::dispatchNow($maker->getCompiledHTML(true), auth()->user()->company());
+
+
+        $file_path = (new PreviewPdf($maker->getCompiledHTML(true), auth()->user()->company()))->handle();
 
         $response = Response::make($file_path, 200);
         $response->header('Content-Type', 'application/pdf');

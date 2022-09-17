@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -26,12 +26,12 @@ class SubscriptionRecurringInvoicesTable extends Component
     public $per_page = 10;
 
     public $company;
-    
+
     public function mount()
     {
         MultiDB::setDb($this->company->db);
     }
-    
+
     public function render()
     {
         $query = RecurringInvoice::query()

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -23,8 +23,8 @@ use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\App;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\App;
 
 class SendVerificationNotification implements ShouldQueue
 {
@@ -52,9 +52,7 @@ class SendVerificationNotification implements ShouldQueue
 
         $event->user->service()->invite($event->company);
 
-
-        if(Carbon::parse($event->company->created_at)->lt(now()->subDay()))
-        {
+        if (Carbon::parse($event->company->created_at)->lt(now()->subDay())) {
             App::forgetInstance('translator');
             $t = app('translator');
             $t->replace(Ninja::transformTranslations($event->company->settings));
@@ -64,8 +62,7 @@ class SendVerificationNotification implements ShouldQueue
             $nmo->company = $event->company;
             $nmo->settings = $event->company->settings;
             $nmo->to_user = $event->creating_user;
-            NinjaMailerJob::dispatch($nmo);
+            NinjaMailerJob::dispatch($nmo, true);
         }
-
     }
 }

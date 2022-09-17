@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -34,7 +34,7 @@ class StoreDesignRequest extends Request
         ];
     }
 
-    protected function prepareForValidation()
+    public function prepareForValidation()
     {
         $input = $this->all();
 
@@ -49,11 +49,11 @@ class StoreDesignRequest extends Request
         if (! array_key_exists('includes', $input['design']) || is_null($input['design']['includes'])) {
             $input['design']['includes'] = '';
         }
-        
+
         if (! array_key_exists('footer', $input['design']) || is_null($input['design']['footer'])) {
             $input['design']['footer'] = '';
         }
-        
+
         if (! array_key_exists('header', $input['design']) || is_null($input['design']['header'])) {
             $input['design']['header'] = '';
         }

@@ -4,13 +4,14 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
 
+use App\Models\Presenters\VendorContactPresenter;
 use App\Notifications\ClientContactResetPassword;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Contracts\Translation\HasLocalePreference;
@@ -35,21 +36,16 @@ class VendorContact extends Authenticatable implements HasLocalePreference
 
     protected $touches = ['vendor'];
 
+    protected $presenter = VendorContactPresenter::class;
+
     /* Allow microtime timestamps */
     protected $dateFormat = 'Y-m-d H:i:s.u';
-
-    protected $dates = [
-        'deleted_at',
-    ];
 
     protected $appends = [
         'hashed_id',
     ];
 
-    protected $with = [
-        // 'vendor',
-        // 'company'
-    ];
+    protected $with = [];
 
     protected $casts = [
         'updated_at' => 'timestamp',
@@ -69,6 +65,24 @@ class VendorContact extends Authenticatable implements HasLocalePreference
         'is_primary',
         'vendor_id',
     ];
+
+    public function avatar()
+    {
+        if ($this->avatar) {
+            return $this->avatar;
+        }
+
+        return asset('images/svg/user.svg');
+    }
+
+    public function setAvatarAttribute($value)
+    {
+        if (! filter_var($value, FILTER_VALIDATE_URL) && $value) {
+            $this->attributes['avatar'] = url('/').$value;
+        } else {
+            $this->attributes['avatar'] = $value;
+        }
+    }
 
     public function getEntityType()
     {
@@ -107,7 +121,7 @@ class VendorContact extends Authenticatable implements HasLocalePreference
 
     public function sendPasswordResetNotification($token)
     {
-        $this->notify(new ClientContactResetPassword($token));
+        // $this->notify(new ClientContactResetPassword($token));
     }
 
     public function preferredLocale()
@@ -115,12 +129,8 @@ class VendorContact extends Authenticatable implements HasLocalePreference
         $languages = Cache::get('languages');
 
         return $languages->filter(function ($item) {
-            return $item->id == $this->client->getSetting('language_id');
+            return $item->id == $this->company->getSetting('language_id');
         })->first()->locale;
-
-        //$lang = Language::find($this->client->getSetting('language_id'));
-
-        //return $lang->locale;
     }
 
     /**
@@ -135,5 +145,19 @@ class VendorContact extends Authenticatable implements HasLocalePreference
         return $this
             ->withTrashed()
             ->where('id', $this->decodePrimaryKey($value))->firstOrFail();
+    }
+
+    public function purchase_order_invitations(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PurchaseOrderInvitation::class);
+    }
+
+    public function getLoginLink()
+    {
+
+        $domain = isset($this->company->portal_domain) ? $this->company->portal_domain : $this->company->domain();
+
+        return $domain.'/vendor/key_login/'.$this->contact_key;
+
     }
 }

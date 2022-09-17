@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -23,9 +23,9 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Mail;
 
 //@deprecated for mail
-class ClientContactRequestCancellation extends Notification 
+class ClientContactRequestCancellation extends Notification
 {
-  //  use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    //  use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
      * Create a new notification instance.

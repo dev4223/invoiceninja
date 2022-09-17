@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -26,7 +26,7 @@ class InvoiceMap
             7 => 'invoice.date',
             8 => 'invoice.due_date',
             9 => 'invoice.terms',
-			10 => 'invoice.status',
+            10 => 'invoice.status',
             11 => 'invoice.public_notes',
             12 => 'invoice.is_sent',
             13 => 'invoice.private_notes',
@@ -87,7 +87,7 @@ class InvoiceMap
             7 => 'texts.date',
             8 => 'texts.due_date',
             9 => 'texts.terms',
-			10 => 'texts.status',
+            10 => 'texts.status',
             11 => 'texts.public_notes',
             12 => 'texts.sent',
             13 => 'texts.private_notes',

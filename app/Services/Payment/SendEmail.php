@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -34,12 +34,10 @@ class SendEmail
     {
         $this->payment->load('company', 'client.contacts');
 
-        $this->payment->client->contacts->each(function ($contact) {
-            if ($contact->email) {
-                EmailPayment::dispatchNow($this->payment, $this->payment->company, $contact);
-                return false;
-                //11-01-2021 only send payment receipt to the first contact
-            }
-        });
+        $contact = $this->payment->client->contacts()->first();
+
+        if ($contact?->email)
+            EmailPayment::dispatch($this->payment, $this->payment->company, $contact);
+         
     }
 }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -30,16 +30,16 @@ class BulkUserRequest extends Request
 
     public function rules()
     {
-
         $rules = [];
 
-        if(Ninja::isHosted() && $this->action && $this->action == 'restore')
+        if (Ninja::isHosted() && $this->action && $this->action == 'restore') {
             $rules['ids'] = new CanRestoreUserRule();
+        }
 
         return $rules;
     }
 
-    protected function prepareForValidation()
+    public function prepareForValidation()
     {
         $input = $this->all();
 

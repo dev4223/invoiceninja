@@ -4,15 +4,17 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
 
+use App\DataMapper\CompanySettings;
 use App\Models\Language;
 use App\Models\Presenters\CompanyPresenter;
+use App\Models\PurchaseOrder;
 use App\Models\User;
 use App\Services\Notification\NotificationService;
 use App\Utils\Ninja;
@@ -36,16 +38,27 @@ class Company extends BaseModel
     use \Awobaz\Compoships\Compoships;
 
     const ENTITY_RECURRING_INVOICE = 'recurring_invoice';
+
     const ENTITY_CREDIT = 'credit';
+
     const ENTITY_QUOTE = 'quote';
+
     const ENTITY_TASK = 'task';
+
     const ENTITY_EXPENSE = 'expense';
+
     const ENTITY_PROJECT = 'project';
+
     const ENTITY_VENDOR = 'vendor';
+
     const ENTITY_TICKET = 'ticket';
+
     const ENTITY_PROPOSAL = 'proposal';
+
     const ENTITY_RECURRING_EXPENSE = 'recurring_expense';
+
     const ENTITY_RECURRING_TASK = 'task';
+
     const ENTITY_RECURRING_QUOTE = 'recurring_quote';
 
     protected $presenter = CompanyPresenter::class;
@@ -100,6 +113,15 @@ class Company extends BaseModel
         'client_registration_fields',
         'convert_rate_to_client',
         'markdown_email_enabled',
+        'stop_on_unpaid_recurring',
+        'use_quote_terms_on_conversion',
+        'enable_applying_payments',
+        'track_inventory',
+        'inventory_notification_threshold',
+        'stock_notification',
+        'enabled_expense_tax_rates',
+        'invoice_task_project',
+        'report_include_deleted',
     ];
 
     protected $hidden = [
@@ -118,9 +140,7 @@ class Company extends BaseModel
         'client_registration_fields' => 'array',
     ];
 
-    protected $with = [
-   //     'tokens'
-    ];
+    protected $with = [];
 
     public static $modules = [
         self::ENTITY_RECURRING_INVOICE => 1,
@@ -181,10 +201,15 @@ class Company extends BaseModel
     {
         return $this->hasMany(ExpenseCategory::class)->withTrashed();
     }
-    
+
     public function subscriptions()
     {
         return $this->hasMany(Subscription::class)->withTrashed();
+    }
+
+    public function purchase_orders()
+    {
+        return $this->hasMany(PurchaseOrder::class)->withTrashed();
     }
 
     public function task_statuses()
@@ -196,6 +221,7 @@ class Company extends BaseModel
     {
         return $this->hasMany(Client::class)->withTrashed();
     }
+
     /**
      * @return HasMany
      */
@@ -229,7 +255,6 @@ class Company extends BaseModel
     {
         return $this->hasMany(Activity::class);
     }
-
 
     public function activities()
     {
@@ -318,8 +343,21 @@ class Company extends BaseModel
      */
     public function country()
     {
+        $companies = Cache::get('countries');
+
+        if (! $companies) {
+            $this->buildCache(true);
+
+            $companies = Cache::get('countries');
+
+        }
+
+        return $companies->filter(function ($item) {
+            return $item->id == $this->getSetting('country_id');
+        })->first();
+
 //        return $this->belongsTo(Country::class);
-        return Country::find($this->settings->country_id);
+        // return Country::find($this->settings->country_id);
     }
 
     public function group_settings()
@@ -329,11 +367,11 @@ class Company extends BaseModel
 
     public function timezone()
     {
-
         $timezones = Cache::get('timezones');
 
-        if(!$timezones)
+        if (! $timezones) {
             $this->buildCache(true);
+        }
 
         return $timezones->filter(function ($item) {
             return $item->id == $this->settings->timezone_id;
@@ -367,18 +405,23 @@ class Company extends BaseModel
      */
     public function language()
     {
-        
         $languages = Cache::get('languages');
 
-        if(!$languages)
+        //build cache and reinit
+        if (! $languages) {
             $this->buildCache(true);
+            $languages = Cache::get('languages');
+        }
+
+        //if the cache is still dead, get from DB
+        if(!$languages && property_exists($this->settings, 'language_id'))
+            return Language::find($this->settings->language_id);
 
         return $languages->filter(function ($item) {
             return $item->id == $this->settings->language_id;
         })->first();
 
-
-        // return Language::find($this->settings->language_id);
+        
     }
 
     public function getLocale()
@@ -400,6 +443,12 @@ class Company extends BaseModel
     {
         if (property_exists($this->settings, $setting) != false) {
             return $this->settings->{$setting};
+        }
+
+        $cs = CompanySettings::defaults();
+
+        if (property_exists($cs, $setting) != false) {
+            return $cs->{$setting};
         }
 
         return null;
@@ -478,8 +527,7 @@ class Company extends BaseModel
 
     public function owner()
     {
-        return $this->company_users()->withTrashed()->where('is_owner', true)->first()->user;
-        //return $this->company_users->where('is_owner', true)->first()->user;
+        return $this->company_users()->withTrashed()->where('is_owner', true)->first()?->user;
     }
 
     public function resolveRouteBinding($value, $field = null)
@@ -490,11 +538,11 @@ class Company extends BaseModel
     public function domain()
     {
         if (Ninja::isHosted()) {
-
-            if($this->portal_mode == 'domain' && strlen($this->portal_domain) > 3)
+            if ($this->portal_mode == 'domain' && strlen($this->portal_domain) > 3) {
                 return $this->portal_domain;
+            }
 
-            return "https://{$this->subdomain}." . config('ninja.app_domain');
+            return "https://{$this->subdomain}.".config('ninja.app_domain');
         }
 
         return config('ninja.app_url');
@@ -534,7 +582,6 @@ class Company extends BaseModel
         return $data;
     }
 
-
     private function createRBit($type, $source, $properties)
     {
         $data = new \stdClass;
@@ -553,5 +600,18 @@ class Company extends BaseModel
     public function translate_entity()
     {
         return ctrans('texts.company');
+    }
+
+    public function date_format()
+    {
+        $date_formats = Cache::get('date_formats');
+
+        if (! $date_formats) {
+            $this->buildCache(true);
+        }
+
+        return $date_formats->filter(function ($item) {
+            return $item->id == $this->getSetting('date_format_id');
+        })->first()->format;
     }
 }

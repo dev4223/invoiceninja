@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -26,11 +26,10 @@ class ValidAmount implements Rule
      */
     public function passes($attribute, $value)
     {
-        return is_numeric((string)$value);
+        return is_numeric((string) $value);
         //return filter_var((string)$value, FILTER_VALIDATE_FLOAT);
 //        return preg_match('^(?=.)([+-]?([0-9]*)(\.([0-9]+))?)$^', (string)$value);
         // return trim($value, '-1234567890.,') === '';
-
     }
 
     /**

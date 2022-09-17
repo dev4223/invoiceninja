@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -39,7 +39,7 @@ class CheckDbStatus implements ShouldQueue
      */
     public function handle()
     {
-        DbStatus::dispatchNow('db-ninja-01', 'db.status.db-ninja-01');
-        DbStatus::dispatchNow('db-ninja-02', 'db.status.db-ninja-02');
+        (new DbStatus('db-ninja-01', 'db.status.db-ninja-01'))->handle();
+        (new DbStatus('db-ninja-02', 'db.status.db-ninja-02'))->handle();
     }
 }

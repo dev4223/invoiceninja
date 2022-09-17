@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -37,7 +37,7 @@ class TasksTable extends Component
         $query = Task::query()
             ->where('company_id', $this->company->id)
             ->where('is_deleted', false)
-            ->where('client_id', auth()->guard('contact')->user()->client->id);
+            ->where('client_id', auth()->guard('contact')->user()->client_id);
 
         if ($this->company->getSetting('show_all_tasks_client_portal') === 'invoiced') {
             $query = $query->whereNotNull('invoice_id');

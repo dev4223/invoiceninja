@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -46,34 +46,23 @@ class ApplyNumber extends AbstractService
         return $this->credit;
     }
 
-
     private function trySaving()
     {
+        $x = 1;
 
-        $x=1;
-
-        do{
-
-            try{
-
+        do {
+            try {
                 $this->credit->number = $this->getNextCreditNumber($this->client, $this->credit);
                 $this->credit->saveQuietly();
 
                 $this->completed = false;
-                
-
-            }
-            catch(QueryException $e){
-
+            } catch (QueryException $e) {
                 $x++;
 
-                if($x>10)
+                if ($x > 50) {
                     $this->completed = false;
+                }
             }
-        
-        }
-        while($this->completed);
-
+        } while ($this->completed);
     }
-
 }

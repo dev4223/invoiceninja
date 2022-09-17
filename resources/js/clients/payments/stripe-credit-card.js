@@ -5,7 +5,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license 
  */
 
 class StripeCreditCard {
@@ -150,7 +150,7 @@ class StripeCreditCard {
             })
             .then((result) => {
                 if (result.error) {
-                    return this.handleFailure(result);
+                    return this.handleFailure(result.error.message);
                 }
 
                 return this.handleSuccessfulAuthorization(result);

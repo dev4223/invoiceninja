@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -43,7 +43,7 @@ class PingController extends BaseController
     {
         return response()->json(
             ['company_name' => auth()->user()->getCompany()->present()->name(),
-             'user_name' => auth()->user()->present()->name(),
+                'user_name' => auth()->user()->present()->name(),
             ],
             200
         );

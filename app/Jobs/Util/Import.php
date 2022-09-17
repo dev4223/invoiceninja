@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -89,6 +89,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\App;
@@ -187,6 +188,11 @@ class Import implements ShouldQueue
         $this->resources = $resources;
     }
 
+    public function middleware()
+    {
+        return [new WithoutOverlapping($this->company->company_key)];
+    }
+
     /**
      * Execute the job.
      *
@@ -237,10 +243,8 @@ class Import implements ShouldQueue
 
         //company size check
         if ($this->company->invoices()->count() > 500 || $this->company->products()->count() > 500 || $this->company->clients()->count() > 500) {
-            // $this->company->is_large = true;
             $this->company->account->companies()->update(['is_large' => true]);
         }
-
 
         $this->company->client_registration_fields = \App\DataMapper\ClientRegistrationFields::generate();
         $this->company->save();
@@ -248,7 +252,7 @@ class Import implements ShouldQueue
         $this->setInitialCompanyLedgerBalances();
         
         // $this->fixClientBalances();
-        $check_data = CheckCompanyData::dispatchNow($this->company, md5(time()));
+        $check_data = (new CheckCompanyData($this->company, md5(time())))->handle();
         
         // if(Ninja::isHosted() && array_key_exists('ninja_tokens', $data))
         $this->processNinjaTokens($data['ninja_tokens']);
@@ -271,7 +275,12 @@ class Import implements ShouldQueue
 
         info('Completed🚀🚀🚀🚀🚀 at '.now());
 
-        unlink($this->file_path);
+        try{
+            unlink($this->file_path);
+        }
+        catch(\Exception $e){
+            nlog("problem unsetting file");
+        }
     }
 
     private function fixData()
@@ -582,7 +591,7 @@ class Import implements ShouldQueue
             
             $user_agent = array_key_exists('token_name', $resource) ?: request()->server('HTTP_USER_AGENT');
 
-            CreateCompanyToken::dispatchNow($this->company, $user, $user_agent);
+            (new CreateCompanyToken($this->company, $user, $user_agent))->handle();
 
             $key = "users_{$resource['id']}";
 
@@ -919,6 +928,9 @@ class Import implements ShouldQueue
             $modified['company_id'] = $this->company->id;
             $modified['line_items'] = $this->cleanItems($modified['line_items']);
 
+            if(array_key_exists('next_send_date', $resource))
+                $modified['next_send_date_client'] = $resource['next_send_date'];
+
             if(array_key_exists('created_at', $modified))
                 $modified['created_at'] = Carbon::parse($modified['created_at']);
 
@@ -947,6 +959,11 @@ class Import implements ShouldQueue
                 $modified,
                 RecurringInvoiceFactory::create($this->company->id, $modified['user_id'])
             );
+
+            if($invoice->status_id == 4 && $invoice->remaining_cycles == -1){
+                $invoice->status_id =2;
+                $invoice->save();
+            }
 
             $key = "recurring_invoices_{$resource['id']}";
 
@@ -1882,7 +1899,7 @@ class Import implements ShouldQueue
         if(Ninja::isHosted()){
 
             try{
-                \Modules\Admin\Jobs\Account\NinjaUser::dispatchNow($data, $this->company);
+                \Modules\Admin\Jobs\Account\NinjaUser::dispatch($data, $this->company);
             }
             catch(\Exception $e){
                 nlog($e->getMessage());

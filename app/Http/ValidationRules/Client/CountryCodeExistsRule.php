@@ -4,7 +4,7 @@
  *
  * @link https://github.com/creditninja/creditninja source repository
  *
- * @copyright Copyright (c) 2021. Credit Ninja LLC (https://creditninja.com)
+ * @copyright Copyright (c) 2022. Credit Ninja LLC (https://creditninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -19,7 +19,6 @@ use Illuminate\Contracts\Validation\Rule;
  */
 class CountryCodeExistsRule implements Rule
 {
-
     public function __construct()
     {
     }
@@ -40,7 +39,6 @@ class CountryCodeExistsRule implements Rule
     public function message()
     {
         return 'Country code does not exist';
-
     }
 
     /**
@@ -52,9 +50,10 @@ class CountryCodeExistsRule implements Rule
                         ->orWhere('iso_3166_3', $value)
                         ->exists();
 
-        if ($country) 
+        if ($country) {
             return true;
-        
+        }
+
         return false;
     }
 }

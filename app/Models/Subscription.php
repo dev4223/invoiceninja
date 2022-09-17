@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -83,9 +83,13 @@ class Subscription extends BaseModel
         return $this->belongsTo(User::class)->withTrashed();
     }
 
+    public function group_settings()
+    {
+        return $this->belongsTo(GroupSetting::class, 'group_id', 'id');
+    }
+
     public function nextDateByInterval($date, $frequency_id)
     {
-
         switch ($frequency_id) {
 
             case RecurringInvoice::FREQUENCY_DAILY:
@@ -116,5 +120,4 @@ class Subscription extends BaseModel
                 return null;
         }
     }
-
 }

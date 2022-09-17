@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -18,6 +18,7 @@ use App\Models\CreditInvitation;
 use App\Models\Document;
 use App\Transformers\ActivityTransformer;
 use App\Utils\Traits\MakesHash;
+use League\Fractal\Resource\Item;
 
 class CreditTransformer extends EntityTransformer
 {
@@ -30,6 +31,7 @@ class CreditTransformer extends EntityTransformer
 
     protected $availableIncludes = [
         'activities',
+        'client',
     ];
 
     public function includeActivities(Credit $credit)
@@ -53,28 +55,13 @@ class CreditTransformer extends EntityTransformer
         return $this->includeCollection($credit->invitations, $transformer, CreditInvitation::class);
     }
 
-    /*
-        public function includePayments(quote $credit)
-        {
-            $transformer = new PaymentTransformer($this->account, $this->serializer, $credit);
+    public function includeClient(Credit $credit): Item
+    {
+        $transformer = new ClientTransformer($this->serializer);
 
-            return $this->includeCollection($credit->payments, $transformer, ENTITY_PAYMENT);
-        }
+        return $this->includeItem($credit->client, $transformer, Client::class);
+    }
 
-        public function includeClient(quote $credit)
-        {
-            $transformer = new ClientTransformer($this->account, $this->serializer);
-
-            return $this->includeItem($credit->client, $transformer, ENTITY_CLIENT);
-        }
-
-        public function includeExpenses(quote $credit)
-        {
-            $transformer = new ExpenseTransformer($this->account, $this->serializer);
-
-            return $this->includeCollection($credit->expenses, $transformer, ENTITY_EXPENSE);
-        }
-*/
     public function includeDocuments(Credit $credit)
     {
         $transformer = new DocumentTransformer($this->serializer);
@@ -93,7 +80,6 @@ class CreditTransformer extends EntityTransformer
             'amount' => (float) $credit->amount,
             'balance' => (float) $credit->balance,
             'client_id' => (string) $this->encodePrimaryKey($credit->client_id),
-            'vendor_id' => (string) $this->encodePrimaryKey($credit->vendor_id),
             'status_id' => (string) ($credit->status_id ?: 1),
             'design_id' => (string) $this->encodePrimaryKey($credit->design_id),
             'created_at' => (int) $credit->created_at,

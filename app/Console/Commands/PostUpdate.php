@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -50,24 +50,22 @@ class PostUpdate extends Command
             info("I wasn't able to migrate the data.");
         }
 
-        info("finished migrating");
+        info('finished migrating');
 
         $output = [];
 
         // exec('vendor/bin/composer install --no-dev -o', $output);
 
-        info(print_r($output,1));
-        info("finished running composer install ");
+        info(print_r($output, 1));
+        info('finished running composer install ');
 
         try {
-
             Artisan::call('optimize');
-
         } catch (\Exception $e) {
             info("I wasn't able to optimize.");
         }
 
-        info("optimized");
+        info('optimized');
 
         try {
             Artisan::call('view:clear');
@@ -75,7 +73,7 @@ class PostUpdate extends Command
             info("I wasn't able to clear the views.");
         }
 
-        info("view cleared");
+        info('view cleared');
 
         try {
             Artisan::call('queue:restart');
@@ -83,11 +81,10 @@ class PostUpdate extends Command
             info("I wasn't able to restart the queue.");
         }
 
-        info("queue restarted");
+        info('queue restarted');
 
         VersionCheck::dispatch();
 
-        info("Sent for version check");
-
+        info('Sent for version check');
     }
 }

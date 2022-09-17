@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -42,7 +42,7 @@ class EmailPayment implements ShouldQueue
     private $company;
 
     public $settings;
-    
+
     /**
      * Create a new job instance.
      *
@@ -67,11 +67,11 @@ class EmailPayment implements ShouldQueue
      */
     public function handle()
     {
-        if ($this->company->is_disabled) 
+        if ($this->company->is_disabled) {
             return true;
-        
-        if ($this->contact->email) {
+        }
 
+        if ($this->contact->email) {
             MultiDB::setDb($this->company->db);
 
             $this->payment->load('invoices');
@@ -81,8 +81,9 @@ class EmailPayment implements ShouldQueue
 
             $invitation = null;
 
-            if($this->payment->invoices && $this->payment->invoices->count() >=1)
+            if ($this->payment->invoices && $this->payment->invoices->count() >= 1) {
                 $invitation = $this->payment->invoices->first()->invitations()->first();
+            }
 
             $nmo = new NinjaMailerObject;
             $nmo->mailable = new TemplateEmail($email_builder, $this->contact, $invitation);

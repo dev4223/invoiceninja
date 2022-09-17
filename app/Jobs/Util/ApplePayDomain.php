@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -37,11 +37,9 @@ class ApplePayDomain implements ShouldQueue
 
     public function __construct(CompanyGateway $company_gateway, string $db)
     {
-    
         $this->db = $db;
 
         $this->company_gateway = $company_gateway;
-
     }
 
     /**
@@ -51,50 +49,35 @@ class ApplePayDomain implements ShouldQueue
      */
     public function handle()
     {
-        
         MultiDB::setDB($this->db);
 
-        if(in_array($this->company_gateway->gateway_key, $this->stripe_keys))
-        {
-            
+        if (in_array($this->company_gateway->gateway_key, $this->stripe_keys)) {
             $domain = $this->getDomain();
 
-            try{
+            try {
                 $this->company_gateway->driver()->setApplePayDomain($domain);
+            } catch (\Exception $e) {
+                nlog('failed to set Apple Domain with Stripe '.$e->getMessage());
             }
-            catch(\Exception $e){
-                nlog("failed to set Apple Domain with Stripe " . $e->getMessage());
-            }
-
         }
-
     }
 
     private function getDomain()
     {
-
         $domain = '';
 
-        if(Ninja::isHosted())
-        {
-
-            if($this->company_gateway->company->portal_mode == 'domain'){
+        if (Ninja::isHosted()) {
+            if ($this->company_gateway->company->portal_mode == 'domain') {
                 $domain = $this->company_gateway->company->portal_domain;
+            } else {
+                $domain = $this->company_gateway->company->subdomain.'.'.config('ninja.app_domain');
             }
-            else{
-                $domain = $this->company_gateway->company->subdomain . '.' . config('ninja.app_domain');
-            }
-
-        }
-        else {
-
+        } else {
             $domain = config('ninja.app_url');
-        }    
+        }
 
         $parsed_url = parse_url($domain);
 
         return $parsed_url['host'];
-
     }
-
 }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -164,6 +164,7 @@ class SubscriptionService
 
         $recurring_invoice = $this->convertInvoiceToRecurring($client_contact->client_id);
         $recurring_invoice->next_send_date = now()->addSeconds($this->subscription->trial_duration);
+        $recurring_invoice->next_send_date_client = now()->addSeconds($this->subscription->trial_duration);
         $recurring_invoice->backup = 'is_trial';
 
         if(array_key_exists('coupon', $data) && ($data['coupon'] == $this->subscription->promo_code) && $this->subscription->promo_discount > 0)
@@ -476,10 +477,14 @@ class SubscriptionService
 
             nlog($response);
 
-            if($credit)
-                return $this->handleRedirect('/client/credits/'.$credit->hashed_id);
-            else
-                return $this->handleRedirect('/client/credits');      
+            if($credit){
+                // return $this->handleRedirect('/client/credits/'.$credit->hashed_id);
+                return '/client/credits/'.$credit->hashed_id;
+            }
+            else{
+                // return $this->handleRedirect('/client/credits');      
+                return '/client/credits';
+            }
 
     }
 
@@ -620,7 +625,9 @@ class SubscriptionService
             $recurring_invoice = $this->convertInvoiceToRecurring($old_recurring_invoice->client_id);
             $recurring_invoice = $recurring_invoice_repo->save([], $recurring_invoice);
             $recurring_invoice->next_send_date = now()->format('Y-m-d');
+            $recurring_invoice->next_send_date_client = now()->format('Y-m-d');
             $recurring_invoice->next_send_date = $recurring_invoice->nextSendDate();
+            $recurring_invoice->next_send_date_client = $recurring_invoice->nextSendDateClient();
 
             /* Start the recurring service */
             $recurring_invoice->service()
@@ -703,11 +710,12 @@ class SubscriptionService
      * @param  array $data
      * @return Invoice
      */
-    public function createInvoice($data): ?\App\Models\Invoice
+    public function createInvoice($data, $quantity = 1): ?\App\Models\Invoice
     {
 
         $invoice_repo = new InvoiceRepository();
         $subscription_repo = new SubscriptionRepository();
+        $subscription_repo->quantity = $quantity;
 
         $invoice = InvoiceFactory::create($this->subscription->company_id, $this->subscription->user_id);
         $invoice->line_items = $subscription_repo->generateLineItems($this->subscription);
@@ -754,8 +762,9 @@ class SubscriptionService
         $recurring_invoice->auto_bill_enabled =  $this->setAutoBillFlag($recurring_invoice->auto_bill);
         $recurring_invoice->due_date_days = 'terms';
         $recurring_invoice->next_send_date = now()->format('Y-m-d');
+        $recurring_invoice->next_send_date_client = now()->format('Y-m-d');
         $recurring_invoice->next_send_date =  $recurring_invoice->nextSendDate();
-
+        $recurring_invoice->next_send_date_client = $recurring_invoice->nextSendDateClient();
         return $recurring_invoice;
     }
 
@@ -835,7 +844,6 @@ class SubscriptionService
      * Get the single charge products for the
      * subscription
      *
-     * @return ?Product Collection
      */
     public function products()
     {
@@ -854,7 +862,6 @@ class SubscriptionService
      * Get the recurring products for the
      * subscription
      *
-     * @return ?Product Collection
      */
     public function recurring_products()
     {

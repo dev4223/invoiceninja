@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -20,7 +20,7 @@ use stdClass;
 class QuoteRestoredActivity implements ShouldQueue
 {
     public $delay = 5;
-        
+
     protected $activity_repo;
 
     /**
@@ -44,7 +44,6 @@ class QuoteRestoredActivity implements ShouldQueue
         MultiDB::setDb($event->company->db);
 
         $fields = new stdClass;
-
 
         $user_id = array_key_exists('user_id', $event->event_vars) ? $event->event_vars['user_id'] : $event->quote->user_id;
 

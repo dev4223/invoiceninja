@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -34,17 +34,18 @@ class ShowChartRequest extends Request
         ];
     }
 
-    protected function prepareForValidation()
+    public function prepareForValidation()
     {
         $input = $this->all();
 
-            if(!array_key_exists('start_date', $input))
-                $input['start_date'] = now()->subDays(20);
+        if (! array_key_exists('start_date', $input)) {
+            $input['start_date'] = now()->subDays(20);
+        }
 
-            if(!array_key_exists('end_date', $input))
-                $input['end_date'] = now();
+        if (! array_key_exists('end_date', $input)) {
+            $input['end_date'] = now();
+        }
 
         $this->replace($input);
-
     }
 }

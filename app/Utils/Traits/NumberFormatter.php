@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -19,8 +19,8 @@ trait NumberFormatter
     private function formatValue($value, $precision) : string
     {
         /* 08-01-2022 allow increased precision means we need to transform from scientific notation to a regular string */
-        
-        return number_format($this->parseFloat(rtrim(sprintf('%f', $value),"0")), $precision, '.', '');
+
+        return number_format($this->parseFloat(rtrim(sprintf('%f', $value), '0')), $precision, '.', '');
 
         // return number_format($this->parseFloat($value), $precision, '.', '');
     }

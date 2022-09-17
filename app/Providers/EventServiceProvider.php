@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -60,6 +60,15 @@ use App\Events\Payment\PaymentWasRefunded;
 use App\Events\Payment\PaymentWasRestored;
 use App\Events\Payment\PaymentWasUpdated;
 use App\Events\Payment\PaymentWasVoided;
+use App\Events\PurchaseOrder\PurchaseOrderWasAccepted;
+use App\Events\PurchaseOrder\PurchaseOrderWasArchived;
+use App\Events\PurchaseOrder\PurchaseOrderWasCreated;
+use App\Events\PurchaseOrder\PurchaseOrderWasDeleted;
+use App\Events\PurchaseOrder\PurchaseOrderWasEmailed;
+use App\Events\PurchaseOrder\PurchaseOrderWasMarkedSent;
+use App\Events\PurchaseOrder\PurchaseOrderWasRestored;
+use App\Events\PurchaseOrder\PurchaseOrderWasUpdated;
+use App\Events\PurchaseOrder\PurchaseOrderWasViewed;
 use App\Events\Quote\QuoteWasApproved;
 use App\Events\Quote\QuoteWasArchived;
 use App\Events\Quote\QuoteWasCreated;
@@ -155,8 +164,8 @@ use App\Listeners\Invoice\InvoiceCancelledActivity;
 use App\Listeners\Invoice\InvoiceCreatedNotification;
 use App\Listeners\Invoice\InvoiceDeletedActivity;
 use App\Listeners\Invoice\InvoiceEmailActivity;
-use App\Listeners\Invoice\InvoiceEmailFailedActivity;
 use App\Listeners\Invoice\InvoiceEmailedNotification;
+use App\Listeners\Invoice\InvoiceEmailFailedActivity;
 use App\Listeners\Invoice\InvoiceFailedEmailNotification;
 use App\Listeners\Invoice\InvoicePaidActivity;
 use App\Listeners\Invoice\InvoiceReminderEmailActivity;
@@ -166,10 +175,19 @@ use App\Listeners\Invoice\InvoiceViewedActivity;
 use App\Listeners\Invoice\UpdateInvoiceActivity;
 use App\Listeners\Mail\MailSentListener;
 use App\Listeners\Misc\InvitationViewedListener;
-use App\Listeners\Payment\PaymentEmailFailureActivity;
 use App\Listeners\Payment\PaymentEmailedActivity;
+use App\Listeners\Payment\PaymentEmailFailureActivity;
 use App\Listeners\Payment\PaymentNotification;
 use App\Listeners\Payment\PaymentRestoredActivity;
+use App\Listeners\PurchaseOrder\CreatePurchaseOrderActivity;
+use App\Listeners\PurchaseOrder\PurchaseOrderAcceptedActivity;
+use App\Listeners\PurchaseOrder\PurchaseOrderAcceptedNotification;
+use App\Listeners\PurchaseOrder\PurchaseOrderArchivedActivity;
+use App\Listeners\PurchaseOrder\PurchaseOrderDeletedActivity;
+use App\Listeners\PurchaseOrder\PurchaseOrderEmailActivity;
+use App\Listeners\PurchaseOrder\PurchaseOrderRestoredActivity;
+use App\Listeners\PurchaseOrder\PurchaseOrderViewedActivity;
+use App\Listeners\PurchaseOrder\UpdatePurchaseOrderActivity;
 use App\Listeners\Quote\QuoteApprovedActivity;
 use App\Listeners\Quote\QuoteApprovedNotification;
 use App\Listeners\Quote\QuoteApprovedWebhook;
@@ -201,8 +219,8 @@ use App\Listeners\User\ArchivedUserActivity;
 use App\Listeners\User\CreatedUserActivity;
 use App\Listeners\User\DeletedUserActivity;
 use App\Listeners\User\RestoredUserActivity;
-use App\Listeners\User\UpdateUserLastLogin;
 use App\Listeners\User\UpdatedUserActivity;
+use App\Listeners\User\UpdateUserLastLogin;
 use App\Models\Account;
 use App\Models\Client;
 use App\Models\Company;
@@ -215,6 +233,7 @@ use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\PurchaseOrder;
 use App\Models\Quote;
 use App\Models\Subscription;
 use App\Models\Task;
@@ -231,6 +250,7 @@ use App\Observers\PaymentObserver;
 use App\Observers\ProductObserver;
 use App\Observers\ProjectObserver;
 use App\Observers\ProposalObserver;
+use App\Observers\PurchaseOrderObserver;
 use App\Observers\QuoteObserver;
 use App\Observers\SubscriptionObserver;
 use App\Observers\TaskObserver;
@@ -247,9 +267,9 @@ class EventServiceProvider extends ServiceProvider
      * @var array
      */
     protected $listen = [
-        AccountCreated::class =>[
+        AccountCreated::class => [
         ],
-        MessageSending::class =>[
+        MessageSending::class => [
         ],
         MessageSent::class => [
             MailSentListener::class,
@@ -295,35 +315,35 @@ class EventServiceProvider extends ServiceProvider
         PaymentWasVoided::class => [
             PaymentVoidedActivity::class,
         ],
-        PaymentWasRestored::class =>[
+        PaymentWasRestored::class => [
             PaymentRestoredActivity::class,
         ],
         // Clients
-        ClientWasCreated::class =>[
+        ClientWasCreated::class => [
             CreatedClientActivity::class,
         ],
-        ClientWasArchived::class =>[
+        ClientWasArchived::class => [
             ArchivedClientActivity::class,
         ],
-        ClientWasUpdated::class =>[
+        ClientWasUpdated::class => [
             ClientUpdatedActivity::class,
         ],
-        ClientWasDeleted::class =>[
+        ClientWasDeleted::class => [
             DeleteClientActivity::class,
         ],
-        ClientWasRestored::class =>[
+        ClientWasRestored::class => [
             RestoreClientActivity::class,
         ],
         // Documents
-        DocumentWasCreated::class =>[
+        DocumentWasCreated::class => [
         ],
-        DocumentWasArchived::class =>[
+        DocumentWasArchived::class => [
         ],
-        DocumentWasUpdated::class =>[
+        DocumentWasUpdated::class => [
         ],
-        DocumentWasDeleted::class =>[
+        DocumentWasDeleted::class => [
         ],
-        DocumentWasRestored::class =>[
+        DocumentWasRestored::class => [
         ],
         CreditWasCreated::class => [
             CreatedCreditActivity::class,
@@ -374,7 +394,7 @@ class EventServiceProvider extends ServiceProvider
             ExpenseDeletedActivity::class,
         ],
         ExpenseWasRestored::class => [
-            ExpenseRestoredActivity::class
+            ExpenseRestoredActivity::class,
         ],
         //Invoices
         InvoiceWasMarkedSent::class => [
@@ -387,11 +407,11 @@ class EventServiceProvider extends ServiceProvider
         InvoiceWasCreated::class => [
             CreateInvoiceActivity::class,
             InvoiceCreatedNotification::class,
-        //    CreateInvoicePdf::class,
+            //    CreateInvoicePdf::class,
         ],
         InvoiceWasPaid::class => [
-           InvoicePaidActivity::class,
-           CreateInvoicePdf::class,
+            InvoicePaidActivity::class,
+            CreateInvoicePdf::class,
         ],
         InvoiceWasViewed::class => [
             InvoiceViewedActivity::class,
@@ -432,6 +452,31 @@ class EventServiceProvider extends ServiceProvider
         ],
         PaymentWasEmailedAndFailed::class => [
             PaymentEmailFailureActivity::class,
+        ],
+        PurchaseOrderWasArchived::class => [
+            PurchaseOrderArchivedActivity::class,
+        ],
+        PurchaseOrderWasCreated::class => [
+            CreatePurchaseOrderActivity::class,
+        ],
+        PurchaseOrderWasDeleted::class => [
+            PurchaseOrderDeletedActivity::class,
+        ],
+        PurchaseOrderWasEmailed::class => [
+            PurchaseOrderEmailActivity::class,
+        ],
+        PurchaseOrderWasRestored::class => [
+            PurchaseOrderRestoredActivity::class,
+        ],
+        PurchaseOrderWasUpdated::class => [
+            UpdatePurchaseOrderActivity::class,
+        ],
+        PurchaseOrderWasViewed::class => [
+            PurchaseOrderViewedActivity::class,
+        ],
+        PurchaseOrderWasAccepted::class => [
+            PurchaseOrderAcceptedActivity::class,
+            PurchaseOrderAcceptedNotification::class,
         ],
         CompanyDocumentsDeleted::class => [
             DeleteCompanyDocuments::class,
@@ -479,7 +524,7 @@ class EventServiceProvider extends ServiceProvider
             RecurringExpenseDeletedActivity::class,
         ],
         RecurringExpenseWasRestored::class => [
-            RecurringExpenseRestoredActivity::class
+            RecurringExpenseRestoredActivity::class,
         ],
         RecurringQuoteWasUpdated::class => [
             UpdateRecurringQuoteActivity::class,
@@ -556,6 +601,11 @@ class EventServiceProvider extends ServiceProvider
         VendorWasUpdated::class => [
             VendorUpdatedActivity::class,
         ],
+        \SocialiteProviders\Manager\SocialiteWasCalled::class => [
+            // ... Manager won't register drivers that are not added to this listener.
+            \SocialiteProviders\Apple\AppleExtendSocialite::class.'@handle',
+            \SocialiteProviders\Microsoft\MicrosoftExtendSocialite::class.'@handle',
+        ],
 
     ];
 
@@ -593,5 +643,16 @@ class EventServiceProvider extends ServiceProvider
         Quote::observe(QuoteObserver::class);
         Task::observe(TaskObserver::class);
         User::observe(UserObserver::class);
+        PurchaseOrder::observe(PurchaseOrderObserver::class);
+    }
+
+    /**
+     * Determine if events and listeners should be automatically discovered.
+     *
+     * @return bool
+     */
+    public function shouldDiscoverEvents()
+    {
+        return false;
     }
 }

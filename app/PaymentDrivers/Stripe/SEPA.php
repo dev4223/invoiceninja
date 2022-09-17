@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -39,7 +39,7 @@ class SEPA
         $data['client'] = $this->stripe->client;
         $data['country'] = $this->stripe->client->country->iso_3166_2;
         $data['currency'] = $this->stripe->client->currency();
-        
+
         return render('gateways.stripe.sepa.authorize', $data);
     }
 
@@ -59,7 +59,7 @@ class SEPA
             'payment_method_types' => ['sepa_debit'],
             'setup_future_usage' => 'off_session',
             'customer' => $this->stripe->findOrCreateCustomer(),
-            'description' => $this->stripe->decodeUnicodeString(ctrans('texts.invoices') . ': ' . collect($data['invoices'])->pluck('invoice_number')),
+            'description' => $this->stripe->decodeUnicodeString(ctrans('texts.invoices').': '.collect($data['invoices'])->pluck('invoice_number')),
             'metadata' => [
                 'payment_hash' => $this->stripe->payment_hash->hash,
                 'gateway_type_id' => GatewayType::SEPA,
@@ -140,7 +140,6 @@ class SEPA
 
         throw new PaymentFailed('Failed to process the payment.', 500);
     }
-
 
     private function storePaymentMethod($intent)
     {

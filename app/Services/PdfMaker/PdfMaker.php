@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -83,13 +83,13 @@ class PdfMaker
 
     /**
      * Final method to get compiled HTML.
-     * 
+     *
      * @param bool $final @deprecated // is it? i still see it being called elsewhere
-     * @return mixed 
+     * @return mixed
      */
     public function getCompiledHTML($final = false)
     {
-        $html =  $this->document->saveHTML();
+        $html = $this->document->saveHTML();
 
         return str_replace('%24', '$', $html);
     }

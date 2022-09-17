@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -108,6 +108,7 @@ class CreateSingleAccount extends Command
             'default_password_timeout' => 30*60000,
             'portal_mode' => 'domain',
             'portal_domain' => 'http://ninja.test:8000',
+            'track_inventory' => true
         ]);
 
         $settings = $company->settings;
@@ -188,7 +189,7 @@ class CreateSingleAccount extends Command
             $this->createClient($company, $user);
         }
 
-        CreateCompanyTaskStatuses::dispatchNow($company, $user);
+        (new CreateCompanyTaskStatuses($company, $user))->handle();
 
         for ($x = 0; $x < $this->count; $x++) {
             $client = $company->clients->random();
@@ -399,6 +400,7 @@ class CreateSingleAccount extends Command
         $vendor = Project::factory()->create([
                 'user_id' => $client->user->id,
                 'company_id' => $client->company->id,
+                'client_id' => $client->id,
             ]);
     }
 

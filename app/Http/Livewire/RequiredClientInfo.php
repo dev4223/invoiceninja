@@ -5,16 +5,16 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
-
 
 namespace App\Http\Livewire;
 
 use App\Libraries\MultiDB;
 use App\Models\ClientContact;
+use App\Models\CompanyGateway;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -73,6 +73,12 @@ class RequiredClientInfo extends Component
         'state',
         'postal_code',
         'country_id',
+        'shipping_address1',
+        'shipping_address2',
+        'shipping_city',
+        'shipping_state',
+        'shipping_postal_code',
+        'shipping_country_id',
     ];
 
     protected $rules = [
@@ -99,7 +105,9 @@ class RequiredClientInfo extends Component
     public $show_form = false;
 
     public $company;
-    
+
+    public $company_gateway_id;
+
     public function mount()
     {
         MultiDB::setDb($this->company->db);
@@ -109,7 +117,6 @@ class RequiredClientInfo extends Component
         count($this->fields) > 0
             ? $this->checkFields()
             : $this->show_form = false;
-
     }
 
     public function handleSubmit(array $data): bool
@@ -117,7 +124,7 @@ class RequiredClientInfo extends Component
         $rules = [];
 
         collect($this->fields)->map(function ($field) use (&$rules) {
-            if (!array_key_exists('filled', $field)) {
+            if (! array_key_exists('filled', $field)) {
                 $rules[$field['name']] = array_key_exists('validation_rules', $field)
                     ? $field['validation_rules']
                     : 'required';
@@ -137,6 +144,8 @@ class RequiredClientInfo extends Component
                 'client_postal_code' => $this->contact->client->postal_code,
             ]);
 
+            //if stripe is enabled, we want to update the customer at this point.
+
             return true;
         }
 
@@ -146,6 +155,7 @@ class RequiredClientInfo extends Component
 
     private function updateClientDetails(array $data): bool
     {
+        nlog($this->company->id);
         $client = [];
         $contact = [];
 
@@ -168,6 +178,16 @@ class RequiredClientInfo extends Component
             ->push();
 
         if ($contact_update && $client_update) {
+
+            $cg = CompanyGateway::find($this->company_gateway_id);
+
+            if($cg && $cg->update_details){
+                $payment_gateway = $cg->driver($this->client)->init();
+
+            if(method_exists($payment_gateway, "updateCustomer"))
+                $payment_gateway->updateCustomer();
+            }
+
             return true;
         }
 
@@ -225,7 +245,7 @@ class RequiredClientInfo extends Component
             'client_shipping_state' => $this->contact->client->state,
             'client_shipping_postal_code' => $this->contact->client->postal_code,
             'client_shipping_country_id' => $this->contact->client->country_id,
-        ]); 
+        ]);
     }
 
     public function render()

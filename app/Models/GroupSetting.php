@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -42,7 +42,7 @@ class GroupSetting extends StaticModel
     {
         return $this->encodePrimaryKey($this->id);
     }
-    
+
     protected $touches = [];
 
     public function company()
@@ -64,7 +64,7 @@ class GroupSetting extends StaticModel
     {
         return $this->morphMany(Document::class, 'documentable');
     }
-    
+
     /**
      * Retrieve the model for a bound value.
      *

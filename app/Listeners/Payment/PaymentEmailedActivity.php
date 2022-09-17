@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -18,7 +18,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 class PaymentEmailedActivity implements ShouldQueue
 {
     public $delay = 5;
-    
+
     use UserNotifies;
 
     /**
@@ -41,6 +41,5 @@ class PaymentEmailedActivity implements ShouldQueue
         MultiDB::setDb($event->company->db);
 
         $payment = $event->payment;
-        
     }
 }

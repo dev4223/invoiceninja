@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -24,7 +24,6 @@ use Throwable;
  */
 trait MakesInvoiceHtml
 {
-
     private function parseLabelsAndValues($labels, $values, $section) :string
     {
         $section = strtr($section, $labels);
@@ -64,7 +63,7 @@ trait MakesInvoiceHtml
                 ob_end_clean();
             }
 
-            throw new \Exception($e);
+            throw new \Exception($e->getMessage());
         }
 
         return ob_get_clean();

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -38,6 +38,7 @@ use App\Utils\Traits\Uploadable;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
+
 /**
  * Class ClientController.
  * @covers App\Http\Controllers\ClientController
@@ -107,6 +108,8 @@ class ClientController extends BaseController
      */
     public function index(ClientFilters $filters)
     {
+        set_time_limit(45);
+
         $clients = Client::filter($filters);
 
         return $this->listResponse($clients);
@@ -275,7 +278,6 @@ class ClientController extends BaseController
      */
     public function update(UpdateClientRequest $request, Client $client)
     {
-
         if ($request->entityIsDeleted($client)) {
             return $request->disallowUpdate();
         }
@@ -381,10 +383,8 @@ class ClientController extends BaseController
         $client->load('contacts', 'primary_contact');
 
         /* Set the client country to the company if none is set */
-        if(!$client->country_id && strlen($client->company->settings->country_id) > 1){
-
+        if (! $client->country_id && strlen($client->company->settings->country_id) > 1) {
             $client->update(['country_id' => $client->company->settings->country_id]);
-        
         }
 
         $this->uploadLogo($request->file('company_logo'), $client->company, $client);
@@ -446,11 +446,9 @@ class ClientController extends BaseController
      */
     public function destroy(DestroyClientRequest $request, Client $client)
     {
+        $this->client_repo->delete($client);
 
-       $this->client_repo->delete($client);
-
-       return $this->itemResponse($client->fresh());
-
+        return $this->itemResponse($client->fresh());
     }
 
     /**
@@ -511,8 +509,9 @@ class ClientController extends BaseController
         $ids = request()->input('ids');
         $clients = Client::withTrashed()->whereIn('id', $this->transformKeys($ids))->cursor();
 
-        if(!in_array($action, ['restore','archive','delete']))
+        if (! in_array($action, ['restore', 'archive', 'delete'])) {
             return response()->json(['message' => 'That action is not available.'], 400);
+        }
 
         $clients->each(function ($client, $key) use ($action) {
             if (auth()->user()->can('edit', $client)) {
@@ -576,15 +575,15 @@ class ClientController extends BaseController
      */
     public function upload(UploadClientRequest $request, Client $client)
     {
-
-        if(!$this->checkFeature(Account::FEATURE_DOCUMENTS))
+        if (! $this->checkFeature(Account::FEATURE_DOCUMENTS)) {
             return $this->featureFailure();
-        
-        if ($request->has('documents')) 
+        }
+
+        if ($request->has('documents')) {
             $this->saveDocuments($request->file('documents'), $client);
+        }
 
         return $this->itemResponse($client->fresh());
-
     }
 
     /**
@@ -640,10 +639,8 @@ class ClientController extends BaseController
     public function purge(PurgeClientRequest $request, Client $client)
     {
         //delete all documents
-        $client->documents->each(function ($document){
-
+        $client->documents->each(function ($document) {
             Storage::disk(config('filesystems.default'))->delete($document->url);
-
         });
 
         //force delete the client
@@ -652,6 +649,86 @@ class ClientController extends BaseController
         return response()->json(['message' => 'Success'], 200);
 
         //todo add an event here using the client name as reference for purge event
+    }
+
+/**
+     * Update the specified resource in storage.
+     *
+     * @param PurgeClientRequest $request
+     * @param Client $client
+     * @param string $mergeable client hashed_id
+     * @return Response
+     *
+     *
+     *
+     * @OA\Post(
+     *      path="/api/v1/clients/{id}/{mergaeble_client_hashed_id}/merge",
+     *      operationId="mergeClient",
+     *      tags={"clients"},
+     *      summary="Merges two clients",
+     *      description="Handles merging 2 clients",
+     *      @OA\Parameter(ref="#/components/parameters/X-Api-Secret"),
+     *      @OA\Parameter(ref="#/components/parameters/X-Api-Token"),
+     *      @OA\Parameter(ref="#/components/parameters/X-Requested-With"),
+     *      @OA\Parameter(ref="#/components/parameters/include"),
+     *      @OA\Parameter(
+     *          name="id",
+     *          in="path",
+     *          description="The Client Hashed ID",
+     *          example="D2J234DFA",
+     *          required=true,
+     *          @OA\Schema(
+     *              type="string",
+     *              format="string",
+     *          ),
+     *      ),
+     *      @OA\Parameter(
+     *          name="mergeable_client_hashedid",
+     *          in="path",
+     *          description="The Mergeable Client Hashed ID",
+     *          example="D2J234DFA",
+     *          required=true,
+     *          @OA\Schema(
+     *              type="string",
+     *              format="string",
+     *          ),
+     *      ),
+     *      @OA\Response(
+     *          response=200,
+     *          description="Returns the client object",
+     *          @OA\Header(header="X-MINIMUM-CLIENT-VERSION", ref="#/components/headers/X-MINIMUM-CLIENT-VERSION"),
+     *          @OA\Header(header="X-RateLimit-Remaining", ref="#/components/headers/X-RateLimit-Remaining"),
+     *          @OA\Header(header="X-RateLimit-Limit", ref="#/components/headers/X-RateLimit-Limit")
+     *       ),
+     *       @OA\Response(
+     *          response=422,
+     *          description="Validation error",
+     *          @OA\JsonContent(ref="#/components/schemas/ValidationError"),
+     *
+     *       ),
+     *       @OA\Response(
+     *           response="default",
+     *           description="Unexpected Error",
+     *           @OA\JsonContent(ref="#/components/schemas/Error"),
+     *       ),
+     *     )
+     */
+
+    public function merge(PurgeClientRequest $request, Client $client, string $mergeable_client)
+    {
+        
+        $m_client = Client::withTrashed()
+                            ->where('id', $this->decodePrimaryKey($mergeable_client))
+                            ->where('company_id', auth()->user()->company()->id)
+                            ->first();
+
+        if(!$m_client)
+            return response()->json(['message' => "Client not found"]);
+
+        $merged_client = $client->service()->merge($m_client)->save();
+
+        return $this->itemResponse($merged_client);
+
     }
 
 }

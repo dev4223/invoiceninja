@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -28,7 +28,6 @@ class PaymentNotification implements ShouldQueue
 
     public $delay = 5;
 
-    
     /**
      * Create the event listener.
      *
@@ -47,14 +46,15 @@ class PaymentNotification implements ShouldQueue
     public function handle($event)
     {
         MultiDB::setDb($event->company->db);
-        
-        if ($event->company->is_disabled)
+
+        if ($event->company->is_disabled) {
             return true;
+        }
 
         $payment = $event->payment;
 
         $nmo = new NinjaMailerObject;
-        $nmo->mailable = new NinjaMailer( (new EntityPaidObject($payment))->build() );
+        $nmo->mailable = new NinjaMailer((new EntityPaidObject($payment))->build());
         $nmo->company = $event->company;
         $nmo->settings = $event->company->settings;
 
@@ -63,10 +63,10 @@ class PaymentNotification implements ShouldQueue
             $user = $company_user->user;
 
             $methods = $this->findUserEntityNotificationType($payment, $company_user, [
-                'payment_success', 
-                'payment_success_all', 
-                'payment_success_user', 
-                'all_notifications']
+                'payment_success',
+                'payment_success_all',
+                'payment_success_user',
+                'all_notifications', ]
             );
 
             if (($key = array_search('mail', $methods)) !== false) {
@@ -76,7 +76,6 @@ class PaymentNotification implements ShouldQueue
 
                 NinjaMailerJob::dispatch($nmo);
             }
-
         }
 
         /*Google Analytics Track Revenue*/
@@ -92,6 +91,10 @@ class PaymentNotification implements ShouldQueue
         $company = $payment->company;
 
         $analytics_id = $company->google_analytics_key;
+
+        if (! strlen($analytics_id) > 2) {
+            return;
+        }
 
         $client = $payment->client;
         $amount = $payment->amount;

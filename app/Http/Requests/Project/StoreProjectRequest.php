@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -20,7 +20,7 @@ use Illuminate\Validation\Rule;
 class StoreProjectRequest extends Request
 {
     use MakesHash;
-    
+
     /**
      * Determine if the user is authorized to make this request.
      *
@@ -45,19 +45,19 @@ class StoreProjectRequest extends Request
         return $this->globalRules($rules);
     }
 
-    protected function prepareForValidation()
+    public function prepareForValidation()
     {
         $input = $this->decodePrimaryKeys($this->all());
 
-
-        if(array_key_exists('color', $input) && is_null($input['color']))
+        if (array_key_exists('color', $input) && is_null($input['color'])) {
             $input['color'] = '';
-        
+        }
+
         $this->replace($input);
     }
 
     public function getClient($client_id)
     {
-        return Client::find($client_id);
+        return Client::withTrashed()->find($client_id);
     }
 }

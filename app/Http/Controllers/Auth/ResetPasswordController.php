@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -57,19 +57,18 @@ class ResetPasswordController extends Controller
     public function showResetForm(Request $request, $token = null)
     {
         $company = false;
-        
-        if(Ninja::isHosted()){
 
+        if (Ninja::isHosted()) {
             MultiDB::findAndSetDbByCompanyKey($request->session()->get('company_key'));
             $company = Company::where('company_key', $request->session()->get('company_key'))->first();
-
         }
 
-        if($company)
+        if ($company) {
             $account = $company->account;
-        else
+        } else {
             $account = Account::first();
-        
+        }
+
         return $this->render('auth.passwords.reset', ['root' => 'themes', 'token' => $token, 'account' => $account]);
     }
 

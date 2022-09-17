@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -28,7 +28,7 @@ class InvoicesTable extends Component
     public $status = [];
 
     public $company;
-    
+
     public function mount()
     {
         MultiDB::setDb($this->company->db);
@@ -43,10 +43,10 @@ class InvoicesTable extends Component
         $local_status = [];
 
         $query = Invoice::query()
-            ->with('client.gateway_tokens','client.contacts')
-            ->orderBy($this->sort_field, $this->sort_asc ? 'asc' : 'desc')
             ->where('company_id', $this->company->id)
-            ->where('is_deleted', false);
+            ->where('is_deleted', false)
+            ->with('client.gateway_tokens', 'client.contacts')
+            ->orderBy($this->sort_field, $this->sort_asc ? 'asc' : 'desc');
 
         if (in_array('paid', $this->status)) {
             $local_status[] = Invoice::STATUS_PAID;
@@ -83,7 +83,7 @@ class InvoicesTable extends Component
 
         return render('components.livewire.invoices-table', [
             'invoices' => $query,
-            'gateway_available' => !empty(auth()->user()->client->service()->getPaymentMethods(0)),
+            'gateway_available' => ! empty(auth()->user()->client->service()->getPaymentMethods(-1)),
         ]);
     }
 }

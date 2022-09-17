@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -26,7 +26,6 @@ class CreditRepository extends BaseRepository
     {
     }
 
-
     /**
      * Saves the client and its contacts.
      *
@@ -44,4 +43,31 @@ class CreditRepository extends BaseRepository
     {
         return CreditInvitation::where('key', $key)->first();
     }
+
+    public function delete($credit)
+    {
+        if ($credit->is_deleted) {
+            return;
+        }
+
+        $credit = $credit->service()->deleteCredit()->save();
+
+        return parent::delete($credit);
+
+    }
+
+    public function restore($credit)
+    {
+        //we cannot restore a deleted payment.
+        if (! $credit->trashed()) {
+            return;
+        }
+
+        parent::restore($credit);
+
+        $credit = $credit->service()->restoreCredit()->save();
+
+        return $credit;
+    }
+
 }

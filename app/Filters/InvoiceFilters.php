@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -23,6 +23,7 @@ use Illuminate\Support\Carbon;
 class InvoiceFilters extends QueryFilters
 {
     use MakesHash;
+
     /**
      * Filter based on client status.
      *
@@ -67,7 +68,7 @@ class InvoiceFilters extends QueryFilters
         return $this->builder;
     }
 
-    public function number(string $number) :Builder
+    public function number(string $number = '') :Builder
     {
         return $this->builder->where('number', $number);
     }
@@ -97,7 +98,6 @@ class InvoiceFilters extends QueryFilters
                           ->orWhere('invoices.custom_value4', 'like', '%'.$filter.'%');
         });
     }
-
 
     /**
      * Filters the list based on the status
@@ -138,6 +138,47 @@ class InvoiceFilters extends QueryFilters
         });
     }
 
+    public function without_deleted_clients()
+    {
+
+        return $this->builder->whereHas('client', function ($query) {
+                        $query->where('is_deleted',0);
+                       });
+    }
+
+    public function upcoming()
+    {
+        return $this->builder
+                    ->where(function ($query) {
+                        $query->whereNull('due_date')
+                              ->orWhere('due_date', '>', now());
+                    })
+                    ->orderBy('due_date', 'ASC');
+    }
+
+    public function overdue()
+    {
+        $this->builder->whereIn('status_id', [Invoice::STATUS_SENT, Invoice::STATUS_PARTIAL])
+                ->where('is_deleted', 0)
+                ->where(function ($query) {
+                    $query->where('due_date', '<', now())
+                        ->orWhere('partial_due_date', '<', now());
+                })
+                ->orderBy('due_date', 'ASC');
+    }
+
+    public function payable(string $client_id)
+    {
+        if (strlen($client_id) == 0) {
+            return $this->builder;
+        }
+
+        return $this->builder->whereIn('status_id', [Invoice::STATUS_DRAFT, Invoice::STATUS_SENT, Invoice::STATUS_PARTIAL])
+                             ->where('balance', '>', 0)
+                             ->where('is_deleted', 0)
+                             ->where('client_id', $this->decodePrimaryKey($client_id));
+    }
+
     /**
      * Sorts the list based on $sort.
      *
@@ -149,8 +190,9 @@ class InvoiceFilters extends QueryFilters
         $sort_col = explode('|', $sort);
 
         //catch invalid explode array count
-        if(count($sort_col) == 1)
+        if (count($sort_col) == 1) {
             return $this->builder;
+        }
 
         return $this->builder->orderBy($sort_col[0], $sort_col[1]);
     }
@@ -179,7 +221,7 @@ class InvoiceFilters extends QueryFilters
     {
         if (auth()->guard('contact')->user()) {
             return $this->contactViewFilter();
-        } else {
+        } else {            
             return $this->builder->company()->with(['invitations.company'], ['documents.company']);
         }
 

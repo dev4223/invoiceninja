@@ -14,8 +14,8 @@ return [
     'require_https' => env('REQUIRE_HTTPS', true),
     'app_url' => rtrim(env('APP_URL', ''), '/'),
     'app_domain' => env('APP_DOMAIN', 'invoicing.co'),
-    'app_version' => '5.3.83',
-    'app_tag' => '5.3.83',
+    'app_version' => '5.5.23',
+    'app_tag' => '5.5.23',
     'minimum_client_version' => '5.0.16',
     'terms_version' => '1.0.1',
     'api_secret' => env('API_SECRET', ''),
@@ -40,7 +40,7 @@ return [
     'local_download' => env('LOCAL_DOWNLOAD', false),
     'sentry_dsn' => env('SENTRY_LARAVEL_DSN', 'https://39389664f3f14969b4c43dadda00a40b@sentry2.invoicing.co/5'),
     'environment' => env('NINJA_ENVIRONMENT', 'selfhost'), // 'hosted', 'development', 'selfhost', 'reseller'
-	'preconfigured_install' => env('PRECONFIGURED_INSTALL',false),
+    'preconfigured_install' => env('PRECONFIGURED_INSTALL', false),
     'update_secret' => env('UPDATE_SECRET', ''),
     // Settings used by invoiceninja.com
 
@@ -88,11 +88,11 @@ return [
         'braintree' => env('BRAINTREE_KEYS', ''),
         'paytrace' => [
             'username' => env('PAYTRACE_U', ''),
-            'password' => env('PAYTRACE_P',''),
+            'password' => env('PAYTRACE_P', ''),
             'decrypted' => env('PAYTRACE_KEYS', ''),
         ],
         'mollie' => env('MOLLIE_KEYS', ''),
-        'square' => env('SQUARE_KEYS',''),
+        'square' => env('SQUARE_KEYS', ''),
     ],
     'contact' => [
         'email' => env('MAIL_FROM_ADDRESS'),
@@ -155,6 +155,15 @@ return [
     'designs' => [
         'base_path' => resource_path('views/pdf-designs/'),
     ],
+    'o365' => [
+        'client_secret' => env('MICROSOFT_CLIENT_SECRET', false),
+        'client_id' => env('MICROSOFT_CLIENT_ID', false),
+        'tenant_id' => env('MICROSOFT_TENANT_ID', false),
+    ],
+    'maintenance' => [
+        'delete_pdfs' => env('DELETE_PDF_DAYS', 0),
+        'delete_backups' => env('DELETE_BACKUP_DAYS', 0),
+    ],
     'log_pdf_html' => env('LOG_PDF_HTML', false),
     'expanded_logging' => env('EXPANDED_LOGGING', false),
     'snappdf_chromium_path' => env('SNAPPDF_CHROMIUM_PATH', false),
@@ -168,7 +177,7 @@ return [
     'wepay' => [
         'environment' => env('WEPAY_ENVIRONMENT', 'stage'),
         'client_id' => env('WEPAY_CLIENT_ID', ''),
-        'client_secret' => env('WEPAY_CLIENT_SECRET',''),
+        'client_secret' => env('WEPAY_CLIENT_SECRET', ''),
         'fee_payer' => env('WEPAY_FEE_PAYER'),
         'fee_cc_multiplier' => env('WEPAY_APP_FEE_CC_MULTIPLIER'),
         'fee_ach_multiplier' => env('WEPAY_APP_FEE_ACH_MULTIPLIER'),
@@ -183,7 +192,13 @@ return [
     'ninja_apple_api_key' => env('APPLE_API_KEY', false),
     'ninja_apple_private_key' => env('APPLE_PRIVATE_KEY', false),
     'ninja_apple_bundle_id' => env('APPLE_BUNDLE_ID', false),
-    'ninja_apple_issuer_id' => env('APPLE_ISSUER_ID', false)
-      
-];
+    'ninja_apple_issuer_id' => env('APPLE_ISSUER_ID', false),
+    'react_app_enabled' => env('REACT_APP_ENABLED', false),
+    'ninja_apple_client_id' => env('APPLE_CLIENT_ID', false),
+    'ninja_apple_client_secret' => env('APPLE_CLIENT_SECRET',false),
+    'ninja_apple_redirect_url' => env('APPLE_REDIRECT_URI',false),
+    'twilio_account_sid' => env('TWILIO_ACCOUNT_SID',false),
+    'twilio_auth_token' => env('TWILIO_AUTH_TOKEN',false),
+    'twilio_verify_sid' => env('TWILIO_VERIFY_SID',false),
 
+];

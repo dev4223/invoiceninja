@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -25,7 +25,6 @@ class InvoiceBalanceSanity implements Rule
     public $input;
 
     private $message;
-
 
     public function __construct(Invoice $invoice, $input)
     {
@@ -56,22 +55,20 @@ class InvoiceBalanceSanity implements Rule
      */
     private function checkIfInvoiceBalanceIsSane() : bool
     {
-
         DB::connection(config('database.default'))->beginTransaction();
 
         $this->invoice = Invoice::on(config('database.default'))->withTrashed()->find($this->invoice->id);
         $this->invoice->line_items = $this->input['line_items'];
         $temp_invoice = $this->invoice->calc()->getTempEntity();
- 
+
         DB::connection(config('database.default'))->rollBack();
 
-        if($temp_invoice->balance < 0){
+        if ($temp_invoice->balance < 0) {
             $this->message = 'Invoice balance cannot go negative';
+
             return false;
         }
 
-
-       return true;
-
+        return true;
     }
 }

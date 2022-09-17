@@ -5,7 +5,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://opensource.org/licenses/AAL
+ * @license https://www.elastic.co/licensing/elastic-license 
  */
 
 class AuthorizeACH {
@@ -70,6 +70,13 @@ class AuthorizeACH {
     };
 
     handleSubmit = (e) => {
+
+        if (!document.getElementById('accept-terms').checked) {
+                errors.textContent = "You must accept the mandate terms prior to making payment.";
+                errors.hidden = false;
+                return;
+        }
+
         document.getElementById('save-button').disabled = true;
         document.querySelector('#save-button > svg').classList.remove('hidden');
         document.querySelector('#save-button > span').classList.add('hidden');

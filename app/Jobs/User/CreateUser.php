@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -66,8 +66,9 @@ class CreateUser
         $user->last_login = now();
         $user->ip = request()->ip();
 
-        if(Ninja::isSelfHost())
+        if (Ninja::isSelfHost()) {
             $user->email_verified_at = now();
+        }
 
         $user->save();
 
@@ -82,7 +83,7 @@ class CreateUser
             'settings' => null,
         ]);
 
-        if(!Ninja::isSelfHost()) {
+        if (! Ninja::isSelfHost()) {
             event(new UserWasCreated($user, $user, $this->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
         }
 

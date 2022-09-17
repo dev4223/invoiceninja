@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -24,11 +24,20 @@ class OAuth
      * Socialite Providers.
      */
     const SOCIAL_GOOGLE = 1;
+
     const SOCIAL_FACEBOOK = 2;
+
     const SOCIAL_GITHUB = 3;
+
     const SOCIAL_LINKEDIN = 4;
+
     const SOCIAL_TWITTER = 5;
+
     const SOCIAL_BITBUCKET = 6;
+
+    const SOCIAL_MICROSOFT = 7;
+
+    const SOCIAL_APPLE = 8;
 
     /**
      * @param Socialite $user
@@ -38,8 +47,8 @@ class OAuth
     {
         /** 1. Ensure user arrives on the correct provider **/
         $query = [
-            'oauth_user_id' =>$socialite_user->getId(),
-            'oauth_provider_id'=>$provider,
+            'oauth_user_id' => $socialite_user->getId(),
+            'oauth_provider_id' => $provider,
         ];
 
         if ($user = MultiDB::hasUser($query)) {
@@ -59,7 +68,7 @@ class OAuth
         return [$first_name, $last_name];
     }
 
-    public static function providerToString(int $social_provider) : string
+    public static function providerToString(int $social_provider): string
     {
         switch ($social_provider) {
             case SOCIAL_GOOGLE:
@@ -74,10 +83,14 @@ class OAuth
                 return 'twitter';
             case SOCIAL_BITBUCKET:
                 return 'bitbucket';
+            case SOCIAL_MICROSOFT:
+                return 'microsoft';
+            case SOCIAL_APPLE:
+                return 'apple';
         }
     }
 
-    public static function providerToInt(string $social_provider) : int
+    public static function providerToInt(string $social_provider): int
     {
         switch ($social_provider) {
             case 'google':
@@ -92,6 +105,10 @@ class OAuth
                 return SOCIAL_TWITTER;
             case 'bitbucket':
                 return SOCIAL_BITBUCKET;
+            case 'microsoft':
+                return SOCIAL_MICROSOFT;
+            case 'apple':
+                return SOCIAL_APPLE;
         }
     }
 
@@ -103,7 +120,6 @@ class OAuth
                 $this->provider_id = self::SOCIAL_GOOGLE;
 
                 return $this;
-
             default:
                 return null;
                 break;

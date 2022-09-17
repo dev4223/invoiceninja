@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -22,7 +22,6 @@ use Illuminate\Http\Response;
 
 class StaticController extends BaseController
 {
-
     /**
      * Show the list of Invoices.
      *
@@ -36,7 +35,7 @@ class StaticController extends BaseController
      *      tags={"statics"},
      *      summary="Gets a list of statics",
      *      description="Lists all statics",
-     * 
+     *
      *      @OA\Parameter(ref="#/components/parameters/X-Api-Secret"),
      *      @OA\Parameter(ref="#/components/parameters/X-Api-Token"),
      *      @OA\Parameter(ref="#/components/parameters/X-Requested-With"),
@@ -62,12 +61,8 @@ class StaticController extends BaseController
      */
     public function __invoke()
     {
-    
         $response = Statics::company(auth()->user()->getCompany()->getLocale());
-        
+
         return response()->json($response, 200, ['Content-type'=> 'application/json; charset=utf-8'], JSON_PRETTY_PRINT);
-
     }
-
 }
-
