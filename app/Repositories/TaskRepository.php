@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -25,6 +25,8 @@ class TaskRepository extends BaseRepository
 
     public $new_task = true;
 
+    private $completed = true;
+
     /**
      * Saves the task and its contacts.
      *
@@ -33,14 +35,14 @@ class TaskRepository extends BaseRepository
      *
      * @return     task|null  task Object
      */
-    public function save(array $data, Task $task) : ?Task
+    public function save(array $data, Task $task): ?Task
     {
         if ($task->id) {
             $this->new_task = false;
         }
 
         $task->fill($data);
-        $task->save();
+        $task->saveQuietly();
 
         if ($this->new_task && ! $task->status_id) {
             $this->setDefaultStatus($task);
@@ -95,8 +97,9 @@ class TaskRepository extends BaseRepository
         } else {
             $time_log = [];
         }
-
-        array_multisort($time_log);
+        
+        $key_values = array_column($time_log, 0);
+        array_multisort($key_values, SORT_ASC, $time_log);
 
         if (isset($data['action'])) {
             if ($data['action'] == 'start') {
@@ -115,11 +118,13 @@ class TaskRepository extends BaseRepository
             $task->is_running = $data['is_running'] ? 1 : 0;
         }
 
+        $task->calculated_start_date = $this->harvestStartDate($time_log, $task);
+        
         $task->time_log = json_encode($time_log);
-        // $task->start_time = $task->start_time ?: $task->calcStartTime();
-        // $task->duration = $task->calcDuration();
 
-        $task->save();
+
+
+        $task->saveQuietly();
 
         if (array_key_exists('documents', $data)) {
             $this->saveDocuments($data['documents'], $task);
@@ -128,17 +133,31 @@ class TaskRepository extends BaseRepository
         return $task;
     }
 
+    private function harvestStartDate($time_log, $task)
+    {
+        
+        if(isset($time_log[0][0])){
+            return \Carbon\Carbon::createFromTimestamp($time_log[0][0])->addSeconds($task->company->utc_offset());
+        }
+
+        return null;
+
+    }
+
     /**
      * Store tasks in bulk.
      *
      * @param array $task
-     * @return task|null
+     * @return Task|null
      */
     public function create($task): ?Task
     {
+        /** @var \App\Models\User $user **/
+        $user = auth()->user();
+
         return $this->save(
             $task,
-            TaskFactory::create(auth()->user()->company()->id, auth()->user()->id)
+            TaskFactory::create($user->company()->id, $user->id)
         );
     }
 
@@ -159,7 +178,7 @@ class TaskRepository extends BaseRepository
     /**
      * Sorts the task status order IF the old status has changed between requests
      *
-     * @param  stdCLass $old_task The old task object
+     * @param  \stdCLass $old_task The old task object
      * @param  Task     $new_task The new Task model
      * @return void
      */
@@ -181,7 +200,7 @@ class TaskRepository extends BaseRepository
             return $key >= $index;
         }))->each(function ($item, $key) {
             $item->status_order = $key;
-            $item->save();
+            $item->saveQuietly();
         });
     }
 
@@ -195,20 +214,26 @@ class TaskRepository extends BaseRepository
         if (strlen($task->time_log) < 5) {
             $log = [];
 
-            $log = array_merge($log, [[time(), 0]]);
+            $start_time = time();
+
+            $log = array_merge($log, [[$start_time, 0]]);
             $task->time_log = json_encode($log);
-            $task->save();
+            $task->calculated_start_date = \Carbon\Carbon::createFromTimestamp($start_time)->addSeconds($task->company->utc_offset());
+
+            $task->saveQuietly();
         }
 
         $log = json_decode($task->time_log, true);
 
         $last = end($log);
 
-        if (is_array($last) && $last[1] !== 0) {
+        if (is_array($last) && $last[1] !== 0) { // this line is a disaster
             $new = [time(), 0];
+
             $log = array_merge($log, [$new]);
             $task->time_log = json_encode($log);
-            $task->save();
+
+            $task->saveQuietly();
         }
 
         return $task;
@@ -224,10 +249,10 @@ class TaskRepository extends BaseRepository
             $last[1] = time();
 
             array_pop($log);
-            $log = array_merge($log, [$last]);
+            $log = array_merge($log, [$last]);//check at this point, it may be prepending here.
 
             $task->time_log = json_encode($log);
-            $task->save();
+            $task->saveQuietly();
         }
 
         return $task;
@@ -249,30 +274,22 @@ class TaskRepository extends BaseRepository
 
     private function trySaving(Task $task)
     {
-
         $x=1;
 
-        do{
-
-            try{
-
+        do {
+            try {
                 $task->number = $this->getNextTaskNumber($task);
                 $task->saveQuietly();
                 $this->completed = false;
-
-            }
-            catch(QueryException $e){
-
+            } catch(QueryException $e) {
                 $x++;
 
-                if($x>50)
+                if ($x>50) {
                     $this->completed = false;
+                }
             }
-        
-        }
-        while($this->completed);
+        } while ($this->completed);
 
         return $task->number;
-
     }
 }

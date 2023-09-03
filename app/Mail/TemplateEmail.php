@@ -4,27 +4,20 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Mail;
 
-use App\Jobs\Entity\CreateEntityPdf;
 use App\Jobs\Invoice\CreateUbl;
 use App\Models\Account;
-use App\Models\Client;
 use App\Models\ClientContact;
-use App\Models\User;
 use App\Services\PdfMaker\Designs\Utilities\DesignHelpers;
 use App\Utils\HtmlEngine;
 use App\Utils\Ninja;
-use App\Utils\TemplateEngine;
-use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Storage;
 
 class TemplateEmail extends Mailable
 {
@@ -51,6 +44,31 @@ class TemplateEmail extends Mailable
         $this->invitation = $invitation;
     }
 
+    /**
+     * Supports inline attachments for large
+     * attachments in custom designs
+     *
+     * @return string
+     */
+    private function buildLinksForCustomDesign(): string
+    {
+        $links = $this->build_email->getAttachmentLinks();
+
+        if (count($links) == 0) {
+            return '';
+        }
+
+        $link_string = '<ul>';
+
+        foreach ($this->build_email->getAttachmentLinks() as $link) {
+            $link_string .= "<li>{$link}</li>";
+        }
+
+        $link_string .= '</ul>';
+
+        return $link_string;
+    }
+
     public function build()
     {
         $template_name = 'email.template.'.$this->build_email->getTemplate();
@@ -60,7 +78,7 @@ class TemplateEmail extends Mailable
         }
 
         if ($this->build_email->getTemplate() == 'custom') {
-            $this->build_email->setBody(str_replace('$body', $this->build_email->getBody(), $this->client->getSetting('email_style_custom')));
+            $this->build_email->setBody(str_replace('$body', $this->build_email->getBody().$this->buildLinksForCustomDesign(), $this->client->getSetting('email_style_custom')));
         }
 
         $settings = $this->client->getMergedSettings();
@@ -91,13 +109,14 @@ class TemplateEmail extends Mailable
         if (strlen($settings->bcc_email) > 1) {
             if (Ninja::isHosted()) {
                 $bccs = explode(',', str_replace(' ', '', $settings->bcc_email));
-                $this->bcc(reset($bccs)); //remove whitespace if any has been inserted.
+                $this->bcc(array_slice($bccs, 0, 2));
+                //$this->bcc(reset($bccs)); //remove whitespace if any has been inserted.
             } else {
                 $this->bcc(explode(',', str_replace(' ', '', $settings->bcc_email)));
             }//remove whitespace if any has been inserted.
         }
 
-        $this->subject($this->build_email->getSubject())
+        $this->subject(str_replace("<br>", "", $this->build_email->getSubject()))
             ->text('email.template.text', [
                 'text_body' => $this->build_email->getTextBody(),
                 'whitelabel' => $this->client->user->account->isPaid() ? true : false,
@@ -115,45 +134,13 @@ class TemplateEmail extends Mailable
                 'company' => $company,
                 'whitelabel' => $this->client->user->account->isPaid() ? true : false,
                 'logo' => $this->company->present()->logo($settings),
+                'links' => $this->build_email->getAttachmentLinks(),
             ]);
-            // ->withSymfonyMessage(function ($message) use ($company) {
-            //    $message->getHeaders()->addTextHeader('Tag', $company->company_key);
-            //    $message->invitation = $this->invitation;
-            //});
-            // ->tag($company->company_key);
-
-        /*In the hosted platform we need to slow things down a little for Storage to catch up.*/
-
-        if(Ninja::isHosted() && $this->invitation){
-
-            $path = false;
-
-            if($this->invitation->invoice)
-                $path = $this->client->invoice_filepath($this->invitation).$this->invitation->invoice->numberFormatter().'.pdf';
-            elseif($this->invitation->quote)
-                $path = $this->client->quote_filepath($this->invitation).$this->invitation->quote->numberFormatter().'.pdf';
-            elseif($this->invitation->credit)
-                $path = $this->client->credit_filepath($this->invitation).$this->invitation->credit->numberFormatter().'.pdf';
-
-            sleep(1);
-
-            if($path && !Storage::disk(config('filesystems.default'))->exists($path)){
-
-                sleep(2);
-
-                if(!Storage::disk(config('filesystems.default'))->exists($path)) {
-                    (new CreateEntityPdf($this->invitation))->handle();
-                    sleep(2);
-                }
-
-            }
-
-        }
 
         foreach ($this->build_email->getAttachments() as $file) {
-            if (is_string($file)) {
-                $this->attach($file);
-            } elseif (is_array($file)) {
+            if (array_key_exists('file', $file)) {
+                $this->attachData(base64_decode($file['file']), $file['name']);
+            } else {
                 $this->attach($file['path'], ['as' => $file['name'], 'mime' => null]);
             }
         }
@@ -161,9 +148,22 @@ class TemplateEmail extends Mailable
         if ($this->invitation && $this->invitation->invoice && $settings->ubl_email_attachment && $this->company->account->hasFeature(Account::FEATURE_PDF_ATTACHMENT)) {
             $ubl_string = (new CreateUbl($this->invitation->invoice))->handle();
 
+            nlog("template {$ubl_string}");
+
             if ($ubl_string) {
                 $this->attachData($ubl_string, $this->invitation->invoice->getFileName('xml'));
             }
+            
+        }
+        if ($this->invitation && $this->invitation->invoice && $this->invitation->invoice->client->getSetting('enable_e_invoice') && $this->company->account->hasFeature(Account::FEATURE_PDF_ATTACHMENT)) {
+            $xml_string = $this->invitation->invoice->service()->getEInvoice($this->invitation->contact);
+
+            nlog("template {$xml_string}");
+
+            if($xml_string) {
+                $this->attachData($xml_string, $this->invitation->invoice->getEFileName("xml"));
+            }
+        
         }
 
         return $this;

@@ -1,31 +1,33 @@
 <?php
+/**
+ * Invoice Ninja (https://invoiceninja.com).
+ *
+ * @link https://github.com/invoiceninja/invoiceninja source repository
+ *
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ *
+ * @license https://www.elastic.co/licensing/elastic-license
+ */
 
 namespace App\Mail;
 
+use App\Libraries\MultiDB;
 use App\Models\Company;
 use App\Utils\Ninja;
-use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\App;
 
 class MigrationCompleted extends Mailable
 {
-    // use Queueable, SerializesModels;
 
-    public $company;
-
-    public $check_data;
-
+    public ?Company $company;
     /**
      * Create a new message instance.
      *
      * @return void
      */
-    public function __construct(Company $company, $check_data = '')
+    public function __construct(public int $company_id, public string $db, public string $check_data = '')
     {
-        $this->company = $company;
-        $this->check_data = $check_data;
     }
 
     /**
@@ -35,6 +37,9 @@ class MigrationCompleted extends Mailable
      */
     public function build()
     {
+        MultiDB::setDb($this->db);
+        $this->company = Company::query()->find($this->company_id);
+
         App::forgetInstance('translator');
         $t = app('translator');
         $t->replace(Ninja::transformTranslations($this->company->settings));
@@ -45,6 +50,8 @@ class MigrationCompleted extends Mailable
         $data['whitelabel'] = $this->company->account->isPaid() ? true : false;
         $data['check_data'] = $this->check_data ?: '';
         $data['logo'] = $this->company->present()->logo();
+        $data['url'] = Ninja::isHosted() ? config('ninja.react_url') : config('ninja.app_url');
+
 
         $data = array_merge($data, [
             'logo' => $this->company->present()->logo(),

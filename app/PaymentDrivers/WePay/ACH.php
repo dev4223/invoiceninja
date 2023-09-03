@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -19,11 +19,9 @@ use App\Models\GatewayType;
 use App\Models\Payment;
 use App\Models\SystemLog;
 use App\Notifications\Ninja\WePayFailureNotification;
-use App\PaymentDrivers\WePay\WePayCommon;
 use App\PaymentDrivers\WePayPaymentDriver;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Http\Request;
-use Illuminate\Notifications\Messages\SlackMessage;
 use Illuminate\Support\Str;
 
 class ACH
@@ -41,6 +39,7 @@ class ACH
     public function authorizeView($data)
     {
         $data['gateway'] = $this->wepay_payment_driver;
+        $data['country_code'] = $this->wepay_payment_driver?->client?->country ? $this->wepay_payment_driver->client->country->iso_3166_2 : $this->wepay_payment_driver->company_gateway->company->country()->iso_3166_2;
 
         return render('gateways.wepay.authorize.bank_transfer', $data);
     }
@@ -202,7 +201,7 @@ class ACH
 
     public function paymentResponse($request)
     {
-        $token = ClientGatewayToken::find($this->decodePrimaryKey($request->input('source')));
+        $token = ClientGatewayToken::query()->find($this->decodePrimaryKey($request->input('source')));
         $token_meta = $token->meta;
 
         if (! property_exists($token_meta, 'state') || $token_meta->state != 'authorized') {

@@ -3,8 +3,22 @@
 
     <head>
         <!-- Error: {{ session('error') }} -->
-
-        @if (config('services.analytics.tracking_id'))
+         @if (isset($company) && $company->matomo_url && $company->matomo_id)
+            <script>
+                var _paq = window._paq = window._paq || [];
+                /* tracker methods like "setCustomDimension" should be called before "trackPageView" */
+                _paq.push(['trackPageView']);
+                _paq.push(['enableLinkTracking']);
+                (function() {
+                var u="{{ $company->matomo_url }}";
+                _paq.push(['setTrackerUrl', u+'matomo.php']);
+                _paq.push(['setSiteId', '{{ $company->matomo_id }}']);
+                var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];
+                g.async=true; g.src=u+'matomo.js'; s.parentNode.insertBefore(g,s);
+                })();
+            </script>
+            <noscript><p><img src="{{ $company->matomo_url }}/matomo.php?idsite={{ $company->matomo_id }}&amp;rec=1" style="border:0;" alt="" /></p></noscript>
+        @elseif (config('services.analytics.tracking_id'))
             <script async src="https://www.googletagmanager.com/gtag/js?id=UA-122229484-1"></script>
             <script>
                 window.dataLayer = window.dataLayer || [];
@@ -31,7 +45,7 @@
         @endif
 
         <!-- Title -->
-        @auth()
+        @auth('contact')
             <title>@yield('meta_title', '') — {{ auth()->guard('contact')->user()->user->account->isPaid() ? auth()->guard('contact')->user()->company->present()->name() : 'Invoice Ninja' }}</title>
         @endauth
 
@@ -55,8 +69,19 @@
         <script src="{{ asset('vendor/alpinejs@2.8.2/alpine.js') }}" defer></script>
 
         <!-- Fonts -->
-        <link rel="dns-prefetch" href="https://fonts.gstatic.com">
-        <link href="https://fonts.googleapis.com/css?family=Open+Sans&display=swap" rel="stylesheet" type="text/css" defer>
+        {{-- <link rel="dns-prefetch" href="https://fonts.gstatic.com"> --}}
+        {{-- <link href="https://fonts.googleapis.com/css?family=Open+Sans&display=swap" rel="stylesheet" type="text/css" defer> --}}
+        <style>
+            @font-face {
+              font-family: 'Open Sans';
+              font-style: normal;
+              font-weight: 400;
+              font-stretch: 100%;
+              font-display: swap;
+              src: url( {{asset('css/memSYaGs126MiZpBA-UvWbX2vVnXBbObj2OVZyOOSr4dVJWUgsjZ0B4gaVI.woff2')}}) format('woff2');
+              unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+            }
+        </style>
 
         <!-- Styles -->
         @if(strpos(Request::url(),'setup') === false)
@@ -64,7 +89,10 @@
         @else
             <link href="{{ str_replace("setup", "", Request::url())}}css/app.css" rel="stylesheet">
         @endif
+        
+        @if(auth()->guard('contact')->user() && !auth()->guard('contact')->user()->user->account->isPaid())
         {{-- <link href="{{ mix('favicon.png') }}" rel="shortcut icon" type="image/png"> --}}
+        @endif
 
         <link rel="canonical" href="{{ config('ninja.app_url') }}/{{ request()->path() }}"/>
 
@@ -108,9 +136,9 @@
                     },
                     "content": {
                         "href": "{{ config('ninja.privacy_policy_url.hosted') }}",
-                        "message": "This website uses cookies to ensure you get the best experience on our website.",
-                        "dismiss": "Got it!",
-                        "link": "Learn more",
+                        "message": "{{ ctrans('texts.cookie_message')}}",
+                        "dismiss": "{{ ctrans('texts.got_it')}}",
+                        "link": "{{ ctrans('texts.learn_more')}}",
                     }
                 })}
             );

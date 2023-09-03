@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -22,14 +22,6 @@ class InvoiceWasViewed
 {
     use SerializesModels;
 
-    /**
-     * @var Invoice
-     */
-    public $invitation;
-
-    public $company;
-
-    public $event_vars;
 
     /**
      * Create a new event instance.
@@ -38,10 +30,7 @@ class InvoiceWasViewed
      * @param Company $company
      * @param array $event_vars
      */
-    public function __construct(InvoiceInvitation $invitation, Company $company, array $event_vars)
+    public function __construct(public InvoiceInvitation $invitation, public Company $company, public array $event_vars)
     {
-        $this->invitation = $invitation;
-        $this->company = $company;
-        $this->event_vars = $event_vars;
     }
 }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,10 +12,8 @@
 namespace App\Http\Requests\Expense;
 
 use App\Http\Requests\Request;
-use App\Http\ValidationRules\Expense\UniqueExpenseNumberRule;
 use App\Models\Expense;
 use App\Models\Project;
-use App\Models\PurchaseOrder;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Validation\Rule;
 
@@ -41,9 +39,11 @@ class StoreExpenseRequest extends Request
             $rules['number'] = Rule::unique('expenses')->where('company_id', auth()->user()->company()->id);
         }
 
-        if (! empty($this->client_id)) {
+        if ($this->client_id) {
             $rules['client_id'] = 'bail|sometimes|exists:clients,id,company_id,'.auth()->user()->company()->id;
         }
+
+        $rules['category_id'] = 'bail|nullable|sometimes|exists:expense_categories,id,company_id,'.auth()->user()->company()->id.',is_deleted,0';
 
         return $this->globalRules($rules);
     }
@@ -54,10 +54,6 @@ class StoreExpenseRequest extends Request
 
         $input = $this->decodePrimaryKeys($input);
 
-        if (array_key_exists('category_id', $input) && is_string($input['category_id'])) {
-            $input['category_id'] = $this->decodePrimaryKey($input['category_id']);
-        }
-
         if (! array_key_exists('currency_id', $input) || strlen($input['currency_id']) == 0) {
             $input['currency_id'] = (string) auth()->user()->company()->settings->currency_id;
         }
@@ -66,19 +62,15 @@ class StoreExpenseRequest extends Request
             $input['color'] = '';
         }
 
-
         /* Ensure the project is related */
         if (array_key_exists('project_id', $input) && isset($input['project_id'])) {
             $project = Project::withTrashed()->where('id', $input['project_id'])->company()->first();
 
-            if($project){
+            if ($project) {
                 $input['client_id'] = $project->client_id;
-            }
-            else
-            {
+            } else {
                 unset($input['project_id']);
             }
-
         }
 
 

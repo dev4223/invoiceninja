@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,6 +12,9 @@
 namespace App\Providers;
 
 use App\Models\Activity;
+use App\Models\BankIntegration;
+use App\Models\BankTransaction;
+use App\Models\BankTransactionRule;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\CompanyGateway;
@@ -32,6 +35,7 @@ use App\Models\Quote;
 use App\Models\RecurringExpense;
 use App\Models\RecurringInvoice;
 use App\Models\RecurringQuote;
+use App\Models\Scheduler;
 use App\Models\Subscription;
 use App\Models\Task;
 use App\Models\TaskStatus;
@@ -40,6 +44,9 @@ use App\Models\User;
 use App\Models\Vendor;
 use App\Models\Webhook;
 use App\Policies\ActivityPolicy;
+use App\Policies\BankIntegrationPolicy;
+use App\Policies\BankTransactionPolicy;
+use App\Policies\BankTransactionRulePolicy;
 use App\Policies\ClientPolicy;
 use App\Policies\CompanyGatewayPolicy;
 use App\Policies\CompanyPolicy;
@@ -60,6 +67,7 @@ use App\Policies\QuotePolicy;
 use App\Policies\RecurringExpensePolicy;
 use App\Policies\RecurringInvoicePolicy;
 use App\Policies\RecurringQuotePolicy;
+use App\Policies\SchedulerPolicy;
 use App\Policies\SubscriptionPolicy;
 use App\Policies\TaskPolicy;
 use App\Policies\TaskStatusPolicy;
@@ -79,7 +87,9 @@ class AuthServiceProvider extends ServiceProvider
      */
     protected $policies = [
         Activity::class => ActivityPolicy::class,
-        Subscription::class => SubscriptionPolicy::class,
+        BankIntegration::class => BankIntegrationPolicy::class,
+        BankTransaction::class => BankTransactionPolicy::class,
+        BankTransactionRule::class => BankTransactionRulePolicy::class,
         Client::class => ClientPolicy::class,
         Company::class => CompanyPolicy::class,
         CompanyToken::class => CompanyTokenPolicy::class,
@@ -95,17 +105,19 @@ class AuthServiceProvider extends ServiceProvider
         PaymentTerm::class => PaymentTermPolicy::class,
         Product::class => ProductPolicy::class,
         Project::class => ProjectPolicy::class,
+        PurchaseOrder::class => PurchaseOrderPolicy::class,
         Quote::class => QuotePolicy::class,
         RecurringExpense::class => RecurringExpensePolicy::class,
         RecurringInvoice::class => RecurringInvoicePolicy::class,
         RecurringQuote::class => RecurringQuotePolicy::class,
-        Webhook::class => WebhookPolicy::class,
+        Scheduler::class => SchedulerPolicy::class,
+        Subscription::class => SubscriptionPolicy::class,
         Task::class => TaskPolicy::class,
         TaskStatus::class => TaskStatusPolicy::class,
         TaxRate::class => TaxRatePolicy::class,
         User::class => UserPolicy::class,
         Vendor::class => VendorPolicy::class,
-        PurchaseOrder::class => PurchaseOrderPolicy::class,
+        Webhook::class => WebhookPolicy::class,
     ];
 
     /**

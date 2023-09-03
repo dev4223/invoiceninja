@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -56,9 +56,10 @@ class DocumentController extends Controller
     {
         MultiDB::documentFindAndSetDb($document_hash);
 
+        /** @var \App\Models\Document $document **/
         $document = Document::where('hash', $document_hash)->firstOrFail();
 
-        $headers = [];
+        $headers = ['Cache-Control:' => 'no-cache'];
 
         if (request()->input('inline') == 'true') {
             $headers = array_merge($headers, ['Content-Disposition' => 'inline']);
@@ -69,7 +70,8 @@ class DocumentController extends Controller
 
     public function downloadMultiple(DownloadMultipleDocumentsRequest $request)
     {
-        $documents = Document::whereIn('id', $this->transformKeys($request->file_hash))
+        /** @var \Illuminate\Database\Eloquent\Collection<Document> $documents **/
+        $documents = Document::query()->whereIn('id', $this->transformKeys($request->file_hash))
             ->where('company_id', auth()->guard('contact')->user()->company_id)
             ->get();
 
@@ -86,7 +88,7 @@ class DocumentController extends Controller
             $zipFile->saveAsFile($filepath) // save the archive to a file
                    ->close(); // close archive
 
-           return response()->download($filepath, $filename)->deleteFileAfterSend(true);
+            return response()->download($filepath, $filename)->deleteFileAfterSend(true);
         } catch (\PhpZip\Exception\ZipException $e) {
             // handle exception
         } finally {

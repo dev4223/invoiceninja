@@ -16,8 +16,13 @@
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         font-family: $font_name, Helvetica, sans-serif;
-        font-size: "$font_size";
+        font-size: $font_size !important;
         zoom: 80%;
+    }
+
+
+    table tr td, table tr, th {
+        font-size: $font_size !important;
     }
 
     @page {
@@ -35,22 +40,43 @@
 
     .header-wrapper {
         display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-rows:0.5fr;
+        grid-template-columns: auto auto auto auto;
+        grid-template-areas: "a b c d e";
+        grid-auto-columns: minmax(0, 1fr);
+        grid-auto-flow: column;
+        justify-content:left;
         gap: 20px;
         line-height: var(--line-height);
     }
 
     .company-logo {
-        max-width: 65%;
+        max-width: $company_logo_size;  
+        float:right;  
     }
 
-    #entity-details p { margin-top: 5px; }
+    ,logo-wrapper {
+        grid-area: e; 
+        align-content: right; 
+        border:1px solid #000;
+    }
+
+    #entity-details {
+        width: 100%;
+        white-space: nowrap;
+        margin-right: 3rem;
+    }
+
+    #entity-details p { 
+        margin-top: 5px; 
+    }
 
     .header-wrapper #client-details,
     .header-wrapper #company-details,
     .header-wrapper #company-address {
         display: flex;
         flex-direction: column;
+        line-height: var(--line-height) !important;
     }
 
     [data-ref="company_details-company.name"] {
@@ -64,11 +90,12 @@
 
     .header-wrapper .company-info-wrapper > * {
         margin-bottom: 1rem;
+        grid-row-end: 4;
     }
 
     .entity-label-wrapper {
         display: grid;
-        grid-template-columns: 2fr 1fr;
+        grid-template-columns: 3fr 1fr;
         margin-top: 1rem;
     }
 
@@ -94,13 +121,19 @@
         text-align: left;
     }
 
+    #shipping-details {
+        display: $show_shipping_address;
+        flex-direction: column;
+        line-height: var(--line-height) !important;
+    }
+
     .entity-label-wrapper #entity-details > tr,
     .entity-label-wrapper #entity-details th {
         font-weight: normal;
     }
 
     [data-ref="table"] {
-        margin-bottom: 50px; 
+        margin-bottom: 5px; 
         min-width: 100%;
         table-layout: fixed;
         overflow-wrap: break-word;
@@ -185,10 +218,10 @@
     [data-element='product-table-balance-due'] {
         font-weight: bold;
         color: var(--primary-color);
-    }
+    }resources/views/pdf-designs/creative.html
 
     #table-totals > * > * {
-        padding-left: 1rem;
+        padding-left: 0.5rem;
     }
 
     #table-totals > * > :last-child {
@@ -204,7 +237,8 @@
     }
 
     [data-ref="total_table-footer"] {
-        padding-left: 1rem
+        padding-left: 1rem;
+        padding-right:0.8rem;
     }
 
     /** Markdown-specific styles. **/
@@ -244,6 +278,53 @@
         overflow-wrap: break-word; 
     }
 
+    .stamp {
+      transform: rotate(12deg);
+        color: #555;
+        font-size: 3rem;
+        font-weight: 700;
+        border: 0.25rem solid #555;
+        display: inline-block;
+        padding: 0.25rem 1rem;
+        text-transform: uppercase;
+        border-radius: 1rem;
+        font-family: 'Courier';
+        mix-blend-mode: multiply;
+        z-index:200 !important;
+        position:  fixed;
+        text-align: center;
+    }
+
+    .is-paid {
+        color:  #D23;
+        border: 1rem double  #D23;
+        transform: rotate(-5deg);
+        font-size: 6rem;
+        font-family: "Open sans", Helvetica, Arial, sans-serif;
+        border-radius: 0;
+        padding: 0.5rem;
+        opacity: 0.2;
+        z-index:200 !important;
+        position:  fixed;
+        display: $show_paid_stamp;
+
+    } 
+
+    .project-header {
+        font-size: 1.2em;
+        margin-top: 0.1em;
+        margin-bottom: 0;
+        padding-bottom: 0;
+        margin-left: 0;
+        margin-right: 0;
+        font-weight: bold;
+        color: #505050;
+    } 
+
+    .pqrcode {
+        
+    }
+    
     /** Useful snippets, uncomment to enable. **/
 
     /** Hide company logo **/
@@ -289,22 +370,28 @@
                <div class="header-wrapper">
                   <div id="client-details"></div>
                   <div id="vendor-details"></div>
+                  <div id="shipping-details"></div>
+
                   <div class="company-info-wrapper">
                      <div id="company-details">Holger Kral</div>
                      <div id="company-address"></div>
                   </div>
+                  <div class="logo-wrapper">
                   <img
                      class="company-logo"
                      src="$company.logo"
                      alt="$company.name logo"
                      />
+                  </div>
                </div>
                <div class="entity-label-wrapper">
                   <h1 class="entity-label">
                      <span>$entity_label</span>&nbsp;<br />
                      <span class="invno">#$entity_number</span>
                   </h1>
-                  <table id="entity-details" cellspacing="0" dir="$dir"></table>
+                    <div class="entity-details-wrapper">
+                        <table id="entity-details" cellspacing="0" dir="$dir"></table>
+                    </div>
                </div>
                <table id="product-table" cellspacing="0" data-ref="table"></table>
                <table id="task-table" cellspacing="0" data-ref="table"></table>
@@ -313,9 +400,11 @@
                <div id="statement-invoice-table-totals" data-ref="statement-totals"></div>
                <table id="statement-payment-table" cellspacing="0" data-ref="table"></table>
                <div id="statement-payment-table-totals" data-ref="statement-totals"></div>
+                            <table id="statement-credit-table" cellspacing="0" data-ref="table"></table>
+                            <div id="statement-credit-table-totals" data-ref="statement-totals"></div>
                <table id="statement-aging-table" cellspacing="0" data-ref="table"></table>
                <div id="statement-aging-table-totals" data-ref="statement-totals"></div>
-               <div id="table-totals" cellspacing="0"></div>
+               <div id="table-totals" cellspacing="0">$status_logo</div>
                <table id="delivery-note-table" cellspacing="0"><tr><td><b>Konto und Zahlungsinformationen:</b><br>Triodos Bank<br>IBAN: DE81 5003 1000 1066 7990 06<br>BIC: TRODDEF1<br>Verwendungszweck: ReNr $entity_number<br>Betrag: $amount_due</td></tr></table>
             </div>
          </td>
@@ -344,7 +433,7 @@ $entity_images
                     'product-table', 'task-table', 'delivery-note-table',
                     'statement-invoice-table', 'statement-payment-table', 'statement-aging-table-totals',
                     'statement-invoice-table-totals', 'statement-payment-table-totals', 'statement-aging-table',
-                    'vendor-details', 'client-details'
+                    'client-details', 'vendor-details', 'swiss-qr', 'shipping-details', 'statement-credit-table', 'statement-credit-table-totals',
                 ];
 
                 tables.forEach((tableIdentifier) => {

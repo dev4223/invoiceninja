@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -19,25 +19,18 @@ use Illuminate\Contracts\Validation\Rule;
  */
 class ValidSubdomain implements Rule
 {
-    /**
-     * @param string $attribute
-     * @param mixed $value
-     * @return bool
-     */
-    private $input;
 
-    public function __construct($input)
+    public function __construct()
     {
-        $this->input = $input;
     }
 
     public function passes($attribute, $value)
     {
-        if (empty($input['subdomain'])) {
+        if (empty($value)) {
             return true;
         }
 
-        return MultiDB::checkDomainAvailable($input['subdomain']);
+        return MultiDB::checkDomainAvailable($value);
     }
 
     /**

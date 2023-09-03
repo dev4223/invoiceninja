@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -24,9 +24,6 @@ class AccountCreated
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    /**
-     * @var
-     */
     public $user;
 
     public $company;
@@ -47,13 +44,14 @@ class AccountCreated
         $this->event_vars = $event_vars;
     }
 
-    /**
-     * Get the channels the event should broadcast on.
-     *
-     * @return Channel|array
-     */
-    public function broadcastOn()
-    {
-        return new PrivateChannel('channel-name');
-    }
+    // /**
+    //  * Get the channels the event should broadcast on.
+    //  *
+    //  * @return Channel|array
+    //  */
+     public function broadcastOn()
+     {
+        return [];
+       //  return new PrivateChannel('channel-name');
+     }
 }

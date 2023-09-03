@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -37,7 +37,7 @@ class ProductTransformer extends EntityTransformer
     /**
      * @param Product $product
      *
-     * @return Collection
+     * @return \Illuminate\Support\Collection
      */
     public function includeUser(Product $product)
     {
@@ -49,7 +49,7 @@ class ProductTransformer extends EntityTransformer
     /**
      * @param Product $product
      *
-     * @return Collection
+     * @return \Illuminate\Support\Collection
      */
     public function includeCompany(Product $product)
     {
@@ -93,6 +93,9 @@ class ProductTransformer extends EntityTransformer
             'in_stock_quantity' => (int) $product->in_stock_quantity ?: 0,
             'stock_notification' => (bool) $product->stock_notification,
             'stock_notification_threshold' => (int) $product->stock_notification_threshold,
+            'max_quantity' => (int) $product->max_quantity,
+            'product_image' => (string) $product->product_image ?: '',
+            'tax_id' => (string) $product->tax_id ?: '1',     
         ];
     }
 }

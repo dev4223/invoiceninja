@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -42,10 +42,16 @@ class VerifyUserObject
         $this->user->confirmation_code = $this->createDbHash($this->company->db);
         $this->user->save();
 
+        $react_redirect = '';
+
+        if(Ninja::isHosted()) {
+            $react_redirect = '?react=true';
+        }
+
         $data = [
             'title' => ctrans('texts.confirmation_subject'),
             'message' => ctrans('texts.confirmation_message'),
-            'url' => url("/user/confirm/{$this->user->confirmation_code}"),
+            'url' => url("/user/confirm/{$this->user->confirmation_code}".$react_redirect),
             'button' => ctrans('texts.button_confirmation_message'),
             'settings' => $this->company->settings,
             'logo' => $this->company->present()->logo(),

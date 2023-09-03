@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -53,9 +53,8 @@ class QuoteEmailActivity implements ShouldQueue
         $fields->client_id = $event->invitation->quote->client_id;
         $fields->company_id = $event->invitation->quote->company_id;
         $fields->client_contact_id = $event->invitation->quote->client_contact_id;
-        $fields->client_id = $event->invitation->quote->client_id;
         $fields->activity_type_id = Activity::EMAIL_QUOTE;
 
-        $this->activity_repo->save($fields, $event->invitation->quote, $event->event_vars);
+        $this->activity_repo->save($fields, $event->invitation, $event->event_vars);
     }
 }

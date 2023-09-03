@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -25,7 +25,10 @@ class ClientPortalEnabled
      */
     public function handle($request, Closure $next)
     {
-        if (auth()->user()->client->getSetting('enable_client_portal') === false) {
+        /** @var \App\Models\ClientContact $client_contact */
+        $client_contact = auth()->user();
+
+        if ($client_contact->client->getSetting('enable_client_portal') === false) {
             return redirect()->route('client.error')->with(['title' => ctrans('texts.client_portal'), 'notification' => 'This section of the app has been disabled by the administrator.']);
         }
 

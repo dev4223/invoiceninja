@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -37,13 +37,14 @@ class VersionCheck implements ShouldQueue
     {
         $version_file = trim(@file_get_contents(config('ninja.version_url')));
 
-        nlog("latest version = {$version_file}");
-
         if (Ninja::isSelfHost() && $version_file) {
-            Account::whereNotNull('id')->update(['latest_version' => $version_file]);
+            Account::query()->whereNotNull('id')->update(['latest_version' => $version_file]);
         }
 
         if (Ninja::isSelfHost()) {
+            nlog("latest version = {$version_file}");
+
+            /** @var \App\Models\Account $account **/
             $account = Account::first();
 
             if (! $account) {

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -19,15 +19,12 @@ use App\Libraries\MultiDB;
 use App\Mail\DownloadInvoices;
 use App\Models\Company;
 use App\Models\User;
-use App\Utils\TempFile;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
-use ZipArchive;
 
 class ZipInvoices implements ShouldQueue
 {
@@ -65,11 +62,8 @@ class ZipInvoices implements ShouldQueue
      * Execute the job.
      *
      * @return void
-     * @throws \ZipStream\Exception\FileNotFoundException
-     * @throws \ZipStream\Exception\FileNotReadableException
-     * @throws \ZipStream\Exception\OverflowException
      */
-    public function handle()
+    public function handle(): void
     {
         MultiDB::setDb($this->company->db);
 
@@ -79,18 +73,19 @@ class ZipInvoices implements ShouldQueue
         $invitation = $this->invoices->first()->invitations->first();
         $path = $this->invoices->first()->client->invoice_filepath($invitation);
 
-        $this->invoices->each(function ($invoice) {
-            (new CreateEntityPdf($invoice->invitations()->first()))->handle();
-        });
-
         try {
-            foreach ($this->invoices as $invoice) {
-                $file = $invoice->service()->getInvoicePdf();
-                $zip_file_name = basename($file);
-                $zipFile->addFromString($zip_file_name, Storage::get($file));
 
-                //$download_file = file_get_contents($invoice->pdf_file_path($invitation, 'url', true));
-                //$zipFile->addFromString(basename($invoice->pdf_file_path($invitation)), $download_file);
+
+            foreach ($this->invoices as $invoice) {
+                
+                if ($invoice->client->getSetting('enable_e_invoice')) {
+                    $xml = $invoice->service()->getEInvoice();
+                    $zipFile->addFromString($invoice->getFileName("xml"), $xml);
+                }
+
+                $file = $invoice->service()->getRawInvoicePdf();
+                $zip_file_name = $invoice->getFileName();
+                $zipFile->addFromString($zip_file_name, $file);
             }
 
             Storage::put($path.$file_name, $zipFile->outputAsString());

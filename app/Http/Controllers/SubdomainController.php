@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -15,41 +15,18 @@ use App\Libraries\MultiDB;
 
 class SubdomainController extends BaseController
 {
-    private $protected = [
-        'www',
-        'app',
-        'ninja',
-        'sentry',
-        'sentry2',
-        'staging',
-        'pdf',
-        'demo',
-        'docs',
-        'client_domain',
-        'custom_domain',
-        'preview',
-        'invoiceninja',
-        'cname',
-        'sandbox',
-        'stage',
-        'html',
-        'lb',
-        'shopify',
-        'beta',
-    ];
 
     public function __construct()
     {
     }
 
     /**
-     * Display a listing of the resource.
+     * Return if a subdomain is available.
      *
-     * @return void
      */
     public function index()
     {
-        if (in_array(request()->input('subdomain'), $this->protected) || MultiDB::findAndSetDbByDomain(['subdomain' => request()->input('subdomain')])) {
+        if (!MultiDB::checkDomainAvailable(request()->input('subdomain'))) {
             return response()->json(['message' => 'Domain not available'], 401);
         }
 

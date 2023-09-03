@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -15,19 +15,16 @@ namespace App\PaymentDrivers\Stripe;
 use App\Exceptions\StripeConnectFailure;
 use App\Factory\ClientContactFactory;
 use App\Factory\ClientFactory;
-use App\Factory\ClientGatewayTokenFactory;
 use App\Models\Client;
 use App\Models\ClientGatewayToken;
 use App\Models\Country;
 use App\Models\Currency;
-use App\Models\GatewayType;
-use App\PaymentDrivers\Stripe\UpdatePaymentMethods;
 use App\PaymentDrivers\StripePaymentDriver;
 use App\Utils\Ninja;
 use App\Utils\Traits\GeneratesCounter;
 use App\Utils\Traits\MakesHash;
+use Illuminate\Database\QueryException;
 use Stripe\Customer;
-use Stripe\PaymentMethod;
 
 class ImportCustomers
 {
@@ -36,6 +33,8 @@ class ImportCustomers
 
     /** @var StripePaymentDriver */
     public $stripe;
+
+    private bool $completed = true;
 
     public $update_payment_methods;
 
@@ -63,7 +62,17 @@ class ImportCustomers
                 $this->addCustomer($customer);
             }
 
-            $starting_after = end($customers->data)['id'];
+            //handle
+            // if(is_array($customers->data) && end($customers->data) && array_key_exists('id', end($customers->data)))
+            //     $starting_after = end($customers->data)['id'];
+            // else
+            //     break;
+
+            $starting_after = isset(end($customers->data)['id']) ? end($customers->data)['id'] : false;
+
+            if (!$starting_after) {
+                break;
+            }
         } while ($customers->has_more);
     }
 
@@ -71,7 +80,7 @@ class ImportCustomers
     {
         $account = $this->stripe->company_gateway->company->account;
 
-        if (Ninja::isHosted() && ! $account->isPaidHostedClient() && Client::where('company_id', $this->stripe->company_gateway->company_id)->count() > config('ninja.quotas.free.clients')) {
+        if (Ninja::isHosted() && ! $account->isPaidHostedClient() && Client::query()->where('company_id', $this->stripe->company_gateway->company_id)->count() > config('ninja.quotas.free.clients')) {
             return;
         }
 
@@ -106,7 +115,7 @@ class ImportCustomers
             $client->phone = $customer->address->phone ? $customer->phone : '';
 
             if ($customer->address->country) {
-                $country = Country::where('iso_3166_2', $customer->address->country)->first();
+                $country = Country::query()->where('iso_3166_2', $customer->address->country)->first();
 
                 if ($country) {
                     $client->country_id = $country->id;
@@ -115,7 +124,7 @@ class ImportCustomers
         }
 
         if ($customer->currency) {
-            $currency = Currency::where('code', $customer->currency)->first();
+            $currency = Currency::query()->where('code', $customer->currency)->first();
 
             if ($currency) {
                 $settings = $client->settings;
@@ -127,10 +136,25 @@ class ImportCustomers
         $client->name = $customer->name ? $customer->name : $customer->email;
 
         if (! isset($client->number) || empty($client->number)) {
-            $client->number = $this->getNextClientNumber($client);
-        }
+            $x = 1;
 
-        $client->save();
+            do {
+                try {
+                    $client->number = $this->getNextClientNumber($client);
+                    $client->saveQuietly();
+
+                    $this->completed = false;
+                } catch (QueryException $e) {
+                    $x++;
+
+                    if ($x > 10) {
+                        $this->completed = false;
+                    }
+                }
+            } while ($this->completed);
+        } else {
+            $client->save();
+        }
 
         $contact = ClientContactFactory::create($client->company_id, $client->user_id);
         $contact->client_id = $client->id;
@@ -185,7 +209,7 @@ class ImportCustomers
             // nlog(count($searchResults));
 
             if (count($searchResults) == 1) {
-                $cgt = ClientGatewayToken::where('gateway_customer_reference', $searchResults->data[0]->id)->where('company_id', $this->stripe->company_gateway->company->id)->exists();
+                $cgt = ClientGatewayToken::query()->where('gateway_customer_reference', $searchResults->data[0]->id)->where('company_id', $this->stripe->company_gateway->company->id)->exists();
 
                 if (! $cgt) {
                     nlog('customer '.$searchResults->data[0]->id.' does not exist.');

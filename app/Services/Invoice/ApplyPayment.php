@@ -4,32 +4,22 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Invoice;
 
-use App\Jobs\Ninja\TransactionLog;
 use App\Models\Invoice;
 use App\Models\Payment;
-use App\Models\TransactionEvent;
 use App\Services\AbstractService;
 
 class ApplyPayment extends AbstractService
 {
-    private $invoice;
 
-    private $payment;
-
-    private $payment_amount;
-
-    public function __construct($invoice, $payment, $payment_amount)
+    public function __construct(private Invoice $invoice, private Payment $payment, private float $payment_amount)
     {
-        $this->invoice = $invoice;
-        $this->payment = $payment;
-        $this->payment_amount = $payment_amount;
     }
 
     /* Apply payment to a single invoice */
@@ -41,7 +31,6 @@ class ApplyPayment extends AbstractService
 
         if ($this->invoice->hasPartial()) {
             if ($this->invoice->partial == $this->payment_amount) {
-
                 //is partial and amount is exactly the partial amount
 
                 $amount_paid = $this->payment_amount * -1;
@@ -95,25 +84,15 @@ class ApplyPayment extends AbstractService
         /* Update Pivot Record amount */
         $this->payment->invoices->each(function ($inv) use ($amount_paid) {
             if ($inv->id == $this->invoice->id) {
-                $inv->pivot->amount = ($amount_paid * -1);
-                $inv->pivot->save();
-
+                // $inv->pivot->amount = ($amount_paid * -1);
+                // $inv->pivot->save();
+                //25-06-2023
                 $inv->paid_to_date += floatval($amount_paid * -1);
                 $inv->save();
             }
         });
 
-        $this->invoice->service()->applyNumber()->workFlow()->save();
-
-        $transaction = [
-            'invoice' => $this->invoice->transaction_event(),
-            'payment' => $this->payment->transaction_event(),
-            'client' => $this->invoice->client->transaction_event(),
-            'credit' => [],
-            'metadata' => [],
-        ];
-
-        TransactionLog::dispatch(TransactionEvent::INVOICE_PAYMENT_APPLIED, $transaction, $this->invoice->company->db);
+        $this->invoice->service()->applyNumber()->workFlow()->deletePdf()->save();
 
         return $this->invoice;
     }

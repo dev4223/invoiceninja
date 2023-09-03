@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -40,14 +40,14 @@ class RegisterRequest extends FormRequest
         $rules = [];
 
         foreach ($this->company()->client_registration_fields as $field) {
-            if ($field['required']) {
-                $rules[$field['key']] = ['bail','required'];
+            if ($field['visible']) {
+                $rules[$field['key']] = $field['required'] ? ['bail','required'] : ['sometimes'];
             }
         }
 
         foreach ($rules as $field => $properties) {
             if ($field === 'email') {
-                $rules[$field] = array_merge($rules[$field], ['email:rfc,dns', 'max:255', Rule::unique('client_contacts')->where('company_id', $this->company()->id)]);
+                $rules[$field] = array_merge($rules[$field], ['email:rfc,dns', 'max:191', Rule::unique('client_contacts')->where('company_id', $this->company()->id)]);
             }
 
             if ($field === 'current_password') {
@@ -64,18 +64,17 @@ class RegisterRequest extends FormRequest
 
     public function company()
     {
-
         //this should be all we need, the rest SHOULD be redundant because of our Middleware
         if ($this->key) {
-            return Company::where('company_key', $this->key)->first();
+            return Company::query()->where('company_key', $this->key)->first();
         }
 
         if ($this->company_key) {
-            return Company::where('company_key', $this->company_key)->firstOrFail();
+            return Company::query()->where('company_key', $this->company_key)->firstOrFail();
         }
 
         if (! $this->route()->parameter('company_key') && Ninja::isSelfHost()) {
-            $company = Account::first()->default_company;
+            $company = Account::query()->first()->default_company;
 
             if (! $company->client_can_register) {
                 abort(403, 'This page is restricted');

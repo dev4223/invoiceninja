@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -40,4 +40,7 @@ function nlog($output, $context = []): void
     } else {
         \Illuminate\Support\Facades\Log::channel('invoiceninja')->info($output, $context);
     }
+
+    $output = null;
+    $context = null;
 }

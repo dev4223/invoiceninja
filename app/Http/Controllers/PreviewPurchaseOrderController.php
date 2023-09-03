@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,38 +12,21 @@
 namespace App\Http\Controllers;
 
 use App\DataMapper\Analytics\LivePreview;
-use App\Factory\CreditFactory;
-use App\Factory\InvoiceFactory;
 use App\Factory\PurchaseOrderFactory;
-use App\Factory\QuoteFactory;
-use App\Factory\RecurringInvoiceFactory;
-use App\Http\Requests\Invoice\StoreInvoiceRequest;
-use App\Http\Requests\Preview\PreviewInvoiceRequest;
 use App\Http\Requests\Preview\PreviewPurchaseOrderRequest;
 use App\Jobs\Util\PreviewPdf;
 use App\Libraries\MultiDB;
 use App\Models\Client;
-use App\Models\ClientContact;
-use App\Models\Credit;
-use App\Models\Invoice;
-use App\Models\InvoiceInvitation;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderInvitation;
-use App\Models\Quote;
-use App\Models\RecurringInvoice;
 use App\Models\Vendor;
 use App\Models\VendorContact;
-use App\Repositories\CreditRepository;
-use App\Repositories\InvoiceRepository;
 use App\Repositories\PurchaseOrderRepository;
-use App\Repositories\QuoteRepository;
-use App\Repositories\RecurringInvoiceRepository;
+use App\Services\PdfMaker\Design;
 use App\Services\PdfMaker\Design as PdfDesignModel;
 use App\Services\PdfMaker\Design as PdfMakerDesign;
-use App\Services\PdfMaker\Design;
 use App\Services\PdfMaker\PdfMaker;
 use App\Utils\HostedPDF\NinjaPdf;
-use App\Utils\HtmlEngine;
 use App\Utils\Ninja;
 use App\Utils\PhantomJS\Phantom;
 use App\Utils\Traits\MakesHash;
@@ -52,7 +35,6 @@ use App\Utils\Traits\Pdf\PageNumbering;
 use App\Utils\VendorHtmlEngine;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Response;
 use Turbo124\Beacon\Facades\LightLogs;
 
@@ -79,7 +61,6 @@ class PreviewPurchaseOrderController extends BaseController
      *      tags={"preview"},
      *      summary="Returns a pdf preview for purchase order",
      *      description="Returns a pdf preview for purchase order.",
-     *      @OA\Parameter(ref="#/components/parameters/X-Api-Secret"),
      *      @OA\Parameter(ref="#/components/parameters/X-Requested-With"),
      *      @OA\Response(
      *          response=200,
@@ -108,14 +89,13 @@ class PreviewPurchaseOrderController extends BaseController
             ! empty(request()->input('entity')) &&
             ! empty(request()->input('entity_id')) &&
             request()->has('body')) {
-            
             $design_object = json_decode(json_encode(request()->input('design')));
 
             if (! is_object($design_object)) {
                 return response()->json(['message' => ctrans('texts.invalid_design_object')], 400);
             }
 
-            $entity_obj = PurchaseOrder::whereId($this->decodePrimaryKey(request()->input('entity_id')))->company()->first();
+            $entity_obj = PurchaseOrder::query()->whereId($this->decodePrimaryKey(request()->input('entity_id')))->company()->first();
 
             if (! $entity_obj) {
                 return $this->blankEntity();
@@ -160,20 +140,23 @@ class PreviewPurchaseOrderController extends BaseController
                 return (new Phantom)->convertHtmlToPdf($maker->getCompiledHTML(true));
             }
             
-            if(config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja'){
+            /** @var \App\Models\User $user */
+            $user = auth()->user();
+
+            if (config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja') {
                 $pdf = (new NinjaPdf())->build($maker->getCompiledHTML(true));
 
-                $numbered_pdf = $this->pageNumbering($pdf, auth()->user()->company());
+                $numbered_pdf = $this->pageNumbering($pdf, $user->company());
 
-                if($numbered_pdf)
+                if ($numbered_pdf) {
                     $pdf = $numbered_pdf;
+                }
 
                 return $pdf;
-
             }
 
             //else
-            $file_path = (new PreviewPdf($maker->getCompiledHTML(true), auth()->user()->company()))->handle();
+            $file_path = (new PreviewPdf($maker->getCompiledHTML(true), $user->company()))->handle();
 
             return response()->download($file_path, basename($file_path), ['Cache-Control:' => 'no-cache'])->deleteFileAfterSend(true);
         }
@@ -183,33 +166,35 @@ class PreviewPurchaseOrderController extends BaseController
 
     public function live(PreviewPurchaseOrderRequest $request)
     {
-        $company = auth()->user()->company();
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        $company = $user->company();
 
         MultiDB::setDb($company->db);
 
         $repo = new PurchaseOrderRepository();
-        $entity_obj = PurchaseOrderFactory::create($company->id, auth()->user()->id);
+        $entity_obj = PurchaseOrderFactory::create($company->id, $user->id);
         $class = PurchaseOrder::class;
 
         try {
-
             DB::connection(config('database.default'))->beginTransaction();
 
-            if($request->has('entity_id')){
-
-                $entity_obj = $class::on(config('database.default'))
+            if ($request->has('entity_id')) {
+                /** @var \App\Models\PurchaseOrder|\Illuminate\Contracts\Database\Eloquent\Builder $entity_obj **/
+                $entity_obj = \App\Models\PurchaseOrder::on(config('database.default'))
                                     ->with('vendor.company')
                                     ->where('id', $this->decodePrimaryKey($request->input('entity_id')))
                                     ->where('company_id', $company->id)
                                     ->withTrashed()
                                     ->first();
-
             }
 
             $entity_obj = $repo->save($request->all(), $entity_obj);
 
-            if(!$request->has('entity_id'))
+            if (!$request->has('entity_id')) {
                 $entity_obj->service()->fillDefaults()->save();
+            }
                 
             App::forgetInstance('translator');
             $t = app('translator');
@@ -218,11 +203,13 @@ class PreviewPurchaseOrderController extends BaseController
 
             $html = new VendorHtmlEngine($entity_obj->invitations()->first());
 
-            $design = \App\Models\Design::find($entity_obj->design_id);
+            /** @var \App\Models\Design $design */
+            $design = \App\Models\Design::withTrashed()->find($entity_obj->design_id);
 
             /* Catch all in case migration doesn't pass back a valid design */
-            if(!$design)
+            if (!$design) {
                 $design = \App\Models\Design::find(2);
+            }
 
             if ($design->is_custom) {
                 $options = [
@@ -259,28 +246,27 @@ class PreviewPurchaseOrderController extends BaseController
             if (request()->query('html') == 'true') {
                 return $maker->getCompiledHTML();
             }
-
-
-        }
-        catch(\Exception $e){
-
+        } catch(\Exception $e) {
             DB::connection(config('database.default'))->rollBack();
             return;
         }
 
+            /** @var \App\Models\User $user */
+            $user = auth()->user();
 
             //if phantom js...... inject here..
             if (config('ninja.phantomjs_pdf_generation') || config('ninja.pdf_generator') == 'phantom') {
                 return (new Phantom)->convertHtmlToPdf($maker->getCompiledHTML(true));
             }
             
-            if(config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja'){
+            if (config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja') {
                 $pdf = (new NinjaPdf())->build($maker->getCompiledHTML(true));
 
-                $numbered_pdf = $this->pageNumbering($pdf, auth()->user()->company());
+                $numbered_pdf = $this->pageNumbering($pdf, $user->company());
 
-                if($numbered_pdf)
+                if ($numbered_pdf) {
                     $pdf = $numbered_pdf;
+                }
 
                 return $pdf;
             }
@@ -288,32 +274,35 @@ class PreviewPurchaseOrderController extends BaseController
             $file_path = (new PreviewPdf($maker->getCompiledHTML(true), $company))->handle();
 
 
-            if(Ninja::isHosted())
-            {
-                LightLogs::create(new LivePreview())
-                         ->increment()
-                         ->batch();
-            }
+        if (Ninja::isHosted()) {
+            LightLogs::create(new LivePreview())
+                     ->increment()
+                     ->batch();
+        }
 
 
         $response = Response::make($file_path, 200);
         $response->header('Content-Type', 'application/pdf');
 
         return $response;
-
     }
 
     private function blankEntity()
     {
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
         App::forgetInstance('translator');
         $t = app('translator');
-        $t->replace(Ninja::transformTranslations(auth()->user()->company()->settings));
+        $t->replace(Ninja::transformTranslations($user->company()->settings));
 
-        $invitation = PurchaseOrderInvitation::where('company_id', auth()->user()->company()->id)->orderBy('id', 'desc')->first();
+        /** @var \App\Models\PurchaseOrderInvitation $invitation */
+        $invitation = PurchaseOrderInvitation::where('company_id', $user->company()->id)->orderBy('id', 'desc')->first();
 
         /* If we don't have a valid invitation in the system - create a mock using transactions */
-        if(!$invitation)
+        if (!$invitation) {
             return $this->mockEntity();
+        }
 
         $design_object = json_decode(json_encode(request()->input('design')));
 
@@ -352,63 +341,72 @@ class PreviewPurchaseOrderController extends BaseController
             return (new Phantom)->convertHtmlToPdf($maker->getCompiledHTML(true));
         }
 
-        if(config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja'){
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        if (config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja') {
             $pdf =  (new NinjaPdf())->build($maker->getCompiledHTML(true));
 
-            $numbered_pdf = $this->pageNumbering($pdf, auth()->user()->company());
+            $numbered_pdf = $this->pageNumbering($pdf, $user->company());
 
-                if($numbered_pdf)
-                    $pdf = $numbered_pdf;
+            if ($numbered_pdf) {
+                $pdf = $numbered_pdf;
+            }
 
-                return $pdf;
+            return $pdf;
         }
             
-        $file_path = (new PreviewPdf($maker->getCompiledHTML(true), auth()->user()->company()))->handle();
+        $file_path = (new PreviewPdf($maker->getCompiledHTML(true), $user->company()))->handle();
 
         $response = Response::make($file_path, 200);
         $response->header('Content-Type', 'application/pdf');
 
         return $response;
-
     }
 
     private function mockEntity()
     {
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
 
-        DB::connection(auth()->user()->company()->db)->beginTransaction();
+        DB::connection($user->company()->db)->beginTransaction();
 
+        /** @var \App\Models\Vendor $vendor */
         $vendor = Vendor::factory()->create([
-                'user_id' => auth()->user()->id,
-                'company_id' => auth()->user()->company()->id,
+                'user_id' => $user->id,
+                'company_id' => $user->company()->id,
             ]);
 
+        /** @var \App\Models\VendorContact $contact */
         $contact = VendorContact::factory()->create([
-                'user_id' => auth()->user()->id,
-                'company_id' => auth()->user()->company()->id,
+                'user_id' => $user->id,
+                'company_id' => $user->company()->id,
                 'vendor_id' => $vendor->id,
                 'is_primary' => 1,
                 'send_email' => true,
             ]);
 
+        /** @var \App\Models\PurchaseOrder $purchase_order */
         $purchase_order = PurchaseOrder::factory()->create([
-                    'user_id' => auth()->user()->id,
-                    'company_id' => auth()->user()->company()->id,
+                    'user_id' => $user->id,
+                    'company_id' => $user->company()->id,
                     'vendor_id' => $vendor->id,
                     'terms' => 'Sample Terms',
                     'footer' => 'Sample Footer',
                     'public_notes' => 'Sample Public Notes',
                 ]);
 
+        /** @var \App\Models\PurchaseOrderInvitation $invitation */
         $invitation = PurchaseOrderInvitation::factory()->create([
-                    'user_id' => auth()->user()->id,
-                    'company_id' => auth()->user()->company()->id,
+                    'user_id' => $user->id,
+                    'company_id' => $user->company()->id,
                     'purchase_order_id' => $purchase_order->id,
                     'vendor_contact_id' => $contact->id,
         ]);
 
         $purchase_order->setRelation('invitations', $invitation);
         $purchase_order->setRelation('vendor', $vendor);
-        $purchase_order->setRelation('company', auth()->user()->company());
+        $purchase_order->setRelation('company', $user->company());
         $purchase_order->load('vendor.company');
 
         $design_object = json_decode(json_encode(request()->input('design')));
@@ -439,7 +437,10 @@ class PreviewPurchaseOrderController extends BaseController
             ->design($design)
             ->build();
 
-        DB::connection(auth()->user()->company()->db)->rollBack();
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        DB::connection($user->company()->db)->rollBack();
 
         if (request()->query('html') == 'true') {
             return $maker->getCompiledHTML();
@@ -449,18 +450,19 @@ class PreviewPurchaseOrderController extends BaseController
             return (new Phantom)->convertHtmlToPdf($maker->getCompiledHTML(true));
         }
 
-        if(config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja'){
+        if (config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja') {
             $pdf = (new NinjaPdf())->build($maker->getCompiledHTML(true));
 
-            $numbered_pdf = $this->pageNumbering($pdf, auth()->user()->company());
+            $numbered_pdf = $this->pageNumbering($pdf, $user->company());
 
-                if($numbered_pdf)
-                    $pdf = $numbered_pdf;
+            if ($numbered_pdf) {
+                $pdf = $numbered_pdf;
+            }
 
-                return $pdf;
+            return $pdf;
         }
             
-        $file_path = (new PreviewPdf($maker->getCompiledHTML(true), auth()->user()->company()))->handle();
+        $file_path = (new PreviewPdf($maker->getCompiledHTML(true), $user->company()))->handle();
 
         $response = Response::make($file_path, 200);
         $response->header('Content-Type', 'application/pdf');

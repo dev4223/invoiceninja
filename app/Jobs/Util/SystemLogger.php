@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -79,15 +79,26 @@ class SystemLogger implements ShouldQueue
 
         if (! $this->log) {
             nlog('SystemLogger:: no log to store');
-
+            $this->category_id = null;
+            $this->event_id = null;
+            $this->type_id = null;
+            $this->client = null;
+            $this->company = null;
             return;
         }
 
         SystemLog::create($sl);
+
+        $this->log = null;
+        $this->category_id = null;
+        $this->event_id = null;
+        $this->type_id = null;
+        $this->client = null;
+        $this->company = null;
     }
 
     public function failed($e)
     {
-        nlog($e->getMessage());
+        config(['queue.failed.driver' => null]);
     }
 }

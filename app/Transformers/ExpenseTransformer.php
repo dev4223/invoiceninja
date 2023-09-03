@@ -4,19 +4,23 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Transformers;
 
-use App\Models\Document;
-use App\Models\Expense;
+use App\Models\Client;
 use App\Models\Vendor;
+use App\Models\Expense;
+use App\Models\Invoice;
+use App\Models\Document;
+use App\Models\ExpenseCategory;
 use App\Utils\Traits\MakesHash;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use League\Fractal\Resource\Item;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Transformers\ExpenseCategoryTransformer;
 
 /**
  * class ExpenseTransformer.
@@ -36,6 +40,8 @@ class ExpenseTransformer extends EntityTransformer
     protected $availableIncludes = [
         'client',
         'vendor',
+        'category',
+        'invoice',
     ];
 
     public function includeDocuments(Expense $expense)
@@ -54,6 +60,28 @@ class ExpenseTransformer extends EntityTransformer
         }
 
         return $this->includeItem($expense->client, $transformer, Client::class);
+    }
+
+    public function includeInvoice(Expense $expense): ?Item
+    {
+        $transformer = new InvoiceTransformer($this->serializer);
+
+        if (!$expense->invoice) {
+            return null;
+        }
+
+        return $this->includeItem($expense->invoice, $transformer, Invoice::class);
+    }
+
+    public function includeCategory(Expense $expense): ?Item
+    {
+        $transformer = new ExpenseCategoryTransformer($this->serializer);
+
+        if (!$expense->category) {
+            return null;
+        }
+
+        return $this->includeItem($expense->category, $transformer, ExpenseCategory::class);
     }
 
     public function includeVendor(Expense $expense): ?Item
@@ -87,7 +115,7 @@ class ExpenseTransformer extends EntityTransformer
             'currency_id' => (string) $expense->currency_id ?: '',
             'category_id' => $this->encodePrimaryKey($expense->category_id),
             'payment_type_id' => (string) $expense->payment_type_id ?: '',
-            'recurring_expense_id' => (string) $expense->recurring_expense_id ?: '',
+            'recurring_expense_id' => (string) $this->encodePrimaryKey($expense->recurring_expense_id) ?: '',
             'is_deleted' => (bool) $expense->is_deleted,
             'should_be_invoiced' => (bool) $expense->should_be_invoiced,
             'invoice_documents' => (bool) $expense->invoice_documents,
@@ -103,7 +131,7 @@ class ExpenseTransformer extends EntityTransformer
             'private_notes' => (string) $expense->private_notes ?: '',
             'public_notes' => (string) $expense->public_notes ?: '',
             'transaction_reference' => (string) $expense->transaction_reference ?: '',
-            'transaction_id' => (string) $expense->transaction_id ?: '',
+            'transaction_id' => (string) $this->encodePrimaryKey($expense->transaction_id) ?: '',
             'date' => $expense->date ?: '',
             'number' => (string)$expense->number ?: '',
             'payment_date' => $expense->payment_date ?: '',

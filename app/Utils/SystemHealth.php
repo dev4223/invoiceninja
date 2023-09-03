@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -32,6 +32,7 @@ class SystemHealth
         'mbstring',
         'xml',
         'bcmath',
+        'iconv',
     ];
 
     private static $php_version = 8.1;
@@ -82,7 +83,36 @@ class SystemHealth
             'queue' => (string) config('queue.default'),
             'trailing_slash' => (bool) self::checkUrlState(),
             'file_permissions' => (string) self::checkFileSystem(),
+            'exchange_rate_api_not_configured' => (bool)self::checkCurrencySanity(),
         ];
+    }
+
+    private static function checkCurrencySanity()
+    {
+        if (!self::simpleDbCheck()) {
+            return true;
+        }
+
+        if (strlen(config('ninja.currency_converter_api_key')) == 0) {
+            try {
+                $cs = DB::table('clients')
+                      ->select('settings->currency_id as id')
+                                ->get();
+            } catch(\Exception $e) {
+                return true; //fresh installs, there may be no DB connection, nor migrations could have run yet.
+            }
+
+                $currency_count = $cs->unique('id')->filter(function ($value) {
+                    return !is_null($value->id);
+                })->count();
+
+
+            if ($currency_count > 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function checkQueueSize()
@@ -184,8 +214,9 @@ class SystemHealth
 
     private static function checkPhpCli()
     {
-        if(!function_exists('exec'))
+        if (!function_exists('exec')) {
             return "Unable to check CLI version";
+        }
         
         try {
             exec('php -v', $foo, $exitCode);
@@ -230,6 +261,8 @@ class SystemHealth
             try {
                 $pdo = DB::connection()->getPdo();
                 $x = DB::connection()->getDatabaseName();
+                // nlog($pdo);
+                // nlog($x);
                 $result['success'] = true;
             } catch (Exception $e) {
                 // $x = [config('database.connections.'.config('database.default').'.database') => false];
@@ -245,7 +278,7 @@ class SystemHealth
                     $x = DB::connection()->getDatabaseName();
                     $result['success'] = true;
                 } catch (Exception $e) {
-                   // $x = [config('database.connections.'.config('database.default').'.database') => false];
+                    // $x = [config('database.connections.'.config('database.default').'.database') => false];
                     $result['success'] = false;
                     $result['message'] = $e->getMessage();
                 }
@@ -253,11 +286,6 @@ class SystemHealth
         }
 
         return $result;
-    }
-
-    private static function checkDbConnection()
-    {
-        return DB::connection()->getPdo();
     }
 
     public static function testMailServer($request = null)

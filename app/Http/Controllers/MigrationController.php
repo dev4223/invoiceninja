@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -32,6 +32,8 @@ class MigrationController extends BaseController
 {
     use DispatchesJobs;
 
+    public bool $silent_migration = false;
+
     public function __construct()
     {
         parent::__construct();
@@ -46,8 +48,7 @@ class MigrationController extends BaseController
      *      tags={"migration"},
      *      summary="Attempts to purge a company record and all its child records",
      *      description="Attempts to purge a company record and all its child records",
-     *      @OA\Parameter(ref="#/components/parameters/X-Api-Secret"),
-     *      @OA\Parameter(ref="#/components/parameters/X-Api-Token"),
+     *      @OA\Parameter(ref="#/components/parameters/X-API-TOKEN"),
      *      @OA\Parameter(ref="#/components/parameters/X-Requested-With"),
      *      @OA\Parameter(
      *          name="company",
@@ -137,8 +138,7 @@ class MigrationController extends BaseController
      *      tags={"migration"},
      *      summary="Attempts to purge a companies child records but save the company record and its settings",
      *      description="Attempts to purge a companies child records but save the company record and its settings",
-     *      @OA\Parameter(ref="#/components/parameters/X-Api-Secret"),
-     *      @OA\Parameter(ref="#/components/parameters/X-Api-Token"),
+     *      @OA\Parameter(ref="#/components/parameters/X-API-TOKEN"),
      *      @OA\Parameter(ref="#/components/parameters/X-Requested-With"),
      *      @OA\Parameter(
      *          name="company",
@@ -182,6 +182,10 @@ class MigrationController extends BaseController
         $company->vendors()->forceDelete();
         $company->expenses()->forceDelete();
         $company->purchase_orders()->forceDelete();
+        $company->bank_transaction_rules()->forceDelete();
+        $company->bank_transactions()->forceDelete();
+        // $company->bank_integrations()->forceDelete();
+
         $company->all_activities()->forceDelete();
 
         $settings = $company->settings;
@@ -218,10 +222,9 @@ class MigrationController extends BaseController
      *      tags={"migration"},
      *      summary="Starts the migration from previous version of Invoice Ninja",
      *      description="Starts the migration from previous version of Invoice Ninja",
-     *      @OA\Parameter(ref="#/components/parameters/X-Api-Secret"),
-     *      @OA\Parameter(ref="#/components/parameters/X-Api-Token"),
+     *      @OA\Parameter(ref="#/components/parameters/X-API-TOKEN"),
      *      @OA\Parameter(ref="#/components/parameters/X-Requested-With"),
-     *      @OA\Parameter(ref="#/components/parameters/X-Api-Password"),
+     *      @OA\Parameter(ref="#/components/parameters/X-API-PASSWORD"),
      *      @OA\Parameter(
      *          name="migration",
      *          in="query",
@@ -252,12 +255,14 @@ class MigrationController extends BaseController
      *       ),
      *     )
      * @param Request $request
-     * @param Company $company
      * @return \Illuminate\Http\JsonResponse|void
      */
     public function startMigration(Request $request)
     {
         nlog('Starting Migration');
+
+        if($request->has('silent_migration'))
+            $this->silent_migration = true;
 
         if ($request->companies) {
             //handle Laravel 5.5 UniHTTP
@@ -296,6 +301,7 @@ class MigrationController extends BaseController
                 $user = auth()->user();
 
                 $company_count = $user->account->companies()->count();
+                $fresh_company = false;
 
                 // Look for possible existing company (based on company keys).
                 $existing_company = Company::whereRaw('BINARY `company_key` = ?', [$company['company_key']])->first();
@@ -311,7 +317,9 @@ class MigrationController extends BaseController
                     $nmo->company = $user->account->companies()->first();
                     $nmo->settings = $user->account->companies()->first()->settings;
                     $nmo->to_user = $user;
-                    NinjaMailerJob::dispatch($nmo, true);
+
+                    if(!$this->silent_migration)
+                        NinjaMailerJob::dispatch($nmo, true);
 
                     return;
                 } elseif ($existing_company && $company_count > 10) {
@@ -320,7 +328,9 @@ class MigrationController extends BaseController
                     $nmo->company = $user->account->companies()->first();
                     $nmo->settings = $user->account->companies()->first()->settings;
                     $nmo->to_user = $user;
-                    NinjaMailerJob::dispatch($nmo, true);
+
+                    if(!$this->silent_migration)
+                        NinjaMailerJob::dispatch($nmo, true);
 
                     return;
                 }
@@ -340,7 +350,8 @@ class MigrationController extends BaseController
                     $nmo->settings = $user->account->companies()->first();
                     $nmo->to_user = $user;
 
-                    NinjaMailerJob::dispatch($nmo, true);
+                    if(!$this->silent_migration)
+                        NinjaMailerJob::dispatch($nmo, true);
 
                     return response()->json([
                         '_id' => Str::uuid(),
@@ -430,11 +441,19 @@ class MigrationController extends BaseController
                 nlog($migration_file);
 
                 if (Ninja::isHosted()) {
-                    StartMigration::dispatch($migration_file, $user, $fresh_company)->onQueue('migration');
+                    StartMigration::dispatch($migration_file, $user, $fresh_company, $this->silent_migration)->onQueue('migration');
                 } else {
-                    StartMigration::dispatch($migration_file, $user, $fresh_company);
+                    StartMigration::dispatch($migration_file, $user, $fresh_company, $this->silent_migration);
                 }
             }
+
+            return response()->json([
+                '_id' => Str::uuid(),
+                'method' => config('queue.default'),
+                'started_at' => now(),
+            ], 200);
+        
         }
+
     }
 }

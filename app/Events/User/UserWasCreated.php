@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -26,30 +26,8 @@ class UserWasCreated
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    /**
-     * @var
-     */
-    public $user;
-
-    public $creating_user;
-
-    public $company;
-
-    public $event_vars;
-
-    /**
-     * Create a new event instance.
-     *
-     * @param User $user
-     * @param Company $company
-     * @param array $event_vars
-     */
-    public function __construct(User $user, User $creating_user, Company $company, array $event_vars)
+    public function __construct(public User $user, public User $creating_user, public Company $company, public array $event_vars)
     {
-        $this->user = $user;
-        $this->creating_user = $creating_user;
-        $this->company = $company;
-        $this->event_vars = $event_vars;
     }
 
     /**
@@ -57,8 +35,8 @@ class UserWasCreated
      *
      * @return Channel|array
      */
-    public function broadcastOn()
-    {
-        return new PrivateChannel('channel-name');
-    }
+     public function broadcastOn()
+     {
+        return [];
+     }
 }

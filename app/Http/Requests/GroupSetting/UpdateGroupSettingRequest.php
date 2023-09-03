@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -55,7 +55,7 @@ class UpdateGroupSettingRequest extends Request
      * are saveable
      *
      * @param  object $settings
-     * @return stdClass $settings
+     * @return array $settings
      */
     private function filterSaveableSettings($settings)
     {

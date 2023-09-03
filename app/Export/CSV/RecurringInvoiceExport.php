@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,7 +12,6 @@
 namespace App\Export\CSV;
 
 use App\Libraries\MultiDB;
-use App\Models\Client;
 use App\Models\Company;
 use App\Models\RecurringInvoice;
 use App\Transformers\RecurringInvoiceTransformer;
@@ -22,22 +21,21 @@ use League\Csv\Writer;
 
 class RecurringInvoiceExport extends BaseExport
 {
-    private Company $company;
-
-    protected array $input;
 
     private $invoice_transformer;
 
-    protected string $date_key = 'date';
+    public string $date_key = 'date';
 
-    protected array $entity_keys = [
+    public Writer $csv;
+
+    public array $entity_keys = [
         'amount' => 'amount',
         'balance' => 'balance',
         'client' => 'client_id',
-        'custom_surcharge1' => 'custom_surcharge1',
-        'custom_surcharge2' => 'custom_surcharge2',
-        'custom_surcharge3' => 'custom_surcharge3',
-        'custom_surcharge4' => 'custom_surcharge4',
+        // 'custom_surcharge1' => 'custom_surcharge1',
+        // 'custom_surcharge2' => 'custom_surcharge2',
+        // 'custom_surcharge3' => 'custom_surcharge3',
+        // 'custom_surcharge4' => 'custom_surcharge4',
         'custom_value1' => 'custom_value1',
         'custom_value2' => 'custom_value2',
         'custom_value3' => 'custom_value3',
@@ -54,6 +52,7 @@ class RecurringInvoiceExport extends BaseExport
         'po_number' => 'po_number',
         'private_notes' => 'private_notes',
         'public_notes' => 'public_notes',
+        'next_send_date' => 'next_send_date',
         'status' => 'status_id',
         'tax_name1' => 'tax_name1',
         'tax_name2' => 'tax_name2',
@@ -66,6 +65,7 @@ class RecurringInvoiceExport extends BaseExport
         'currency' => 'currency_id',
         'vendor' => 'vendor_id',
         'project' => 'project_id',
+        'frequency_id' => 'frequency_id',
     ];
 
     private array $decorate_keys = [
@@ -126,11 +126,22 @@ class RecurringInvoiceExport extends BaseExport
         foreach (array_values($this->input['report_keys']) as $key) {
             $keyval = array_search($key, $this->entity_keys);
 
+            if(!$keyval) {
+                $keyval = array_search(str_replace("recurring_invoice.", "", $key), $this->entity_keys) ?? $key;
+            }
+
+            if(!$keyval) {
+                $keyval = $key;
+            }
+
             if (array_key_exists($key, $transformed_invoice)) {
                 $entity[$keyval] = $transformed_invoice[$key];
+            } elseif (array_key_exists($keyval, $transformed_invoice)) {
+                $entity[$keyval] = $transformed_invoice[$keyval];
             } else {
-                $entity[$keyval] = '';
+                $entity[$keyval] = $this->resolveKey($keyval, $invoice, $this->invoice_transformer);
             }
+
         }
 
         return $this->decorateAdvancedFields($invoice, $entity);
@@ -160,6 +171,10 @@ class RecurringInvoiceExport extends BaseExport
 
         if (in_array('vendor_id', $this->input['report_keys'])) {
             $entity['vendor'] = $invoice->vendor ? $invoice->vendor->name : '';
+        }
+
+        if (in_array('recurring_invoice.frequency_id', $this->input['report_keys']) || in_array('frequency_id', $this->input['report_keys'])) {
+            $entity['frequency_id'] = $invoice->frequencyForKey($invoice->frequency_id);
         }
 
         return $entity;

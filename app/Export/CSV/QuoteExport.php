@@ -12,7 +12,6 @@
 namespace App\Export\CSV;
 
 use App\Libraries\MultiDB;
-use App\Models\Client;
 use App\Models\Company;
 use App\Models\Quote;
 use App\Transformers\QuoteTransformer;
@@ -22,15 +21,14 @@ use League\Csv\Writer;
 
 class QuoteExport extends BaseExport
 {
-    private Company $company;
-
-    protected array $input;
 
     private $quote_transformer;
 
-    protected string $date_key = 'date';
+    public string $date_key = 'date';
 
-    protected array $entity_keys = [
+    public Writer $csv;
+
+    public array $entity_keys = [
         'amount' => 'amount',
         'balance' => 'balance',
         'client' => 'client_id',
@@ -44,7 +42,7 @@ class QuoteExport extends BaseExport
         'custom_value4' => 'custom_value4',
         'date' => 'date',
         'discount' => 'discount',
-        'due_date' => 'due_date',
+        'valid_until' => 'due_date',
         'exchange_rate' => 'exchange_rate',
         'footer' => 'footer',
         'number' => 'number',
@@ -99,6 +97,7 @@ class QuoteExport extends BaseExport
         $this->csv->insertOne($this->buildHeader());
 
         $query = Quote::query()
+                        ->withTrashed()
                         ->with('client')
                         ->where('company_id', $this->company->id)
                         ->where('is_deleted', 0);
@@ -115,17 +114,28 @@ class QuoteExport extends BaseExport
 
     private function buildRow(Quote $quote) :array
     {
-        $transformed_quote = $this->quote_transformer->transform($quote);
+        $transformed_entity = $this->quote_transformer->transform($quote);
 
         $entity = [];
 
         foreach (array_values($this->input['report_keys']) as $key) {
             $keyval = array_search($key, $this->entity_keys);
 
-            if (array_key_exists($key, $transformed_quote)) {
-                $entity[$keyval] = $transformed_quote[$key];
-            } else {
-                $entity[$keyval] = '';
+            if(!$keyval) {
+                $keyval = array_search(str_replace("invoice.", "", $key), $this->entity_keys) ?? $key;
+            }
+
+            if(!$keyval) {
+                $keyval = $key;
+            }
+
+            if (array_key_exists($key, $transformed_entity)) {
+                $entity[$keyval] = $transformed_entity[$key];
+            } elseif (array_key_exists($keyval, $transformed_entity)) {
+                $entity[$keyval] = $transformed_entity[$keyval];
+            }
+            else {
+                $entity[$keyval] = $this->resolveKey($keyval, $quote, $this->quote_transformer);
             }
         }
 

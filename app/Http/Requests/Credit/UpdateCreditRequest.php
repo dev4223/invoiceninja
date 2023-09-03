@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -30,7 +30,10 @@ class UpdateCreditRequest extends Request
      */
     public function authorize() : bool
     {
-        return auth()->user()->can('edit', $this->credit);
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        return $user->can('edit', $this->credit);
     }
 
     /**
@@ -40,25 +43,37 @@ class UpdateCreditRequest extends Request
      */
     public function rules()
     {
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
         $rules = [];
+        
+        if ($this->file('documents') && is_array($this->file('documents'))) {
+            $rules['documents.*'] = $this->file_validation;
+        } elseif ($this->file('documents')) {
+            $rules['documents'] = $this->file_validation;
+        }
 
-        if ($this->input('documents') && is_array($this->input('documents'))) {
-            $documents = count($this->input('documents'));
-
-            foreach (range(0, $documents) as $index) {
-                $rules['documents.'.$index] = 'file|mimes:png,ai,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
-            }
-        } elseif ($this->input('documents')) {
-            $rules['documents'] = 'file|mimes:png,ai,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
+        if ($this->file('file') && is_array($this->file('file'))) {
+            $rules['file.*'] = $this->file_validation;
+        } elseif ($this->file('file')) {
+            $rules['file'] = $this->file_validation;
         }
 
         if ($this->number) {
-            $rules['number'] = Rule::unique('credits')->where('company_id', auth()->user()->company()->id)->ignore($this->credit->id);
+            $rules['number'] = Rule::unique('credits')->where('company_id', $user->company()->id)->ignore($this->credit->id);
         }
 
         $rules['line_items'] = 'array';
         $rules['discount'] = 'sometimes|numeric';
         $rules['is_amount_discount'] = ['boolean'];
+        $rules['tax_rate1'] = 'bail|sometimes|numeric';
+        $rules['tax_rate2'] = 'bail|sometimes|numeric';
+        $rules['tax_rate3'] = 'bail|sometimes|numeric';
+        $rules['tax_name1'] = 'bail|sometimes|string|nullable';
+        $rules['tax_name2'] = 'bail|sometimes|string|nullable';
+        $rules['tax_name3'] = 'bail|sometimes|string|nullable';
+        $rules['exchange_rate'] = 'bail|sometimes|numeric';
 
         return $rules;
     }
@@ -71,6 +86,10 @@ class UpdateCreditRequest extends Request
 
         if (isset($input['line_items'])) {
             $input['line_items'] = isset($input['line_items']) ? $this->cleanItems($input['line_items']) : [];
+        }
+
+        if (array_key_exists('exchange_rate', $input) && is_null($input['exchange_rate'])) {
+            $input['exchange_rate'] = 1;
         }
 
         $input['id'] = $this->credit->id;

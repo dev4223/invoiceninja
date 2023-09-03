@@ -5,13 +5,14 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\PaymentDrivers;
 
+use App\Exceptions\PaymentFailed;
 use App\Http\Requests\ClientPortal\Payments\PaymentResponseRequest;
 use App\Http\Requests\Gateways\Checkout3ds\Checkout3dsRequest;
 use App\Http\Requests\Payments\PaymentWebhookRequest;
@@ -26,6 +27,7 @@ use App\Models\PaymentType;
 use App\Models\SystemLog;
 use App\PaymentDrivers\CheckoutCom\CreditCard;
 use App\PaymentDrivers\CheckoutCom\Utilities;
+use App\PaymentDrivers\CheckoutCom\CheckoutWebhook;
 use App\Utils\Traits\SystemLogTrait;
 use Checkout\CheckoutApi;
 use Checkout\CheckoutApiException;
@@ -33,11 +35,10 @@ use Checkout\CheckoutArgumentException;
 use Checkout\CheckoutAuthorizationException;
 use Checkout\CheckoutDefaultSdk;
 use Checkout\CheckoutFourSdk;
-use Checkout\Common\CustomerRequest;
+use Checkout\Common\Phone;
+use Checkout\Customers\CustomerRequest;
 use Checkout\Customers\Four\CustomerRequest as FourCustomerRequest;
 use Checkout\Environment;
-use Checkout\Library\Exceptions\CheckoutHttpException;
-use Checkout\Models\Payments\IdSource;
 use Checkout\Models\Payments\Refund;
 use Checkout\Payments\Four\Request\PaymentRequest;
 use Checkout\Payments\Four\Request\Source\RequestIdSource as SourceRequestIdSource;
@@ -73,9 +74,6 @@ class CheckoutComPaymentDriver extends BaseDriver
      */
     public $gateway;
 
-    /**
-     * @var
-     */
     public $payment_method; //the gateway type id
 
     public static $methods = [
@@ -153,49 +151,6 @@ class CheckoutComPaymentDriver extends BaseDriver
         return 'gateways.checkout.credit_card.pay';
     }
 
-    public function getClientRequiredFields(): array
-    {
-        $fields = [];
-
-        if ($this->company_gateway->require_client_name) {
-            $fields[] = ['name' => 'client_name', 'label' => ctrans('texts.client_name'), 'type' => 'text', 'validation' => 'required'];
-        }
-
-        if ($this->company_gateway->require_contact_name) {
-            $fields[] = ['name' => 'contact_first_name', 'label' => ctrans('texts.first_name'), 'type' => 'text', 'validation' => 'required'];
-            $fields[] = ['name' => 'contact_last_name', 'label' => ctrans('texts.last_name'), 'type' => 'text', 'validation' => 'required'];
-        }
-
-        if ($this->company_gateway->require_contact_email) {
-            $fields[] = ['name' => 'contact_email', 'label' => ctrans('texts.email'), 'type' => 'text', 'validation' => 'required,email:rfc'];
-        }
-
-        if ($this->company_gateway->require_client_phone) {
-            $fields[] = ['name' => 'client_phone', 'label' => ctrans('texts.client_phone'), 'type' => 'tel', 'validation' => 'required'];
-        }
-
-        if ($this->company_gateway->require_billing_address) {
-            $fields[] = ['name' => 'client_address_line_1', 'label' => ctrans('texts.address1'), 'type' => 'text', 'validation' => 'required'];
-            $fields[] = ['name' => 'client_city', 'label' => ctrans('texts.city'), 'type' => 'text', 'validation' => 'required'];
-            $fields[] = ['name' => 'client_state', 'label' => ctrans('texts.state'), 'type' => 'text', 'validation' => 'required'];
-            $fields[] = ['name' => 'client_country_id', 'label' => ctrans('texts.country'), 'type' => 'text', 'validation' => 'required'];
-        }
-
-        if ($this->company_gateway->require_postal_code) {
-            $fields[] = ['name' => 'client_postal_code', 'label' => ctrans('texts.postal_code'), 'type' => 'text', 'validation' => 'required'];
-        }
-
-        if ($this->company_gateway->require_shipping_address) {
-            $fields[] = ['name' => 'client_shipping_address_line_1', 'label' => ctrans('texts.shipping_address1'), 'type' => 'text', 'validation' => 'required'];
-            $fields[] = ['name' => 'client_shipping_city', 'label' => ctrans('texts.shipping_city'), 'type' => 'text', 'validation' => 'required'];
-            $fields[] = ['name' => 'client_shipping_state', 'label' => ctrans('texts.shipping_state'), 'type' => 'text', 'validation' => 'required'];
-            $fields[] = ['name' => 'client_shipping_postal_code', 'label' => ctrans('texts.shipping_postal_code'), 'type' => 'text', 'validation' => 'required'];
-            $fields[] = ['name' => 'client_shipping_country_id', 'label' => ctrans('texts.shipping_country'), 'type' => 'text', 'validation' => 'required'];
-        }
-
-        return $fields;
-    }
-
     public function authorizeView($data)
     {
         return $this->payment_method->authorizeView($data);
@@ -210,7 +165,7 @@ class CheckoutComPaymentDriver extends BaseDriver
      * Payment View
      *
      * @param array $data Payment data array
-     * @return view         The payment view
+     * @return \Illuminate\View\View         
      */
     public function processPaymentView(array $data)
     {
@@ -220,8 +175,8 @@ class CheckoutComPaymentDriver extends BaseDriver
     /**
      * Process the payment response
      *
-     * @param Request $request The payment request
-     * @return view             The payment response view
+     * @param \Illuminate\Http\Request $request The payment request
+     * @return \Illuminate\View\View         
      */
     public function processPaymentResponse($request)
     {
@@ -254,11 +209,11 @@ class CheckoutComPaymentDriver extends BaseDriver
             ];
         } catch (CheckoutApiException $e) {
             // API error
-            $request_id = $e->request_id;
-            $http_status_code = $e->http_status_code;
-            $error_details = $e->error_details;
+            throw new PaymentFailed($e->getMessage(), $e->getCode());
         } catch (CheckoutArgumentException $e) {
             // Bad arguments
+
+            throw new PaymentFailed($e->getMessage(), $e->getCode());
 
             return [
                 'transaction_reference' => null,
@@ -269,6 +224,8 @@ class CheckoutComPaymentDriver extends BaseDriver
             ];
         } catch (CheckoutAuthorizationException $e) {
             // Bad Invalid authorization
+
+            throw new PaymentFailed($e->getMessage(), $e->getCode());
 
             return [
                 'transaction_reference' => null,
@@ -286,29 +243,62 @@ class CheckoutComPaymentDriver extends BaseDriver
             $response = $this->gateway->getCustomersClient()->get($this->client->present()->email());
 
             return $response;
-
         } catch (\Exception $e) {
-
             if ($this->is_four_api) {
                 $request = new FourCustomerRequest();
-            }
-            else{
+            } else {
                 $request = new CustomerRequest();
             }
             
+            $phone = new Phone();
+            // $phone->number = $this->client->present()->phone();
+            $phone->number = substr(str_pad($this->client->present()->phone(), 6, "0", STR_PAD_RIGHT), 0, 24);
+
             $request->email = $this->client->present()->email();
             $request->name = $this->client->present()->name();
-            $request->phone = $this->client->present()->phone();
+            $request->phone = $phone;
 
-                try {
-                    $response = $this->gateway->getCustomersClient()->create($request);
-                } catch (CheckoutApiException $e) {
-                    // API error
-                    $error_details = $e->error_details;
-                    $http_status_code = isset($e->http_metadata) ? $e->http_metadata->getStatusCode() : null;
-                } catch (CheckoutAuthorizationException $e) {
-                    // Bad Invalid authorization
+            try {
+                $response = $this->gateway->getCustomersClient()->create($request);
+            } catch (CheckoutApiException $e) {
+                // API error
+                $request_id = $e->request_id;
+                $http_status_code = $e->http_status_code;
+                $error_details = $e->error_details;
+
+                if (is_array($error_details)) {
+                    $error_details = end($e->error_details['error_codes']);
                 }
+
+                $human_exception = $error_details ? new \Exception($error_details, 400) : $e;
+
+
+                throw new PaymentFailed($human_exception);
+            } catch (CheckoutArgumentException $e) {
+                // Bad arguments
+
+                $error_details = $e->error_details;
+
+                if (is_array($error_details)) {
+                    $error_details = end($e->error_details['error_codes']);
+                }
+
+                $human_exception = $error_details ? new \Exception($error_details, 400) : $e;
+
+                throw new PaymentFailed($human_exception);
+            } catch (CheckoutAuthorizationException $e) {
+                // Bad Invalid authorization
+          
+                $error_details = $e->error_details;
+         
+                if (is_array($error_details)) {
+                    $error_details = end($e->error_details['error_codes']);
+                }
+
+                $human_exception = $error_details ? new \Exception($error_details, 400) : $e;
+
+                throw new PaymentFailed($human_exception);
+            }
 
             return $response;
         }
@@ -334,7 +324,7 @@ class CheckoutComPaymentDriver extends BaseDriver
     public function tokenBilling(ClientGatewayToken $cgt, PaymentHash $payment_hash)
     {
         $amount = array_sum(array_column($payment_hash->invoices(), 'amount')) + $payment_hash->fee_total;
-        $invoice = Invoice::whereIn('id', $this->transformKeys(array_column($payment_hash->invoices(), 'invoice_id')))->withTrashed()->first();
+        $invoice = Invoice::query()->whereIn('id', $this->transformKeys(array_column($payment_hash->invoices(), 'invoice_id')))->withTrashed()->first();
 
         $this->init();
 
@@ -342,7 +332,7 @@ class CheckoutComPaymentDriver extends BaseDriver
         $paymentRequest->amount = $this->convertToCheckoutAmount($amount, $this->client->getCurrencyCode());
         $paymentRequest->reference = '#'.$invoice->number.' - '.now();
         $paymentRequest->customer = $this->getCustomer();
-        $paymentRequest->metadata = ['udf1' => 'Invoice Ninja'];
+        $paymentRequest->metadata = ['udf1' => 'Invoice Ninja', 'udf2' => $payment_hash->hash];
         $paymentRequest->currency = $this->client->getCurrencyCode();
 
         $request = new PaymentResponseRequest();
@@ -400,8 +390,14 @@ class CheckoutComPaymentDriver extends BaseDriver
             $this->unWindGatewayFees($payment_hash);
             $message = $e->getMessage();
 
+            $error_details = '';
+
+            if (property_exists($e, 'error_details')) {
+                $error_details = $e->error_details;
+            }
+
             $data = [
-                'status' => '',
+                'status' => $e->error_details,
                 'error_type' => '',
                 'error_code' => $e->getCode(),
                 'param' => '',
@@ -423,16 +419,27 @@ class CheckoutComPaymentDriver extends BaseDriver
 
     public function processWebhookRequest(PaymentWebhookRequest $request)
     {
-        return true;
+
+        header('Content-Type: text/plain');
+        $webhook_payload = file_get_contents('php://input');
+
+        if($request->header('cko-signature') == hash_hmac('sha256', $webhook_payload, $this->company_gateway->company->company_key)) {
+            CheckoutWebhook::dispatch($request->all(), $request->company_key, $this->company_gateway->id)->delay(10);
+        }
+        else {
+            nlog("Hash Mismatch = {$request->header('cko-signature')} ".hash_hmac('sha256', $webhook_payload, $this->company_gateway->company->company_key));
+            nlog($request->all());
+        }
+
+        return response()->json(['success' => true]);
     }
 
     public function process3dsConfirmation(Checkout3dsRequest $request)
     {
-
         $this->init();
         $this->setPaymentHash($request->getPaymentHash());
 
-        //11-08-2022 check the user is autenticated
+        //11-08-2022 check the user is authenticated
         if (!Auth::guard('contact')->check()) {
             $client = $request->getClient();
             auth()->guard('contact')->loginUsingId($client->contacts()->first()->id, true);
@@ -443,12 +450,17 @@ class CheckoutComPaymentDriver extends BaseDriver
                 $request->query('cko-session-id')
             );
 
-            if ($payment['approved']) {
+            nlog("checkout3ds");
+            nlog($payment);
+
+            if (isset($payment['approved']) && $payment['approved']) {
                 return $this->processSuccessfulPayment($payment);
             } else {
                 return $this->processUnsuccessfulPayment($payment);
             }
         } catch (CheckoutApiException | Exception $e) {
+            nlog("checkout");
+            nlog($e->getMessage());
             return $this->processInternallyFailedPayment($this, $e);
         }
     }

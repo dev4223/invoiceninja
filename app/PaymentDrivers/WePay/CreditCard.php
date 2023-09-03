@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -17,9 +17,7 @@ use App\Http\Requests\ClientPortal\Payments\PaymentResponseRequest;
 use App\Jobs\Util\SystemLogger;
 use App\Models\GatewayType;
 use App\Models\Payment;
-use App\Models\PaymentType;
 use App\Models\SystemLog;
-use App\PaymentDrivers\WePay\WePayCommon;
 use App\PaymentDrivers\WePayPaymentDriver;
 use Illuminate\Support\Str;
 
@@ -37,6 +35,7 @@ class CreditCard
     public function authorizeView($data)
     {
         $data['gateway'] = $this->wepay_payment_driver;
+        $data['country_code'] = $this->wepay_payment_driver?->client?->country ? $this->wepay_payment_driver->client->country->iso_3166_2 : $this->wepay_payment_driver->company_gateway->company->country()->iso_3166_2;
 
         return render('gateways.wepay.authorize.authorize', $data);
     }
@@ -101,6 +100,7 @@ class CreditCard
     {
         $data['gateway'] = $this->wepay_payment_driver;
         $data['description'] = ctrans('texts.invoices').': '.collect($data['invoices'])->pluck('invoice_number');
+        $data['country_code'] = $this->wepay_payment_driver?->client?->country ? $this->wepay_payment_driver->client->country->iso_3166_2 : $this->wepay_payment_driver->company_gateway->company()->iso_3166_2;
 
         return render('gateways.wepay.credit_card.pay', $data);
     }

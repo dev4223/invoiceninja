@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -17,27 +17,20 @@ use App\Models\Company;
 use App\Transformers\ClientContactTransformer;
 use App\Transformers\ClientTransformer;
 use App\Utils\Ninja;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\App;
 use League\Csv\Writer;
 
 class ClientExport extends BaseExport
 {
-    private $company;
-
-    protected $input;
-
     private $client_transformer;
 
     private $contact_transformer;
 
-    private string $start_date;
+    public Writer $csv;
 
-    private string $end_date;
+    public string $date_key = 'created_at';
 
-    protected string $date_key = 'created_at';
-
-    protected array $entity_keys = [
+    public array $entity_keys = [
         'address1' => 'client.address1',
         'address2' => 'client.address2',
         'balance' => 'client.balance',
@@ -76,6 +69,7 @@ class ClientExport extends BaseExport
         'contact_custom_value3' => 'contact.custom_value3',
         'contact_custom_value4' => 'contact.custom_value4',
         'email' => 'contact.email',
+        'status' => 'status'
     ];
 
     private array $decorate_keys = [
@@ -83,6 +77,9 @@ class ClientExport extends BaseExport
         'client.shipping_country_id',
         'client.currency',
         'client.industry',
+    ];
+
+    public array $forced_keys = [
     ];
 
     public function __construct(Company $company, array $input)
@@ -107,7 +104,7 @@ class ClientExport extends BaseExport
         if (count($this->input['report_keys']) == 0) {
             $this->input['report_keys'] = array_values($this->entity_keys);
         }
-
+        
         //insert the header
         $this->csv->insertOne($this->buildHeader());
 
@@ -132,6 +129,8 @@ class ClientExport extends BaseExport
 
         $transformed_client = $this->client_transformer->transform($client);
 
+        $transformed_contact = [];
+
         if ($contact = $client->contacts()->first()) {
             $transformed_contact = $this->contact_transformer->transform($contact);
         }
@@ -140,15 +139,13 @@ class ClientExport extends BaseExport
 
         foreach (array_values($this->input['report_keys']) as $key) {
             $parts = explode('.', $key);
-
-            $keyval = array_search($key, $this->entity_keys);
-
-            if ($parts[0] == 'client' && array_key_exists($parts[1], $transformed_client)) {
-                $entity[$keyval] = $transformed_client[$parts[1]];
-            } elseif ($parts[0] == 'contact' && array_key_exists($parts[1], $transformed_contact)) {
-                $entity[$keyval] = $transformed_contact[$parts[1]];
+            
+            if (is_array($parts) && $parts[0] == 'client' && array_key_exists($parts[1], $transformed_client)) {
+                $entity[$key] = $transformed_client[$parts[1]];
+            } elseif (is_array($parts) && $parts[0] == 'contact' && array_key_exists($parts[1], $transformed_contact)) {
+                $entity[$key] = $transformed_contact[$parts[1]];
             } else {
-                $entity[$keyval] = '';
+                $entity[$key] = '';
             }
         }
 
@@ -157,16 +154,24 @@ class ClientExport extends BaseExport
 
     private function decorateAdvancedFields(Client $client, array $entity) :array
     {
+        if (in_array('client.user', $this->input['report_keys'])) {
+            $entity['client.user'] = $client->user->present()->name();
+        }
+
+        if (in_array('client.assigned_user', $this->input['report_keys'])) {
+            $entity['client.assigned_user'] = $client->assigned_user ? $client->user->present()->name() : '';
+        }
+
         if (in_array('client.country_id', $this->input['report_keys'])) {
-            $entity['country'] = $client->country ? ctrans("texts.country_{$client->country->name}") : '';
+            $entity['client.country_id'] = $client->country ? ctrans("texts.country_{$client->country->name}") : '';
         }
 
         if (in_array('client.shipping_country_id', $this->input['report_keys'])) {
-            $entity['shipping_country'] = $client->shipping_country ? ctrans("texts.country_{$client->shipping_country->name}") : '';
+            $entity['client.shipping_country_id'] = $client->shipping_country ? ctrans("texts.country_{$client->shipping_country->name}") : '';
         }
 
-        if (in_array('client.currency', $this->input['report_keys'])) {
-            $entity['currency'] = $client->currency() ? $client->currency()->code : $client->company->currency()->code;
+        if (in_array('client.currency_id', $this->input['report_keys'])) {
+            $entity['client.currency_id'] = $client->currency() ? $client->currency()->code : $client->company->currency()->code;
         }
 
         if (in_array('client.industry_id', $this->input['report_keys'])) {
@@ -174,5 +179,18 @@ class ClientExport extends BaseExport
         }
 
         return $entity;
+    }
+
+    private function calculateStatus($client)
+    {
+        if ($client->is_deleted) {
+            return ctrans('texts.deleted');
+        }
+
+        if ($client->deleted_at) {
+            return ctrans('texts.archived');
+        }
+
+        return ctrans('texts.active');
     }
 }

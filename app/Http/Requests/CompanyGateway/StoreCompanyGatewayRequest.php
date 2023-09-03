@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -15,6 +15,7 @@ use App\Http\Requests\Request;
 use App\Http\ValidationRules\ValidCompanyGatewayFeesAndLimitsRule;
 use App\Models\Gateway;
 use App\Utils\Traits\CompanyGatewayFeesAndLimitsSaver;
+use Illuminate\Validation\Rule;
 
 class StoreCompanyGatewayRequest extends Request
 {
@@ -33,7 +34,7 @@ class StoreCompanyGatewayRequest extends Request
     public function rules()
     {
         $rules = [
-            'gateway_key' => 'required|alpha_num',
+            'gateway_key' => ['bail', 'required','alpha_num',Rule::exists('gateways', 'key')],
             'fees_and_limits' => new ValidCompanyGatewayFeesAndLimitsRule(),
         ];
 

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -28,24 +28,39 @@ class UpdateVendorRequest extends Request
      */
     public function authorize() : bool
     {
-        return auth()->user()->can('edit', $this->vendor);
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+        
+        return $user->can('edit', $this->vendor);
     }
 
     public function rules()
     {
-        /* Ensure we have a client name, and that all emails are unique*/
-
-        $rules['country_id'] = 'integer|nullable';
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+        
+        $rules['country_id'] = 'integer';
 
         if ($this->number) {
-            $rules['number'] = Rule::unique('vendors')->where('company_id', auth()->user()->company()->id)->ignore($this->vendor->id);
+            $rules['number'] = Rule::unique('vendors')->where('company_id', $user->company()->id)->ignore($this->vendor->id);
+        }
+        
+        $rules['contacts.*.email'] = 'nullable|distinct';
+        $rules['currency_id'] = 'bail|sometimes|exists:currencies,id';
+
+        if ($this->file('documents') && is_array($this->file('documents'))) {
+            $rules['documents.*'] = $this->file_validation;
+        } elseif ($this->file('documents')) {
+            $rules['documents'] = $this->file_validation;
         }
 
-        // if($this->id_number)
-        //     $rules['id_number'] = Rule::unique('vendors')->where('company_id', auth()->user()->company()->id)->ignore($this->vendor->id);
+        if ($this->file('file') && is_array($this->file('file'))) {
+            $rules['file.*'] = $this->file_validation;
+        } elseif ($this->file('file')) {
+            $rules['file'] = $this->file_validation;
+        }
 
-        $rules['contacts.*.email'] = 'nullable|distinct';
-        // $rules['id_number'] = 'unique:vendors,id_number,'.$this->id.',id,company_id,'.auth()->user()->company()->id;
+        $rules['language_id'] = 'bail|nullable|sometimes|exists:languages,id';
 
         return $rules;
     }
@@ -65,6 +80,10 @@ class UpdateVendorRequest extends Request
 
         if (array_key_exists('assigned_user_id', $input) && is_string($input['assigned_user_id'])) {
             $input['assigned_user_id'] = $this->decodePrimaryKey($input['assigned_user_id']);
+        }
+
+        if (array_key_exists('country_id', $input) && is_null($input['country_id'])) {
+            unset($input['country_id']);
         }
 
         $input = $this->decodePrimaryKeys($input);

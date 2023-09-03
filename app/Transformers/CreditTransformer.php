@@ -4,20 +4,20 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Transformers;
 
-use App\Models\Activity;
 use App\Models\Backup;
+use App\Models\Client;
 use App\Models\Credit;
-use App\Models\CreditInvitation;
+use App\Models\Activity;
 use App\Models\Document;
-use App\Transformers\ActivityTransformer;
 use App\Utils\Traits\MakesHash;
+use App\Models\CreditInvitation;
 use League\Fractal\Resource\Item;
 
 class CreditTransformer extends EntityTransformer

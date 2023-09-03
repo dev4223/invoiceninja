@@ -4,16 +4,14 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
 
-use App\Events\Quote\QuoteWasUpdated;
 use App\Jobs\Entity\CreateEntityPdf;
-use App\Utils\Ninja;
 use App\Utils\Traits\Inviteable;
 use App\Utils\Traits\MakesDates;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,6 +19,45 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
+/**
+ * App\Models\QuoteInvitation
+ *
+ * @property int $id
+ * @property int $company_id
+ * @property int $user_id
+ * @property int $client_contact_id
+ * @property int $quote_id
+ * @property string $key
+ * @property string|null $transaction_reference
+ * @property string|null $message_id
+ * @property string|null $email_error
+ * @property string|null $signature_base64
+ * @property string|null $signature_date
+ * @property string|null $sent_date
+ * @property string|null $viewed_date
+ * @property string|null $opened_date
+ * @property int|null $created_at
+ * @property int|null $updated_at
+ * @property int|null $deleted_at
+ * @property string|null $signature_ip
+ * @property string|null $email_status
+ * @property \App\Models\Company $company
+ * @property \App\Models\ClientContact $contact
+ * @property mixed $hashed_id
+ * @property \App\Models\Quote $quote
+ * @property \App\Models\User $user
+ * @method static \Illuminate\Database\Eloquent\Builder|BaseModel company()
+ * @method static \Illuminate\Database\Eloquent\Builder|BaseModel exclude($columns)
+ * @method static \Database\Factories\QuoteInvitationFactory factory($count = null, $state = [])
+ * @method static \Illuminate\Database\Eloquent\Builder|QuoteInvitation newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|QuoteInvitation newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|QuoteInvitation onlyTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|QuoteInvitation query()
+ * @method static \Illuminate\Database\Eloquent\Builder|BaseModel scope()
+ * @method static \Illuminate\Database\Eloquent\Builder|QuoteInvitation withTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|QuoteInvitation withoutTrashed()
+ * @mixin \Eloquent
+ */
 class QuoteInvitation extends BaseModel
 {
     use MakesDates;
@@ -44,38 +81,6 @@ class QuoteInvitation extends BaseModel
         return self::class;
     }
 
-    // public function getSignatureDateAttribute($value)
-    // {
-    //     if (!$value) {
-    //         return (new Carbon($value))->format('Y-m-d');
-    //     }
-    //     return $value;
-    // }
-
-    // public function getSentDateAttribute($value)
-    // {
-    //     if (!$value) {
-    //         return (new Carbon($value))->format('Y-m-d');
-    //     }
-    //     return $value;
-    // }
-
-    // public function getViewedDateAttribute($value)
-    // {
-    //     if (!$value) {
-    //         return (new Carbon($value))->format('Y-m-d');
-    //     }
-    //     return $value;
-    // }
-
-    // public function getOpenedDateAttribute($value)
-    // {
-    //     if (!$value) {
-    //         return (new Carbon($value))->format('Y-m-d');
-    //     }
-    //     return $value;
-    // }
-
     public function entityType()
     {
         return Quote::class;
@@ -85,6 +90,14 @@ class QuoteInvitation extends BaseModel
      * @return mixed
      */
     public function quote()
+    {
+        return $this->belongsTo(Quote::class)->withTrashed();
+    }
+
+    /**
+     * @return mixed
+     */
+    public function entity()
     {
         return $this->belongsTo(Quote::class)->withTrashed();
     }
@@ -133,7 +146,6 @@ class QuoteInvitation extends BaseModel
         $storage_path = Storage::url($this->quote->client->quote_filepath($this).$this->quote->numberFormatter().'.pdf');
 
         if (! Storage::exists($this->quote->client->quote_filepath($this).$this->quote->numberFormatter().'.pdf')) {
-            event(new QuoteWasUpdated($this->quote, $this->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
             (new CreateEntityPdf($this))->handle();
         }
 

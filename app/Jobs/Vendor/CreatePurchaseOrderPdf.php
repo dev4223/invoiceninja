@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -13,27 +13,16 @@ namespace App\Jobs\Vendor;
 
 use App\Exceptions\FilePermissionsFailure;
 use App\Libraries\MultiDB;
-use App\Models\Account;
-use App\Models\Credit;
-use App\Models\CreditInvitation;
 use App\Models\Design;
-use App\Models\Invoice;
-use App\Models\InvoiceInvitation;
-use App\Models\Quote;
-use App\Models\QuoteInvitation;
-use App\Models\RecurringInvoice;
-use App\Models\RecurringInvoiceInvitation;
 use App\Services\PdfMaker\Design as PdfDesignModel;
 use App\Services\PdfMaker\Design as PdfMakerDesign;
 use App\Services\PdfMaker\PdfMaker as PdfMakerService;
 use App\Utils\HostedPDF\NinjaPdf;
-use App\Utils\HtmlEngine;
 use App\Utils\Ninja;
 use App\Utils\PhantomJS\Phantom;
 use App\Utils\Traits\MakesHash;
 use App\Utils\Traits\MakesInvoiceHtml;
 use App\Utils\Traits\NumberFormatter;
-use App\Utils\Traits\Pdf\PDF;
 use App\Utils\Traits\Pdf\PageNumbering;
 use App\Utils\Traits\Pdf\PdfMaker;
 use App\Utils\VendorHtmlEngine;
@@ -43,9 +32,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Storage;
-use setasign\Fpdi\PdfParser\StreamReader;
 
 class CreatePurchaseOrderPdf implements ShouldQueue
 {
@@ -88,29 +75,17 @@ class CreatePurchaseOrderPdf implements ShouldQueue
         $this->vendor->load('company');
         
         $this->disk = $disk ?? config('filesystems.default');
-
     }
 
     public function handle()
     {
-
         $pdf = $this->rawPdf();
 
         if ($pdf) {
-
-            try{
-                
-                if(!Storage::disk($this->disk)->exists($this->path)) 
-                    Storage::disk($this->disk)->makeDirectory($this->path, 0775);
-
-                Storage::disk($this->disk)->put($this->file_path, $pdf, 'public');
-
-            }
-            catch(\Exception $e)
-            {
-
+            try {
+                Storage::disk($this->disk)->put($this->file_path, $pdf);
+            } catch(\Exception $e) {
                 throw new FilePermissionsFailure($e->getMessage());
-
             }
         }
         
@@ -119,7 +94,6 @@ class CreatePurchaseOrderPdf implements ShouldQueue
 
     public function rawPdf()
     {
-
         MultiDB::setDb($this->company->db);
 
         /* Forget the singleton*/
@@ -128,13 +102,13 @@ class CreatePurchaseOrderPdf implements ShouldQueue
         /* Init a new copy of the translator*/
         $t = app('translator');
         /* Set the locale*/
-        App::setLocale($this->company->locale());
+        App::setLocale($this->vendor->locale());
 
         /* Set customized translations _NOW_ */
         $t->replace(Ninja::transformTranslations($this->company->settings));
 
         if (config('ninja.phantomjs_pdf_generation') || config('ninja.pdf_generator') == 'phantom') {
-            return (new Phantom)->generate($this->invitation);
+            return (new Phantom)->generate($this->invitation, true);
         }
 
         $entity_design_id = '';
@@ -146,11 +120,13 @@ class CreatePurchaseOrderPdf implements ShouldQueue
 
         $entity_design_id = $this->entity->design_id ? $this->entity->design_id : $this->decodePrimaryKey('Wpmbk5ezJn');
 
-        $design = Design::find($entity_design_id);
+        $design = Design::withTrashed()->find($entity_design_id);
 
         /* Catch all in case migration doesn't pass back a valid design */
-        if(!$design)
+        if (!$design) {
+            /** @var \App\Models\Design $design */
             $design = Design::find(2);
+        }
 
         $html = new VendorHtmlEngine($this->invitation);
 
@@ -191,44 +167,38 @@ class CreatePurchaseOrderPdf implements ShouldQueue
         $pdf = null;
 
         try {
-
-            if(config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja'){
+            if (config('ninja.invoiceninja_hosted_pdf_generation') || config('ninja.pdf_generator') == 'hosted_ninja') {
                 $pdf = (new NinjaPdf())->build($maker->getCompiledHTML(true));
 
                 $numbered_pdf = $this->pageNumbering($pdf, $this->company);
 
-                if($numbered_pdf)
+                if ($numbered_pdf) {
                     $pdf = $numbered_pdf;
-
-            }
-            else {
-
+                }
+            } else {
                 $pdf = $this->makePdf(null, null, $maker->getCompiledHTML(true));
                 
                 $numbered_pdf = $this->pageNumbering($pdf, $this->company);
 
-                if($numbered_pdf)
+                if ($numbered_pdf) {
                     $pdf = $numbered_pdf;
-                
-
+                }
             }
-
         } catch (\Exception $e) {
             nlog(print_r($e->getMessage(), 1));
         }
 
         if (config('ninja.log_pdf_html')) {
-            info($maker->getCompiledHTML());
+            nlog($maker->getCompiledHTML());
         }
 
+        $maker = null;
+        $state = null;
+        
         return $pdf;
-
     }
 
     public function failed($e)
     {
-
     }
-    
-
 }

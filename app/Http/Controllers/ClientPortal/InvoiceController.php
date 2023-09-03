@@ -4,31 +4,36 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers\ClientPortal;
 
-use App\Events\Invoice\InvoiceWasViewed;
-use App\Events\Misc\InvitationWasViewed;
-use App\Http\Controllers\Controller;
-use App\Http\Requests\ClientPortal\Invoices\ProcessInvoicesInBulkRequest;
-use App\Http\Requests\ClientPortal\Invoices\ShowInvoiceRequest;
-use App\Http\Requests\ClientPortal\Invoices\ShowInvoicesRequest;
-use App\Models\Invoice;
 use App\Utils\Ninja;
 use App\Utils\Number;
-use App\Utils\TempFile;
-use App\Utils\Traits\MakesDates;
-use App\Utils\Traits\MakesHash;
-use Illuminate\Contracts\Container\BindingResolutionException;
-use Illuminate\Contracts\View\Factory;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use App\Models\Invoice;
 use Illuminate\View\View;
+use Illuminate\Http\Request;
+use App\Models\QuoteInvitation;
+use App\Utils\Traits\MakesHash;
+use App\Models\CreditInvitation;
+use App\Utils\Traits\MakesDates;
+use App\Models\InvoiceInvitation;
+use App\Http\Controllers\Controller;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Contracts\View\Factory;
+use App\Models\PurchaseOrderInvitation;
+use Illuminate\Support\Facades\Storage;
+use App\Events\Invoice\InvoiceWasViewed;
+use App\Events\Misc\InvitationWasViewed;
+use App\Models\RecurringInvoiceInvitation;
+use App\Jobs\Vendor\CreatePurchaseOrderPdf;
+use App\Http\Requests\ClientPortal\Invoices\ShowInvoiceRequest;
+use App\Http\Requests\ClientPortal\Invoices\ShowInvoicesRequest;
+use App\Http\Requests\ClientPortal\Invoices\ProcessInvoicesInBulkRequest;
 
 class InvoiceController extends Controller
 {
@@ -52,11 +57,9 @@ class InvoiceController extends Controller
      *
      * @return Factory|View
      */
-    public function show(ShowInvoiceRequest $request, Invoice $invoice)
+    public function show(ShowInvoiceRequest $request, Invoice $invoice, ?string $hash = null)
     {
         set_time_limit(0);
-
-        $invoice->service()->removeUnpaidGatewayFees()->save();
 
         $invitation = $invoice->invitations()->where('client_contact_id', auth()->guard('contact')->user()->id)->first();
 
@@ -64,13 +67,14 @@ class InvoiceController extends Controller
             $invitation->markViewed();
 
             event(new InvitationWasViewed($invoice, $invitation, $invoice->company, Ninja::eventVars()));
-            event(new InvoiceWasViewed($invitation, $invitation->company, Ninja::eventVars()));
+            event(new InvoiceWasViewed($invitation, $invoice->company, Ninja::eventVars()));
         }
 
         $data = [
             'invoice' => $invoice,
             'invitation' => $invitation ?: $invoice->invitations->first(),
             'key' => $invitation ? $invitation->key : false,
+            'hash' => $hash,
         ];
 
         if ($request->query('mode') === 'fullscreen') {
@@ -80,11 +84,32 @@ class InvoiceController extends Controller
         return $this->render('invoices.show', $data);
     }
 
+    public function showBlob($hash)
+    {
+        $data = Cache::get($hash);
+        $invitation = false;
+        
+        match($data['entity_type']){
+            'invoice' => $invitation = InvoiceInvitation::withTrashed()->find($data['invitation_id']),
+            'quote' => $invitation = QuoteInvitation::withTrashed()->find($data['invitation_id']),
+            'credit' => $invitation = CreditInvitation::withTrashed()->find($data['invitation_id']),
+            'recurring_invoice' => $invitation = RecurringInvoiceInvitation::withTrashed()->find($data['invitation_id']),
+        };
+
+        if (! $invitation) {
+            return redirect('/');
+        }
+
+        $file = (new \App\Jobs\Entity\CreateRawPdf($invitation, $invitation->company->db))->handle();
+        
+        $headers = ['Content-Type' => 'application/pdf'];
+        return response()->make($file, 200, $headers);
+
+    }
+
     /**
      * Pay one or more invoices.
      *
-     * @param ProcessInvoicesInBulkRequest $request
-     * @return mixed
      */
     public function catch_bulk()
     {
@@ -108,7 +133,8 @@ class InvoiceController extends Controller
 
     public function downloadInvoices($ids)
     {
-        $data['invoices'] = Invoice::whereIn('id', $ids)
+        $data['invoices'] = Invoice::query()
+                            ->whereIn('id', $ids)
                             ->whereClientId(auth()->guard('contact')->user()->client->id)
                             ->withTrashed()
                             ->get();
@@ -133,7 +159,8 @@ class InvoiceController extends Controller
      */
     private function makePayment(array $ids)
     {
-        $invoices = Invoice::whereIn('id', $ids)
+        $invoices = Invoice::query()
+                            ->whereIn('id', $ids)
                             ->whereClientId(auth()->guard('contact')->user()->client->id)
                             ->withTrashed()
                             ->get();
@@ -192,11 +219,11 @@ class InvoiceController extends Controller
      *
      * @param array $ids
      *
-     * @return void
      */
     private function downloadInvoicePDF(array $ids)
     {
-        $invoices = Invoice::whereIn('id', $ids)
+        $invoices = Invoice::query()
+                            ->whereIn('id', $ids)
                             ->withTrashed()
                             ->whereClientId(auth()->guard('contact')->user()->client->id)
                             ->get();
@@ -212,8 +239,6 @@ class InvoiceController extends Controller
 
             $file = $invoice->service()->getInvoicePdf(auth()->guard('contact')->user());
 
-            // return response()->download(file_get_contents(public_path($file)));
-
             return response()->streamDownload(function () use ($file) {
                 echo Storage::get($file);
             }, basename($file), ['Content-Type' => 'application/pdf']);
@@ -227,11 +252,19 @@ class InvoiceController extends Controller
         // create new archive
         $zipFile = new \PhpZip\ZipFile();
         try {
-            foreach ($invoices as $invoice) {
 
-                //add it to the zip
-                $zipFile->addFromString(basename($invoice->pdf_file_path()), file_get_contents($invoice->pdf_file_path(null, 'url', true)));
+            foreach ($invoices as $invoice) {
+                            
+                if ($invoice->client->getSetting('enable_e_invoice')) {
+                    $xml = $invoice->service()->getEInvoice();
+                    $zipFile->addFromString($invoice->getFileName("xml"), $xml);
+                }
+
+                $file = $invoice->service()->getRawInvoicePdf();
+                $zip_file_name = $invoice->getFileName();
+                $zipFile->addFromString($zip_file_name, $file);
             }
+
 
             $filename = date('Y-m-d').'_'.str_replace(' ', '_', trans('texts.invoices')).'.zip';
             $filepath = sys_get_temp_dir().'/'.$filename;
@@ -239,7 +272,7 @@ class InvoiceController extends Controller
             $zipFile->saveAsFile($filepath) // save the archive to a file
                    ->close(); // close archive
 
-           return response()->download($filepath, $filename)->deleteFileAfterSend(true);
+            return response()->download($filepath, $filename)->deleteFileAfterSend(true);
         } catch (\PhpZip\Exception\ZipException $e) {
             // handle exception
         } finally {

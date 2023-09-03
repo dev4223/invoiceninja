@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -47,7 +47,7 @@ class ClientTransformer extends EntityTransformer
     /**
      * @param Client $client
      *
-     * @return Collection
+     * @return \Illuminate\Support\Collection
      */
     public function includeActivities(Client $client)
     {
@@ -66,7 +66,7 @@ class ClientTransformer extends EntityTransformer
     /**
      * @param Client $client
      *
-     * @return Collection
+     * @return \Illuminate\Support\Collection
      */
     public function includeContacts(Client $client)
     {
@@ -114,6 +114,7 @@ class ClientTransformer extends EntityTransformer
             'balance' => (float) $client->balance,
             'group_settings_id' => isset($client->group_settings_id) ? (string) $this->encodePrimaryKey($client->group_settings_id) : '',
             'paid_to_date' => (float) $client->paid_to_date,
+            'payment_balance' => (float) $client->payment_balance,
             'credit_balance' => (float) $client->credit_balance,
             'last_login' => (int) $client->last_login,
             'size_id' => (string) $client->size_id,
@@ -146,6 +147,10 @@ class ClientTransformer extends EntityTransformer
             'created_at' => (int) $client->created_at,
             'display_name' => $client->present()->name(),
             'number' => (string) $client->number ?: '',
+            'has_valid_vat_number' => (bool) $client->has_valid_vat_number,
+            'is_tax_exempt' => (bool) $client->is_tax_exempt,
+            'routing_id' => (string) $client->routing_id,
+            'tax_info' => $client->tax_data ?: new \stdClass,
         ];
     }
 }

@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -13,7 +13,6 @@
 namespace App\Http\Controllers\ClientPortal;
 
 use App\Events\Misc\InvitationWasViewed;
-use App\Events\Quote\QuoteWasApproved;
 use App\Events\Quote\QuoteWasViewed;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ClientPortal\Quotes\ProcessQuotesInBulkRequest;
@@ -22,11 +21,9 @@ use App\Http\Requests\ClientPortal\Quotes\ShowQuotesRequest;
 use App\Jobs\Invoice\InjectSignature;
 use App\Models\Quote;
 use App\Utils\Ninja;
-use App\Utils\TempFile;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -56,7 +53,7 @@ class QuoteController extends Controller
     {
         /* If the quote is expired, convert the status here */
 
-        $invitation = $quote->invitations()->where('client_contact_id', auth()->user()->id)->first();
+        $invitation = $quote->invitations()->where('client_contact_id', auth()->guard('contact')->user()->id)->first();
 
         $data = [
             'quote' => $quote,
@@ -86,7 +83,7 @@ class QuoteController extends Controller
             return $this->downloadQuotes((array) $transformed_ids);
         }
 
-        if ($request->action = 'approve') {
+        if ($request->action == 'approve') {
             return $this->approve((array) $transformed_ids, $request->has('process'));
         }
 
@@ -95,8 +92,12 @@ class QuoteController extends Controller
 
     public function downloadQuotes($ids)
     {
-        $data['quotes'] = Quote::whereIn('id', $ids)
-                            ->whereClientId(auth()->user()->client->id)
+        /** @var \App\Models\ClientContact $client_contact **/
+        $client_contact = auth()->user();
+
+        $data['quotes'] = Quote::query()
+                            ->whereIn('id', $ids)
+                            ->where('client_id', $client_contact->client_id)
                             ->withTrashed()
                             ->get();
 
@@ -116,8 +117,13 @@ class QuoteController extends Controller
 
     protected function downloadQuotePdf(array $ids)
     {
-        $quotes = Quote::whereIn('id', $ids)
-            ->whereClientId(auth()->user()->client->id)
+
+        /** @var \App\Models\ClientContact $client_contact **/
+        $client_contact = auth()->user();
+
+        $quotes = Quote::query()
+            ->whereIn('id', $ids)
+            ->whereClientId($client_contact->client_id)
             ->withTrashed()
             ->get();
 
@@ -144,7 +150,6 @@ class QuoteController extends Controller
         $zipFile = new \PhpZip\ZipFile();
         try {
             foreach ($quotes as $quote) {
-
                 //add it to the zip
                 $zipFile->addFromString(basename($quote->pdf_file_path()), file_get_contents($quote->pdf_file_path(null, 'url', true)));
             }
@@ -155,7 +160,7 @@ class QuoteController extends Controller
             $zipFile->saveAsFile($filepath) // save the archive to a file
                    ->close(); // close archive
 
-           return response()->download($filepath, $filename)->deleteFileAfterSend(true);
+            return response()->download($filepath, $filename)->deleteFileAfterSend(true);
         } catch (\PhpZip\Exception\ZipException $e) {
             // handle exception
         } finally {
@@ -165,7 +170,8 @@ class QuoteController extends Controller
 
     protected function approve(array $ids, $process = false)
     {
-        $quotes = Quote::whereIn('id', $ids)
+        $quotes = Quote::query()
+            ->whereIn('id', $ids)
             ->where('client_id', auth()->guard('contact')->user()->client->id)
             ->where('company_id', auth()->guard('contact')->user()->client->company_id)
             ->whereIn('status_id', [Quote::STATUS_DRAFT, Quote::STATUS_SENT])
@@ -180,18 +186,22 @@ class QuoteController extends Controller
 
         if ($process) {
             foreach ($quotes as $quote) {
+                if (request()->has('user_input') && strlen(request()->input('user_input')) > 2) {
+                    $quote->po_number = substr(request()->input('user_input'), 0, 180);
+                    $quote->saveQuietly();
+                }
+
                 $quote->service()->approve(auth()->user())->save();
                 
                 if (request()->has('signature') && ! is_null(request()->signature) && ! empty(request()->signature)) {
-                    InjectSignature::dispatch($quote, request()->signature);
+                    InjectSignature::dispatch($quote, auth()->guard('contact')->user()->id, request()->signature, request()->getClientIp());
                 }
             }
 
-            if (count($ids) == 1) {
-
-            //forward client to the invoice if it exists
-                if ($quote->invoice()->exists()) {
-                    return redirect()->route('client.invoice.show', $quote->invoice->hashed_id);
+            if ($quotes->count() == 1) {
+                //forward client to the invoice if it exists
+                if ($quotes->first()->invoice()->exists()) {
+                    return redirect()->route('client.invoice.show', $quotes->first()->invoice->hashed_id);
                 }
 
                 return redirect()->route('client.quote.show', $quotes->first()->hashed_id);

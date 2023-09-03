@@ -3,8 +3,25 @@
 
     <head>
         <!-- Error: {{ session('error') }} -->
-
-        @if (config('services.analytics.tracking_id'))
+        @if (isset($company) && $company->matomo_url && $company->matomo_id)
+            <script>
+                var _paq = window._paq = window._paq || [];
+                /* tracker methods like "setCustomDimension" should be called before "trackPageView" */
+                _paq.push(['trackPageView']);
+                _paq.push(['enableLinkTracking']);
+                @if (auth()->guard('vendor')->check())
+                _paq.push(['setUserId', '{{ auth()->guard('vendor')->user()->present()->name() }}']);
+                @endif
+                (function() {
+                    var u="{{ $company->matomo_url }}";
+                    _paq.push(['setTrackerUrl', u+'matomo.php']);
+                    _paq.push(['setSiteId', '{{ $company->matomo_id }}']);
+                    var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];
+                    g.async=true; g.src=u+'matomo.js'; s.parentNode.insertBefore(g,s);
+                })();
+            </script>
+            <noscript><p><img src="{{ $company->matomo_url }}/matomo.php?idsite={{ $company->matomo_id }}&amp;rec=1" style="border:0;" alt="" /></p></noscript>
+        @elseif (config('services.analytics.tracking_id'))
             <script async src="https://www.googletagmanager.com/gtag/js?id=UA-122229484-1"></script>
             <script>
                 window.dataLayer = window.dataLayer || [];
@@ -42,7 +59,7 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="description" content="@yield('meta_description')"/>
-        
+
         <!-- CSRF Token -->
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
@@ -51,8 +68,19 @@
         <script src="{{ asset('vendor/alpinejs@2.8.2/alpine.js') }}" defer></script>
 
         <!-- Fonts -->
-        <link rel="dns-prefetch" href="https://fonts.gstatic.com">
-        <link href="https://fonts.googleapis.com/css?family=Open+Sans&display=swap" rel="stylesheet" type="text/css" defer>
+        {{-- <link rel="dns-prefetch" href="https://fonts.gstatic.com"> --}}
+        {{-- <link href="https://fonts.googleapis.com/css?family=Open+Sans&display=swap" rel="stylesheet" type="text/css" defer> --}}
+        <style>
+            @font-face {
+              font-family: 'Open Sans';
+              font-style: normal;
+              font-weight: 400;
+              font-stretch: 100%;
+              font-display: swap;
+              src: url( {{asset('css/memSYaGs126MiZpBA-UvWbX2vVnXBbObj2OVZyOOSr4dVJWUgsjZ0B4gaVI.woff2')}}) format('woff2');
+              unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+            }
+        </style>
 
         <!-- Styles -->
         <link href="{{ mix('css/app.css') }}" rel="stylesheet">
@@ -115,9 +143,9 @@
                     },
                     "content": {
                         "href": "{{ config('ninja.privacy_policy_url.hosted') }}",
-                        "message": "This website uses cookies to ensure you get the best experience on our website.",
-                        "dismiss": "Got it!",
-                        "link": "Learn more",
+                        "message": "{{ ctrans('texts.cookie_message')}}",
+                        "dismiss": "{{ ctrans('texts.got_it')}}",
+                        "link": "{{ ctrans('texts.learn_more')}}",
                     }
                 })}
             );
@@ -146,14 +174,14 @@
                 }
             </script>
         @endif
-        
+
     </body>
 
     <footer>
         @yield('footer')
         @stack('footer')
 
-        @if((bool) \App\Utils\Ninja::isSelfHost() && !empty($settings->portal_custom_footer))
+        @if($company && $company->account->isPaid() && !empty($settings->portal_custom_footer))
             <div class="py-1 text-sm text-center text-white bg-primary">
                 {!! $settings->portal_custom_footer !!}
             </div>

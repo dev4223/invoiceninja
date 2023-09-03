@@ -11,17 +11,17 @@
 
 namespace Tests\Feature;
 
-use App\Models\Client;
-use App\Models\ClientContact;
-use App\Models\Project;
-use App\Models\Quote;
-use App\Utils\Traits\MakesHash;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Routing\Middleware\ThrottleRequests;
-use Illuminate\Support\Facades\Session;
-use Tests\MockAccountData;
 use Tests\TestCase;
+use App\Models\Quote;
+use App\Models\Project;
+use Tests\MockAccountData;
+use App\Models\ClientContact;
+use App\Utils\Traits\MakesHash;
+use App\Exceptions\QuoteConversion;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 
 /**
  * @test
@@ -32,6 +32,8 @@ class QuoteTest extends TestCase
     use MakesHash;
     use DatabaseTransactions;
     use MockAccountData;
+
+    public $faker;
 
     protected function setUp() :void
     {
@@ -50,6 +52,41 @@ class QuoteTest extends TestCase
         );
     }
 
+    public function testQuoteConversion()
+    {
+        $invoice = $this->quote->service()->convertToInvoice();
+
+        $this->assertInstanceOf('\App\Models\Invoice', $invoice);
+
+        $this->expectException(QuoteConversion::class);
+
+        $invoice = $this->quote->service()->convertToInvoice();
+
+
+    }
+
+    public function testQuoteDownloadPDF()
+    {
+        $i = $this->quote->invitations->first();
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->get("/api/v1/quote/{$i->key}/download");
+
+        $response->assertStatus(200);
+        $this->assertTrue($response->headers->get('content-type') == 'application/pdf');
+    }
+
+    public function testQuoteListApproved()
+    {
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->get('/api/v1/quotes?client_status=approved');
+
+        $response->assertStatus(200);
+    }
 
 
     public function testQuoteConvertToProject()
@@ -57,7 +94,7 @@ class QuoteTest extends TestCase
         $response = $this->withHeaders([
             'X-API-SECRET' => config('ninja.api_secret'),
             'X-API-TOKEN' => $this->token,
-        ])->post('/api/v1/quotes/bulk',['action' => 'convert_to_project', 'ids' => [$this->quote->hashed_id]]);
+        ])->post('/api/v1/quotes/bulk', ['action' => 'convert_to_project', 'ids' => [$this->quote->hashed_id]]);
 
         $response->assertStatus(200);
 
@@ -160,5 +197,4 @@ class QuoteTest extends TestCase
 
         $response->assertStatus(200);
     }
-
 }

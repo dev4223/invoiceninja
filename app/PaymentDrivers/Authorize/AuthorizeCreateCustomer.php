@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -136,3 +136,31 @@ class AuthorizeCreateCustomer
 //   }
 // }
 }
+
+// $request = new net\authorize\api\contract\v1\GetCustomerProfileIdsRequest();
+// $request->setMerchantAuthentication($auth->merchant_authentication);
+// $controller = new net\authorize\api\controller\GetCustomerProfileIdsController($request);
+// $response = $controller->executeWithApiResponse($auth->mode());
+
+// // $customer_profile_id = end($response->getIds());
+
+//         foreach($response->getIds() as $customer_profile_id)
+//         {
+//         $request = new net\authorize\api\contract\v1\GetCustomerProfileRequest();
+//         $request->setMerchantAuthentication($auth->merchant_authentication);
+//         $request->setCustomerProfileId($customer_profile_id);
+//         $controller = new net\authorize\api\controller\GetCustomerProfileController($request);
+//         $response = $controller->executeWithApiResponse($auth->mode());
+        
+//         $profileSelected = $response->getProfile();
+
+//           if($profileSelected->getEmail() == 'katnandan@gmail.com')
+//           {
+
+//             $profileSelected;
+//             break;
+
+//           }
+
+
+//         }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -15,7 +15,7 @@
  *
  * //Cache::forever($custom_company_translated_string, 'mogly');
  *
- * @param string translation string key
+ * @param string $string
  * @param array $replace
  * @param null $locale
  * @return string

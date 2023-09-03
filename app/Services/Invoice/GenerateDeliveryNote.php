@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -29,26 +29,12 @@ class GenerateDeliveryNote
     use MakesHash, PdfMaker;
 
     /**
-     * @var \App\Models\Invoice
-     */
-    private $invoice;
-
-    /**
-     * @var \App\Models\ClientContact
-     */
-    private $contact;
-
-    /**
      * @var mixed
      */
     private $disk;
 
-    public function __construct(Invoice $invoice, ClientContact $contact = null, $disk = null)
+    public function __construct(private Invoice $invoice, private ?ClientContact $contact = null, $disk = null)
     {
-        $this->invoice = $invoice;
-
-        $this->contact = $contact;
-
         $this->disk = $disk ?? config('filesystems.default');
     }
 
@@ -66,7 +52,7 @@ class GenerateDeliveryNote
             return (new Phantom)->generate($this->invoice->invitations->first());
         }
 
-        $design = Design::find($design_id);
+        $design = Design::withTrashed()->find($design_id);
         $html = new HtmlEngine($invitation);
 
         if ($design->is_custom) {
@@ -105,11 +91,11 @@ class GenerateDeliveryNote
             info($maker->getCompiledHTML());
         }
 
-        if (! Storage::disk($this->disk)->exists($this->invoice->client->invoice_filepath($invitation))) {
-            Storage::disk($this->disk)->makeDirectory($this->invoice->client->invoice_filepath($invitation), 0775);
-        }
-        Storage::disk($this->disk)->put($file_path, $pdf, 'public');
+        Storage::disk($this->disk)->put($file_path, $pdf);
 
+        $maker = null;
+        $state = null;
+        
         return $file_path;
     }
 }

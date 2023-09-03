@@ -4,23 +4,22 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Requests\User;
 
-use App\DataMapper\DefaultSettings;
 use App\Factory\UserFactory;
 use App\Http\Requests\Request;
 use App\Http\ValidationRules\Ninja\CanAddUserRule;
 use App\Http\ValidationRules\User\AttachableUser;
+use App\Http\ValidationRules\User\HasValidPhoneNumber;
 use App\Http\ValidationRules\ValidUserForCompany;
 use App\Libraries\MultiDB;
 use App\Models\User;
 use App\Utils\Ninja;
-use Illuminate\Validation\Rule;
 
 class StoreUserRequest extends Request
 {
@@ -46,9 +45,13 @@ class StoreUserRequest extends Request
         } else {
             $rules['email'] = ['email', new AttachableUser()];
         }
-
+                
         if (Ninja::isHosted()) {
             $rules['id'] = new CanAddUserRule();
+
+            if ($this->phone && isset($this->phone)) {
+                $rules['phone'] = ['bail', 'string', 'sometimes', new HasValidPhoneNumber()];
+            }
         }
 
         return $rules;
@@ -57,8 +60,6 @@ class StoreUserRequest extends Request
     public function prepareForValidation()
     {
         $input = $this->all();
-
-        //unique user rule - check company_user table for user_id / company_id  / account_id if none exist we can add the user. ELSE return false
 
         if (array_key_exists('email', $input)) {
             $input['email'] = trim($input['email']);
@@ -74,15 +75,21 @@ class StoreUserRequest extends Request
             }
 
             if (! isset($input['company_user']['settings'])) {
-                //$input['company_user']['settings'] = DefaultSettings::userSettings();
                 $input['company_user']['settings'] = null;
             }
         } else {
             $input['company_user'] = [
-                //'settings' => DefaultSettings::userSettings(),
                 'settings' => null,
                 'permissions' => '',
             ];
+        }
+
+        if (array_key_exists('first_name', $input)) {
+            $input['first_name'] = strip_tags($input['first_name']);
+        }
+
+        if (array_key_exists('last_name', $input)) {
+            $input['last_name'] = strip_tags($input['last_name']);
         }
 
         $this->replace($input);

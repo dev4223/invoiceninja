@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -13,19 +13,16 @@ namespace App\Services\Invoice;
 
 use App\Events\Invoice\InvoiceWasArchived;
 use App\Jobs\Entity\CreateEntityPdf;
+use App\Jobs\Entity\CreateRawPdf;
 use App\Jobs\Inventory\AdjustProductInventory;
-use App\Jobs\Invoice\InvoiceWorkflowSettings;
-use App\Jobs\Util\UnlinkFile;
+use App\Jobs\Invoice\CreateEInvoice;
 use App\Libraries\Currency\Conversion\CurrencyApi;
 use App\Models\CompanyGateway;
 use App\Models\Expense;
 use App\Models\Invoice;
+use App\Models\InvoiceInvitation;
 use App\Models\Payment;
 use App\Models\Task;
-use App\Repositories\BaseRepository;
-use App\Services\Client\ClientService;
-use App\Services\Invoice\ApplyPaymentAmount;
-use App\Services\Invoice\UpdateReminder;
 use App\Utils\Ninja;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Support\Carbon;
@@ -35,11 +32,8 @@ class InvoiceService
 {
     use MakesHash;
 
-    public $invoice;
-
-    public function __construct($invoice)
+    public function __construct(public Invoice $invoice)
     {
-        $this->invoice = $invoice;
     }
 
     /**
@@ -47,18 +41,25 @@ class InvoiceService
      * and executes child sub functions.
      * @return $this InvoiceService object
      */
-    public function markPaid()
+    public function markPaid(?string $reference = null)
     {
         $this->removeUnpaidGatewayFees();
 
-        $this->invoice = (new MarkPaid($this->invoice))->run();
+        $this->invoice = (new MarkPaid($this->invoice, $reference))->run();
 
         return $this;
     }
 
-    public function applyPaymentAmount($amount)
+    /**
+     * applyPaymentAmount
+     *
+     * @param  float $amount
+     * @param  ?string $reference
+     * @return self
+     */
+    public function applyPaymentAmount($amount, ?string $reference = null): self
     {
-        $this->invoice = (new ApplyPaymentAmount($this->invoice, $amount))->run();
+        $this->invoice = (new ApplyPaymentAmount($this->invoice, $amount, $reference))->run();
 
         return $this;
     }
@@ -78,9 +79,9 @@ class InvoiceService
      * Sets the exchange rate on the invoice if the client currency
      * is different to the company currency.
      */
-    public function setExchangeRate()
+    public function setExchangeRate($force = false)
     {
-        if ($this->invoice->exchange_rate != 1) {
+        if ($this->invoice->exchange_rate != 1 || $force) {
             return $this;
         }
 
@@ -115,7 +116,7 @@ class InvoiceService
      */
     public function applyPayment(Payment $payment, float $payment_amount)
     {
-        $this->deletePdf();
+        $this->invoice = $this->markSent()->save();
 
         $this->invoice = (new ApplyPayment($this->invoice, $payment, $payment_amount))->run();
 
@@ -173,9 +174,9 @@ class InvoiceService
         return $this;
     }
 
-    public function markSent()
+    public function markSent($fire_event = false)
     {
-        $this->invoice = (new MarkSent($this->invoice->client, $this->invoice))->run();
+        $this->invoice = (new MarkSent($this->invoice->client, $this->invoice))->run($fire_event);
 
         $this->setExchangeRate();
 
@@ -187,9 +188,21 @@ class InvoiceService
         return (new GetInvoicePdf($this->invoice, $contact))->run();
     }
 
+    public function getRawInvoicePdf($contact = null)
+    {
+        $invitation = $contact ? $this->invoice->invitations()->where('contact_id', $contact->id)->first() : $this->invoice->invitations()->first();
+
+        return (new CreateRawPdf($invitation, $invitation->company->db))->handle();
+    }
+
     public function getInvoiceDeliveryNote(Invoice $invoice, \App\Models\ClientContact $contact = null)
     {
         return (new GenerateDeliveryNote($invoice, $contact))->run();
+    }
+
+    public function getEInvoice($contact = null)
+    {
+        return (new CreateEInvoice($this->invoice))->handle();
     }
 
     public function sendEmail($contact = null)
@@ -268,7 +281,12 @@ class InvoiceService
             return $this;
         }
 
-        $this->invoice->due_date = Carbon::parse($this->invoice->date)->addDays($this->invoice->client->getSetting('payment_terms'));
+        //12-10-2022
+        if ($this->invoice->partial > 0 && !$this->invoice->partial_due_date) {
+            $this->invoice->partial_due_date = Carbon::parse($this->invoice->date)->addDays($this->invoice->client->getSetting('payment_terms'));
+        } else {
+            $this->invoice->due_date = Carbon::parse($this->invoice->date)->addDays($this->invoice->client->getSetting('payment_terms'));
+        }
 
         return $this;
     }
@@ -293,6 +311,8 @@ class InvoiceService
             $this->setStatus(Invoice::STATUS_PAID);
         } elseif ($this->invoice->balance > 0 && $this->invoice->balance < $this->invoice->amount) {
             $this->setStatus(Invoice::STATUS_PARTIAL);
+        } elseif ($this->invoice->balance < 0 || $this->invoice->balance > 0) {
+            $this->invoice->status_id = Invoice::STATUS_SENT;
         }
 
         return $this;
@@ -308,8 +328,7 @@ class InvoiceService
             $this->invoice->status_id = Invoice::STATUS_PAID;
         } elseif ($this->invoice->balance > 0 && $this->invoice->balance < $this->invoice->amount) {
             $this->invoice->status_id = Invoice::STATUS_PARTIAL;
-        }
-        elseif ($this->invoice->balance < 0) {
+        } elseif ($this->invoice->balance < 0 || $this->invoice->balance > 0) {
             $this->invoice->status_id = Invoice::STATUS_SENT;
         }
 
@@ -327,7 +346,8 @@ class InvoiceService
                                          return $item;
                                      })->toArray();
 
-        $this->touchPdf();
+        $this->deletePdf();
+        $this->deleteEInvoice();
 
         return $this;
     }
@@ -336,14 +356,38 @@ class InvoiceService
     {
         $this->invoice->load('invitations');
 
+        //30-06-2023
         $this->invoice->invitations->each(function ($invitation) {
             try {
-                if (Storage::disk(config('filesystems.default'))->exists($this->invoice->client->invoice_filepath($invitation).$this->invoice->numberFormatter().'.pdf')) {
+                // if (Storage::disk(config('filesystems.default'))->exists($this->invoice->client->invoice_filepath($invitation).$this->invoice->numberFormatter().'.pdf')) {
                     Storage::disk(config('filesystems.default'))->delete($this->invoice->client->invoice_filepath($invitation).$this->invoice->numberFormatter().'.pdf');
-                }
+                // }
 
-                if (Ninja::isHosted() && Storage::disk('public')->exists($this->invoice->client->invoice_filepath($invitation).$this->invoice->numberFormatter().'.pdf')) {
+                // if (Ninja::isHosted() && Storage::disk('public')->exists($this->invoice->client->invoice_filepath($invitation).$this->invoice->numberFormatter().'.pdf')) {
+                if (Ninja::isHosted()) {
                     Storage::disk('public')->delete($this->invoice->client->invoice_filepath($invitation).$this->invoice->numberFormatter().'.pdf');
+                }
+            } catch (\Exception $e) {
+                nlog($e->getMessage());
+            }
+        });
+
+        return $this;
+    }
+
+    public function deleteEInvoice()
+    {
+        $this->invoice->load('invitations');
+
+        $this->invoice->invitations->each(function ($invitation) {
+            try {
+                // if (Storage::disk(config('filesystems.default'))->exists($this->invoice->client->e_invoice_filepath($invitation).$this->invoice->getFileName("xml"))) {
+                    Storage::disk(config('filesystems.default'))->delete($this->invoice->client->e_invoice_filepath($invitation).$this->invoice->getFileName("xml"));
+                // }
+
+                // if (Ninja::isHosted() && Storage::disk('public')->exists($this->invoice->client->e_invoice_filepath($invitation).$this->invoice->getFileName("xml"))) {
+                if (Ninja::isHosted()) {
+                    Storage::disk('public')->delete($this->invoice->client->e_invoice_filepath($invitation).$this->invoice->getFileName("xml"));
                 }
             } catch (\Exception $e) {
                 nlog($e->getMessage());
@@ -370,6 +414,8 @@ class InvoiceService
                                      })->toArray();
 
         $this->invoice = $this->invoice->calc()->getInvoice();
+        $this->deletePdf();
+        $this->deleteEInvoice();
 
         /* 24-03-2022 */
         $new_balance = $this->invoice->balance;
@@ -427,9 +473,16 @@ class InvoiceService
                 return $this;
             }
 
+
             $this->invoice->invitations->each(function ($invitation) {
                 CreateEntityPdf::dispatch($invitation);
+
+                if ($invitation->invoice->client->getSetting('enable_e_invoice') && $invitation instanceof InvoiceInvitation) {
+                    CreateEInvoice::dispatch($invitation->invoice);
+                }
+
             });
+
         } catch (\Exception $e) {
             nlog('failed creating invoices in Touch PDF');
         }
@@ -488,8 +541,8 @@ class InvoiceService
             return $item;
         });
 
-        Task::whereIn('id', $tasks->pluck('task_id'))->update(['invoice_id' => $this->invoice->id]);
-        Expense::whereIn('id', $tasks->pluck('expense_id'))->update(['invoice_id' => $this->invoice->id]);
+        Task::query()->whereIn('id', $tasks->pluck('task_id'))->update(['invoice_id' => $this->invoice->id]);
+        Expense::query()->whereIn('id', $tasks->pluck('expense_id'))->update(['invoice_id' => $this->invoice->id]);
 
         return $this;
     }
@@ -501,7 +554,7 @@ class InvoiceService
         $settings = $this->invoice->client->getMergedSettings();
 
         if (! $this->invoice->design_id) {
-            $this->invoice->design_id = $this->decodePrimaryKey($settings->invoice_design_id);
+            $this->invoice->design_id = intval($this->decodePrimaryKey($settings->invoice_design_id));
         }
 
         if (! isset($this->invoice->footer) || empty($this->invoice->footer)) {
@@ -519,6 +572,10 @@ class InvoiceService
         /* If client currency differs from the company default currency, then insert the client exchange rate on the model.*/
         if (! isset($this->invoice->exchange_rate) && $this->invoice->client->currency()->id != (int) $this->invoice->company->settings->currency_id) {
             $this->invoice->exchange_rate = $this->invoice->client->currency()->exchange_rate;
+        }
+
+        if ($this->invoice->client->getSetting('auto_bill_standard_invoices')) {
+            $this->invoice->auto_bill_enabled = true;
         }
 
         if ($settings->counter_number_applied == 'when_saved') {

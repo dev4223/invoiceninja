@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -17,7 +17,6 @@ use App\DataMapper\InvoiceItem;
 use App\Factory\InvoiceFactory;
 use App\Models\Client;
 use App\Models\ClientContact;
-use App\Models\Invoice;
 use App\Models\InvoiceInvitation;
 use App\Models\Subscription;
 use App\Utils\Traits\CleanLineItems;
@@ -45,11 +44,11 @@ class SubscriptionRepository extends BaseRepository
 
     private function calculatePrice($subscription) :array
     {
-
         // DB::beginTransaction();
         DB::connection(config('database.default'))->beginTransaction();
         $data = [];
 
+        /** @var \App\Models\Client $client **/
         $client = Client::factory()->create([
             'user_id' => $subscription->user_id,
             'company_id' => $subscription->company_id,
@@ -58,6 +57,7 @@ class SubscriptionRepository extends BaseRepository
             'settings' => ClientSettings::defaults(),
         ]);
 
+        /** @var \App\Models\ClientContact $contact **/
         $contact = ClientContact::factory()->create([
             'user_id' => $subscription->user_id,
             'company_id' => $subscription->company_id,
@@ -117,6 +117,31 @@ class SubscriptionRepository extends BaseRepository
 
         return $line_items;
     }
+
+    public function generateBundleLineItems($bundle, $is_recurring = false, $is_credit = false)
+    {
+        $multiplier = $is_credit ? -1 : 1;
+
+        $line_items = [];
+
+        $line_items = collect($bundle)->filter(function ($item) {
+            return $item->is_recurring;
+        })->map(function ($item) {
+            $line_item = new InvoiceItem;
+            $line_item->product_key = $item->product_key;
+            $line_item->quantity = (float)$item->qty;
+            $line_item->cost = (float)$item->unit_cost;
+            $line_item->notes = $item->description;
+
+            return $line_item;
+        })->toArray();
+
+
+        $line_items = $this->cleanItems($line_items);
+
+        return $line_items;
+    }
+
 
     private function makeLineItem($product, $multiplier)
     {

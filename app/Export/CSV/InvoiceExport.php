@@ -4,33 +4,32 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Export\CSV;
 
-use App\Libraries\MultiDB;
-use App\Models\Client;
+use App\Utils\Ninja;
+use App\Utils\Number;
+use League\Csv\Writer;
 use App\Models\Company;
 use App\Models\Invoice;
-use App\Transformers\InvoiceTransformer;
-use App\Utils\Ninja;
+use App\Libraries\MultiDB;
+use App\Export\CSV\BaseExport;
 use Illuminate\Support\Facades\App;
-use League\Csv\Writer;
+use App\Transformers\InvoiceTransformer;
 
 class InvoiceExport extends BaseExport
 {
-    private Company $company;
-
-    protected array $input;
-
     private $invoice_transformer;
 
-    protected string $date_key = 'date';
+    public string $date_key = 'date';
 
-    protected array $entity_keys = [
+    public Writer $csv;
+
+    public array $entity_keys = [
         'amount' => 'amount',
         'balance' => 'balance',
         'client' => 'client_id',
@@ -64,6 +63,10 @@ class InvoiceExport extends BaseExport
         'terms' => 'terms',
         'total_taxes' => 'total_taxes',
         'currency_id' => 'currency_id',
+        'payment_number' => 'payment_number',
+        'payment_date' => 'payment_date',
+        'payment_amount' => 'payment_amount',
+        'method' => 'method',
     ];
 
     private array $decorate_keys = [
@@ -74,6 +77,7 @@ class InvoiceExport extends BaseExport
         'vendor',
         'project',
     ];
+
 
     public function __construct(Company $company, array $input)
     {
@@ -108,6 +112,10 @@ class InvoiceExport extends BaseExport
 
         $query = $this->addDateRange($query);
 
+        if(isset($this->input['status'])){
+            $query = $this->addInvoiceStatusFilter($query, $this->input['status']);
+        }
+
         $query->cursor()
             ->each(function ($invoice) {
                 $this->csv->insertOne($this->buildRow($invoice));
@@ -125,10 +133,21 @@ class InvoiceExport extends BaseExport
         foreach (array_values($this->input['report_keys']) as $key) {
             $keyval = array_search($key, $this->entity_keys);
 
+            if(!$keyval) {
+                $keyval = array_search(str_replace("invoice.", "", $key), $this->entity_keys) ?? $key;
+            }
+
+            if(!$keyval) {
+                $keyval = $key;
+            }
+
             if (array_key_exists($key, $transformed_invoice)) {
                 $entity[$keyval] = $transformed_invoice[$key];
-            } else {
-                $entity[$keyval] = '';
+            } elseif (array_key_exists($keyval, $transformed_invoice)) {
+                $entity[$keyval] = $transformed_invoice[$keyval];
+            }
+            else {
+                $entity[$keyval] = $this->resolveKey($keyval, $invoice, $this->invoice_transformer);
             }
         }
 
@@ -152,7 +171,17 @@ class InvoiceExport extends BaseExport
         if (in_array('status_id', $this->input['report_keys'])) {
             $entity['status'] = $invoice->stringStatus($invoice->status_id);
         }
+        
+        // $payment_exists = $invoice->payments()->exists();
 
+        // $entity['payment_number'] = $payment_exists ? $invoice->payments()->pluck('number')->implode(',') : '';
+
+        // $entity['payment_date'] = $payment_exists ? $invoice->payments()->pluck('date')->implode(',') : '';
+
+        // $entity['payment_amount'] = $payment_exists ? Number::formatMoney($invoice->payments()->sum('paymentables.amount'), $invoice->company) : ctrans('texts.unpaid');
+
+        // $entity['method'] = $payment_exists ? $invoice->payments()->first()->translatedType() : "";
+        
         return $entity;
     }
 }

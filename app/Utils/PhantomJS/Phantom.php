@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -27,7 +27,6 @@ use App\Utils\HtmlEngine;
 use App\Utils\Traits\MakesHash;
 use App\Utils\Traits\Pdf\PageNumbering;
 use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -42,9 +41,10 @@ class Phantom
      *
      * @param $invitation
      */
-    public function generate($invitation)
+    public function generate($invitation, $return_pdf = false)
     {
         $entity = false;
+        $path = '';
 
         if ($invitation instanceof InvoiceInvitation) {
             $entity = 'invoice';
@@ -107,10 +107,14 @@ class Phantom
         }
 
         if (! Storage::disk(config('filesystems.default'))->exists($path)) {
-            Storage::disk(config('filesystems.default'))->makeDirectory($path, 0775);
+            Storage::disk(config('filesystems.default'))->makeDirectory($path);
         }
 
         $instance = Storage::disk(config('filesystems.default'))->put($file_path, $pdf);
+
+        if ($return_pdf) {
+            return $pdf;
+        }
 
         return $file_path;
     }
@@ -187,7 +191,7 @@ class Phantom
 
         $design_id = $entity_obj->design_id ? $entity_obj->design_id : $this->decodePrimaryKey($entity_obj->client->getSetting($entity_design_id));
 
-        $design = Design::find($design_id);
+        $design = Design::withTrashed()->find($design_id);
         $html = new HtmlEngine($invitation);
 
         if ($design->is_custom) {

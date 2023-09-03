@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -89,7 +89,7 @@ class WePayPaymentDriver extends BaseDriver
      * Setup the gateway
      *
      * @param  array $data user_id + company
-     * @return view
+     * @return \Illuminate\View\View         
      */
     public function setup(array $data)
     {
@@ -174,7 +174,9 @@ class WePayPaymentDriver extends BaseDriver
         $config = $this->company_gateway->getConfig();
 
         $accountId = $this->company_gateway->getConfigField('accountId');
-
+        $objectId = false;
+        $objectType = '';
+        
         foreach (array_keys($input) as $key) {
             if ('_id' == substr($key, -3)) {
                 $objectType = substr($key, 0, -3);
@@ -183,7 +185,7 @@ class WePayPaymentDriver extends BaseDriver
             }
         }
 
-        if (! isset($objectType)) {
+        if (! $objectId) {
             throw new \Exception('Could not find object id parameter');
         }
 
@@ -226,12 +228,13 @@ class WePayPaymentDriver extends BaseDriver
 
             return ['message' => 'Processed successfully'];
         } elseif ($objectType == 'checkout') {
+            /** @var \App\Models\Payment $payment */
             $payment = Payment::where('company_id', $this->company_gateway->company_id)
                               ->where('transaction_reference', '=', $objectId)
                               ->first();
 
             if (! $payment) {
-                throw new Exception('Unknown payment');
+                throw new \Exception('Unknown payment');
             }
 
             if ($payment->is_deleted) {
@@ -341,6 +344,28 @@ class WePayPaymentDriver extends BaseDriver
             $fields[] = ['name' => 'client_shipping_postal_code', 'label' => ctrans('texts.shipping_postal_code'), 'type' => 'text', 'validation' => 'required'];
             $fields[] = ['name' => 'client_shipping_country_id', 'label' => ctrans('texts.shipping_country'), 'type' => 'text', 'validation' => 'required'];
         }
+
+
+
+        if ($this->company_gateway->require_custom_value1) {
+            $fields[] = ['name' => 'client_custom_value1', 'label' => $this->helpers->makeCustomField($this->client->company->custom_fields, 'client1'), 'type' => 'text', 'validation' => 'required'];
+        }
+        
+        if ($this->company_gateway->require_custom_value2) {
+            $fields[] = ['name' => 'client_custom_value2', 'label' => $this->helpers->makeCustomField($this->client->company->custom_fields, 'client2'), 'type' => 'text', 'validation' => 'required'];
+        }
+
+
+        if ($this->company_gateway->require_custom_value3) {
+            $fields[] = ['name' => 'client_custom_value3', 'label' => $this->helpers->makeCustomField($this->client->company->custom_fields, 'client3'), 'type' => 'text', 'validation' => 'required'];
+        }
+
+
+        if ($this->company_gateway->require_custom_value4) {
+            $fields[] = ['name' => 'client_custom_value4', 'label' => $this->helpers->makeCustomField($this->client->company->custom_fields, 'client4'), 'type' => 'text', 'validation' => 'required'];
+        }
+
+
 
         return $fields;
     }

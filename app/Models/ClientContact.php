@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -16,7 +16,8 @@ use App\Jobs\Mail\NinjaMailerJob;
 use App\Jobs\Mail\NinjaMailerObject;
 use App\Mail\ClientContact\ClientContactResetPasswordObject;
 use App\Models\Presenters\ClientContactPresenter;
-use App\Notifications\ClientContactResetPassword;
+use App\Utils\Ninja;
+use App\Utils\Traits\AppSetup;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -31,6 +32,63 @@ use Laracasts\Presenter\PresentableTrait;
  * Class ClientContact
  *
  * @method scope() static
+ * @property int $id
+ * @property int $company_id
+ * @property int $client_id
+ * @property int $user_id
+ * @property string|null $first_name
+ * @property string|null $last_name
+ * @property string|null $phone
+ * @property string|null $custom_value1
+ * @property string|null $custom_value2
+ * @property string|null $custom_value3
+ * @property string|null $custom_value4
+ * @property string|null $email
+ * @property string|null $email_verified_at
+ * @property string|null $confirmation_code
+ * @property bool $is_primary
+ * @property bool $confirmed
+ * @property int|null $last_login
+ * @property int|null $failed_logins
+ * @property string|null $oauth_user_id
+ * @property int|null $oauth_provider_id
+ * @property string|null $google_2fa_secret
+ * @property string|null $accepted_terms_version
+ * @property string|null $avatar
+ * @property string|null $avatar_type
+ * @property string|null $avatar_size
+ * @property string $password
+ * @property string|null $token
+ * @property bool $is_locked
+ * @property bool $send_email
+ * @property string|null $contact_key
+ * @property string|null $remember_token
+ * @property int|null $created_at
+ * @property int|null $updated_at
+ * @property int|null $deleted_at
+ * @property-read \App\Models\Client $client
+ * @property-read \App\Models\Company $company
+ * @property-read int|null $credit_invitations_count
+ * @property-read mixed $contact_id
+ * @property-read mixed $hashed_id
+ * @property-read int|null $invoice_invitations_count
+ * @property-read int|null $notifications_count
+ * @property-read int|null $quote_invitations_count
+ * @property-read int|null $recurring_invoice_invitations_count
+ * @property-read \App\Models\User $user
+ * @method static \Database\Factories\ClientContactFactory factory($count = null, $state = [])
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientContact newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientContact newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientContact onlyTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientContact query()
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientContact withTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder|ClientContact withoutTrashed()
+ * @property-read \Illuminate\Notifications\DatabaseNotificationCollection<int, \Illuminate\Notifications\DatabaseNotification> $notifications
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\QuoteInvitation> $quote_invitations
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\RecurringInvoiceInvitation> $recurring_invoice_invitations
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\CreditInvitation> $credit_invitations
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\InvoiceInvitation> $invoice_invitations
+ * @mixin \Eloquent
  */
 class ClientContact extends Authenticatable implements HasLocalePreference
 {
@@ -39,7 +97,8 @@ class ClientContact extends Authenticatable implements HasLocalePreference
     use PresentableTrait;
     use SoftDeletes;
     use HasFactory;
-
+    use AppSetup;
+    
     /* Used to authenticate a contact */
     protected $guard = 'contact';
 
@@ -155,7 +214,7 @@ class ClientContact extends Authenticatable implements HasLocalePreference
         }
     }
 
-    public function client()
+    public function client(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Client::class)->withTrashed();
     }
@@ -165,27 +224,32 @@ class ClientContact extends Authenticatable implements HasLocalePreference
         return $this->where('is_primary', true);
     }
 
-    public function company()
+    public function company(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Company::class);
     }
 
-    public function user()
+    public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class)->withTrashed();
     }
 
-    public function invoice_invitations()
+    public function invoice_invitations(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(InvoiceInvitation::class);
     }
 
-    public function quote_invitations()
+    public function recurring_invoice_invitations(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(RecurringInvoiceInvitation::class);
+    }
+
+    public function quote_invitations(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(QuoteInvitation::class);
     }
 
-    public function credit_invitations()
+    public function credit_invitations(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(CreditInvitation::class);
     }
@@ -202,7 +266,6 @@ class ClientContact extends Authenticatable implements HasLocalePreference
         $nmo->settings = $this->company->settings;
 
         NinjaMailerJob::dispatch($nmo);
-
     }
 
     public function preferredLocale()
@@ -257,8 +320,23 @@ class ClientContact extends Authenticatable implements HasLocalePreference
      */
     public function getLoginLink()
     {
-        $domain = isset($this->company->portal_domain) ? $this->company->portal_domain : $this->company->domain();
 
-        return $domain.'/client/key_login/'.$this->contact_key;
+        if (Ninja::isHosted()) {
+            $domain = $this->company->domain();
+        } else {
+            $domain = config('ninja.app_url');
+        }
+
+        switch ($this->company->portal_mode) {
+            case 'subdomain':
+                return $domain.'/client/key_login/'.$this->contact_key;
+            case 'iframe':
+                return $domain.'/client/key_login/'.$this->contact_key;
+            case 'domain':
+                return $domain.'/client/key_login/'.$this->contact_key;
+
+            default:
+                return '';
+        }
     }
 }
