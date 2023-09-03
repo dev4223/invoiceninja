@@ -6,7 +6,7 @@
  *
  * @copyright Copyright (c) 2021. Invoice Ninja LLC (https://invoiceninja.com)
  *
- * @license https://www.elastic.co/licensing/elastic-license 
+ * @license https://www.elastic.co/licensing/elastic-license
  */
 namespace Database\Seeders;
 
@@ -74,14 +74,16 @@ class PaymentLibrariesSeeder extends Seeder
             ['id' => 47, 'name' => 'Secure Trading', 'provider' => 'SecureTrading', 'key' => '231cb401487b9f15babe04b1ac4f7a27', 'fields' => '{"siteReference":"","username":"","password":"","applyThreeDSecure":false,"accountType":"ECOM"}'],
             ['id' => 48, 'name' => 'SecPay', 'provider' => 'SecPay', 'key' => 'bad8699d581d9fa040e59c0bb721a76c', 'fields' => '{"mid":"","vpnPswd":"","remotePswd":"","usageType":"","confirmEmail":"","testStatus":"true","mailCustomer":"true","additionalOptions":""}'],
             ['id' => 49, 'name' => 'WePay', 'provider' => 'WePay', 'is_offsite' => false, 'sort_order' => 3, 'key' => '8fdeed552015b3c7b44ed6c8ebd9e992', 'fields' => '{"accountId":"","accessToken":"","type":"goods","testMode":false,"feePayer":"payee"}'],
-            ['id' => 50, 'name' => 'Braintree', 'provider' => 'Braintree', 'sort_order' => 3, 'key' => 'f7ec488676d310683fb51802d076d713', 'fields' => '{"merchantId":"","merchantAccountId":"","publicKey":"","privateKey":"","testMode":false}'],
+            ['id' => 50, 'name' => 'Braintree', 'provider' => 'Braintree', 'sort_order' => 3, 'key' => 'f7ec488676d310683fb51802d076d713', 'fields' => '{"merchantId":"","merchantAccountId":"","publicKey":"","privateKey":"","testMode":false,"threeds":false}'],
             ['id' => 51, 'name' => 'FirstData Payeezy', 'provider' => 'FirstData_Payeezy', 'key' => '30334a52fb698046572c627ca10412e8', 'fields' => '{"gatewayId":"","password":"","keyId":"","hmac":"","testMode":false}'],
             ['id' => 52, 'name' => 'GoCardless', 'provider' => 'GoCardless', 'sort_order' => 9, 'is_offsite' => true, 'key' => 'b9886f9257f0c6ee7c302f1c74475f6c', 'fields' => '{"accessToken":"","webhookSecret":"","testMode":true}'],
             ['id' => 53, 'name' => 'PagSeguro', 'provider' => 'PagSeguro', 'key' => 'ef498756b54db63c143af0ec433da803', 'fields' => '{"email":"","token":"","sandbox":false}'],
             ['id' => 54, 'name' => 'PAYMILL', 'provider' => 'Paymill', 'key' => 'ca52f618a39367a4c944098ebf977e1c', 'fields' => '{"apiKey":""}'],
             ['id' => 55, 'name' => 'Custom', 'provider' => 'Custom', 'is_offsite' => true, 'sort_order' => 21, 'key' => '54faab2ab6e3223dbe848b1686490baa', 'fields' => '{"name":"","text":""}'],
-            ['id' => 57, 'name' => 'Square', 'provider' => 'Square', 'is_offsite' => false, 'sort_order' => 21, 'key' => '65faab2ab6e3223dbe848b1686490baz', 'fields' => '{"accessToken":"","applicationId":"","locationId":"","testMode":false}'],
+            ['id' => 57, 'name' => 'Square', 'provider' => 'Square', 'is_offsite' => false, 'sort_order' => 21, 'key' => '65faab2ab6e3223dbe848b1686490baz', 'fields' => '{"accessToken":"","applicationId":"","locationId":"","signatureKey":"","testMode":false}'],
             ['id' => 58, 'name' => 'Razorpay', 'provider' => 'Razorpay', 'is_offsite' => false, 'sort_order' => 21, 'key' => 'hxd6gwg3ekb9tb3v9lptgx1mqyg69zu9', 'fields' => '{"apiKey":"","apiSecret":""}'],
+            ['id' => 59, 'name' => 'Forte', 'provider' => 'Forte', 'is_offsite' => false, 'sort_order' => 21, 'key' => 'kivcvjexxvdiyqtj3mju5d6yhpeht2xs', 'fields' => '{"testMode":false,"apiLoginId":"","apiAccessId":"","secureKey":"","authOrganizationId":"","organizationId":"","locationId":""}'],
+            ['id' => 60, 'name' => 'PayPal REST', 'provider' => 'PayPal_Rest', 'key' => '80af24a6a691230bbec33e930ab40665', 'fields' => '{"clientId":"","secret":"","signature":"","testMode":false}'],
         ];
 
         foreach ($gateways as $gateway) {
@@ -98,7 +100,7 @@ class PaymentLibrariesSeeder extends Seeder
 
         Gateway::query()->update(['visible' => 0]);
 
-        Gateway::whereIn('id', [1,3,7,11,15,20,39,46,55,50,57,52,58,59])->update(['visible' => 1]);
+        Gateway::whereIn('id', [1,3,7,11,15,20,39,46,55,50,57,52,58,59,60])->update(['visible' => 1]);
 
         if (Ninja::isHosted()) {
             Gateway::whereIn('id', [20])->update(['visible' => 0]);

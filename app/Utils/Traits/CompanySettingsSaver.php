@@ -4,16 +4,18 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Utils\Traits;
 
-use App\DataMapper\CompanySettings;
-use App\Models\Company;
 use stdClass;
+use App\Utils\Ninja;
+use App\Models\Company;
+use App\DataMapper\CompanySettings;
+use App\Jobs\Company\CompanyTaxRate;
 
 /**
  * Class CompanySettingsSaver.
@@ -36,7 +38,6 @@ trait CompanySettingsSaver
      */
     public function saveSettings($settings, $entity)
     {
-
         /* No Settings, No Save!*/
         if (! $settings) {
             return;
@@ -78,6 +79,22 @@ trait CompanySettingsSaver
 
         $entity->settings = $company_settings;
 
+        if($entity?->calculate_taxes && $company_settings->country_id == "840" && array_key_exists('settings', $entity->getDirty()) && !$entity?->account->isFreeHostedClient()) 
+        {
+            $old_settings = $entity->getOriginal()['settings'];
+                                
+            /** Monitor changes of the Postal code */
+            if($old_settings->postal_code != $company_settings->postal_code)
+                CompanyTaxRate::dispatch($entity);
+            
+            
+        }
+        elseif( $entity?->calculate_taxes && $company_settings->country_id == "840" && array_key_exists('calculate_taxes', $entity->getDirty()) && $entity->getOriginal('calculate_taxes') == 0 && !$entity?->account->isFreeHostedClient())
+        {
+            CompanyTaxRate::dispatch($entity);
+        }
+        
+        
         $entity->save();
     }
 
@@ -114,8 +131,9 @@ trait CompanySettingsSaver
             elseif (substr($key, -3) == '_id' || substr($key, -14) == 'number_counter') {
                 $value = 'integer';
 
-                if($key == 'besr_id')
+                if ($key == 'besr_id') {
                     $value = 'string';
+                }
 
                 if (! property_exists($settings, $key)) {
                     continue;
@@ -185,8 +203,9 @@ trait CompanySettingsSaver
                     $value = 'string';
                 }
 
-                if($key == 'besr_id')
+                if ($key == 'besr_id') {
                     $value = 'string';
+                }
 
                 if (! property_exists($settings, $key)) {
                     continue;
@@ -260,7 +279,7 @@ trait CompanySettingsSaver
             case 'json':
                 json_decode($value);
 
-                    return json_last_error() == JSON_ERROR_NONE;
+                return json_last_error() == JSON_ERROR_NONE;
             default:
                 return false;
         }

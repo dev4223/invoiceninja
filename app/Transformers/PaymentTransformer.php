@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -79,6 +79,7 @@ class PaymentTransformer extends EntityTransformer
             'refunded' => (float) $payment->refunded,
             'applied' => (float) $payment->applied,
             'transaction_reference' => $payment->transaction_reference ?: '',
+            'transaction_id' => $this->encodePrimaryKey($payment->transaction_id) ?: '',
             'date' => $payment->date ?: '',
             'is_manual' => (bool) $payment->is_manual,
             'created_at' => (int) $payment->created_at,
@@ -96,6 +97,7 @@ class PaymentTransformer extends EntityTransformer
             'client_id' => (string) $this->encodePrimaryKey($payment->client_id),
             'client_contact_id' => (string) $this->encodePrimaryKey($payment->client_contact_id),
             'company_gateway_id' => (string) $this->encodePrimaryKey($payment->company_gateway_id),
+            'gateway_type_id' => (string) $payment->gateway_type_id ?: '',
             'status_id'=> (string) $payment->status_id,
             'project_id' => (string) $this->encodePrimaryKey($payment->project_id),
             'vendor_id' => (string) $this->encodePrimaryKey($payment->vendor_id),

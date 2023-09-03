@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,10 +12,7 @@
 namespace App\Export\CSV;
 
 use App\Libraries\MultiDB;
-use App\Models\Client;
 use App\Models\Company;
-use App\Models\Credit;
-use App\Models\Document;
 use App\Models\Payment;
 use App\Transformers\PaymentTransformer;
 use App\Utils\Ninja;
@@ -24,15 +21,13 @@ use League\Csv\Writer;
 
 class PaymentExport extends BaseExport
 {
-    private Company $company;
-
-    protected array $input;
-
     private $entity_transformer;
 
-    protected $date_key = 'date';
+    public string $date_key = 'date';
 
-    protected array $entity_keys = [
+    public Writer $csv;
+
+    public array $entity_keys = [
         'amount' => 'amount',
         'applied' => 'applied',
         'client' => 'client_id',
@@ -52,6 +47,7 @@ class PaymentExport extends BaseExport
         'transaction_reference' => 'transaction_reference',
         'type' => 'type_id',
         'vendor' => 'vendor_id',
+        'invoices' => 'invoices',
     ];
 
     private array $decorate_keys = [
@@ -62,6 +58,7 @@ class PaymentExport extends BaseExport
         'currency',
         'exchange_currency',
         'type',
+        'invoices',
     ];
 
     public function __construct(Company $company, array $input)
@@ -89,7 +86,10 @@ class PaymentExport extends BaseExport
         //insert the header
         $this->csv->insertOne($this->buildHeader());
 
-        $query = Payment::query()->where('company_id', $this->company->id)->where('is_deleted', 0);
+        $query = Payment::query()
+                            ->withTrashed()
+                            ->where('company_id', $this->company->id)
+                            ->where('is_deleted', 0);
 
         $query = $this->addDateRange($query);
 
@@ -110,10 +110,21 @@ class PaymentExport extends BaseExport
         foreach (array_values($this->input['report_keys']) as $key) {
             $keyval = array_search($key, $this->entity_keys);
 
+            if(!$keyval) {
+                $keyval = array_search(str_replace("payment.", "", $key), $this->entity_keys) ?? $key;
+            }
+
+            if(!$keyval) {
+                $keyval = $key;
+            }
+
             if (array_key_exists($key, $transformed_entity)) {
                 $entity[$keyval] = $transformed_entity[$key];
-            } else {
-                $entity[$keyval] = '';
+            }  elseif (array_key_exists($keyval, $transformed_entity)) {
+                $entity[$keyval] = $transformed_entity[$keyval];
+            }
+            else {
+                $entity[$keyval] = $this->resolveKey($keyval, $payment, $this->entity_transformer);
             }
         }
 
@@ -138,6 +149,10 @@ class PaymentExport extends BaseExport
             $entity['currency'] = $payment->currency()->exists() ? $payment->currency->code : '';
         }
 
+        if (in_array('payment.currency', $this->input['report_keys'])) {
+            $entity['payment.currency'] = $payment->currency()->exists() ? $payment->currency->code : '';
+        }
+
         if (in_array('exchange_currency_id', $this->input['report_keys'])) {
             $entity['exchange_currency'] = $payment->exchange_currency()->exists() ? $payment->exchange_currency->code : '';
         }
@@ -150,9 +165,19 @@ class PaymentExport extends BaseExport
             $entity['type'] = $payment->translatedType();
         }
 
+        if (in_array('payment.method', $this->input['report_keys'])) {
+            $entity['payment.method'] = $payment->translatedType();
+        }
+
+        if (in_array('payment.status', $this->input['report_keys'])) {
+            $entity['payment.status'] = $payment->stringStatus($payment->status_id);
+        }
+
         if (in_array('gateway_type_id', $this->input['report_keys'])) {
             $entity['gateway'] = $payment->gateway_type ? $payment->gateway_type->name : 'Unknown Type';
         }
+
+        // $entity['invoices'] = $payment->invoices()->exists() ? $payment->invoices->pluck('number')->implode(',') : '';
 
         return $entity;
     }

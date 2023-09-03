@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,7 +12,6 @@
 namespace App\Http\Requests\ClientPortal;
 
 use App\Http\Requests\Request;
-use Zend\Diactoros\Response\JsonResponse;
 
 class StoreDocumentRequest extends Request
 {
@@ -35,6 +34,6 @@ class StoreDocumentRequest extends Request
 
     public function response(array $errors)
     {
-        return new JsonResponse(['error' => $errors], 400);
+        return response()->json(['error' => $errors], 400);
     }
 }

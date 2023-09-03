@@ -6,6 +6,7 @@
     <meta name="year-invalid" content="{{ ctrans('texts.year_invalid') }}">
     <meta name="month-invalid" content="{{ ctrans('texts.month_invalid') }}">
     <meta name="credit-card-invalid" content="{{ ctrans('texts.credit_card_invalid') }}">
+    <meta name="authnet-require-cvv" content="{{ $gateway->company_gateway->require_cvv }}">
 
     <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
     <script src="{{ asset('js/clients/payments/card-js.min.js') }}"></script>
@@ -52,3 +53,23 @@
 
     <script src="{{ asset('js/clients/payment_methods/authorize-authorize-card.js') }}"></script>
 @endsection
+
+@push('footer')
+<script defer>
+ 
+$(function() {
+
+    document.getElementsByClassName("expiry")[0].addEventListener('change', function() {
+
+    str = document.getElementsByClassName("expiry")[0].value.replace(/\s/g, '');
+    const expiryArray = str.split("/");
+
+    document.getElementsByName('expiry-month')[0].value = expiryArray[0];
+    document.getElementsByName('expiry-year')[0].value = expiryArray[1];
+
+    });
+
+});
+
+</script>
+@endpush

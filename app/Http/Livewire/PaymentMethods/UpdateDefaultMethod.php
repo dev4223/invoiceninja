@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -32,7 +32,7 @@ class UpdateDefaultMethod extends Component
 
         MultiDB::setDb($this->company->db);
 
-        $this->is_disabled = $this->token->is_default;
+        // $this->is_disabled = $this->token->is_default;
     }
 
     public function makeDefault(): void

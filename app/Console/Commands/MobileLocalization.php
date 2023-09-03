@@ -1,9 +1,16 @@
 <?php
+/**
+ * Invoice Ninja (https://invoiceninja.com).
+ *
+ * @link https://github.com/invoiceninja/invoiceninja source repository
+ *
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ *
+ * @license https://www.elastic.co/licensing/elastic-license
+ */
 
 namespace App\Console\Commands;
 
-use App\Models\Company;
-use App\Models\User;
 use App\Utils\CurlUtils;
 use Illuminate\Console\Command;
 
@@ -103,8 +110,9 @@ class MobileLocalization extends Command
         $data = substr($data, $start, $end - $start - 5);
 
         $data = str_replace("\n", '', $data);
-        $data = str_replace('"', "\'", $data);
+        $data = str_replace("\'", "\#", $data);
         $data = str_replace("'", '"', $data);
+        $data = str_replace("\#", "'", $data);
 
         return json_decode('{'.rtrim($data, ',').'}');
     }

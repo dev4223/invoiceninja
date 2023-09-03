@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -16,8 +16,9 @@ use App\Factory\ExpenseFactory;
 use App\Libraries\Currency\Conversion\CurrencyApi;
 use App\Models\Expense;
 use App\Utils\Traits\GeneratesCounter;
-use Illuminate\Support\Carbon;
+use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Carbon;
 
 /**
  * ExpenseRepository.
@@ -31,12 +32,12 @@ class ExpenseRepository extends BaseRepository
     /**
      * Saves the expense and its contacts.
      *
-     * @param      array  $data    The data
-     * @param      \App\Models\Expense              $expense  The expense
+     * @param      array                     $data     The data
+     * @param      \App\Models\Expense       $expense  The expense
      *
-     * @return     \App\Models\Expense|null  expense Object
+     * @return     \App\Models\Expense
      */
-    public function save(array $data, Expense $expense): ?Expense
+    public function save(array $data, Expense $expense): Expense
     {
         $expense->fill($data);
 
@@ -44,10 +45,11 @@ class ExpenseRepository extends BaseRepository
             $expense = $this->processExchangeRates($data, $expense);
         }
 
-        if (empty($expense->number))
+        if (empty($expense->number)) {
             $expense = $this->findAndSaveNumber($expense);
+        }
 
-        $expense->save();
+        $expense->saveQuietly();
 
         if (array_key_exists('documents', $data)) {
             $this->saveDocuments($data['documents'], $expense);
@@ -71,6 +73,12 @@ class ExpenseRepository extends BaseRepository
         );
     }
 
+    /**
+     * @param mixed $data
+     * @param mixed $expense
+     * @return Expense
+     * @throws InvalidFormatException
+     */
     public function processExchangeRates($data, $expense): Expense
     {
         if (array_key_exists('exchange_rate', $data) && isset($data['exchange_rate']) && $data['exchange_rate'] != 1) {
@@ -91,6 +99,30 @@ class ExpenseRepository extends BaseRepository
         return $expense;
     }
 
+
+    public function delete($expense) :Expense
+    {
+        
+        if ($expense->transaction()->exists()) {
+            
+            $exp_ids = collect(explode(',', $expense->transaction->expense_id))->filter(function ($id) use ($expense) {
+                return $id != $expense->hashed_id;
+            })->implode(',');
+                    
+            $expense->transaction_id = null;
+            $expense->saveQuietly();
+
+            $expense->transaction->expense_id = $exp_ids;
+            $expense->transaction->saveQuietly();
+
+        }
+
+        parent::delete($expense);
+
+        return $expense;
+    }
+
+
     /**
      * Handle race conditions when creating expense numbers
      *
@@ -99,23 +131,20 @@ class ExpenseRepository extends BaseRepository
      */
     private function findAndSaveNumber($expense): Expense
     {
-
         $x = 1;
 
         do {
-
             try {
-
                 $expense->number = $this->getNextExpenseNumber($expense);
                 $expense->saveQuietly();
 
                 $this->completed = false;
             } catch (QueryException $e) {
-
                 $x++;
 
-                if ($x > 50)
+                if ($x > 50) {
                     $this->completed = false;
+                }
             }
         } while ($this->completed);
 

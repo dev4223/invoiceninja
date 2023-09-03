@@ -4,17 +4,19 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\Export\StoreExportRequest;
-use App\Jobs\Company\CompanyExport;
-use App\Utils\Traits\MakesHash;
+use Illuminate\Support\Str;
 use Illuminate\Http\Response;
+use App\Utils\Traits\MakesHash;
+use App\Jobs\Company\CompanyExport;
+use Illuminate\Support\Facades\Cache;
+use App\Http\Requests\Export\StoreExportRequest;
 
 class ExportController extends BaseController
 {
@@ -32,7 +34,6 @@ class ExportController extends BaseController
      *      tags={"export"},
      *      summary="Export data from the system",
      *      description="Export data from the system",
-     *      @OA\Parameter(ref="#/components/parameters/X-Api-Secret"),
      *      @OA\Parameter(ref="#/components/parameters/X-Requested-With"),
      *      @OA\Response(
      *          response=200,
@@ -55,8 +56,12 @@ class ExportController extends BaseController
      */
     public function index(StoreExportRequest $request)
     {
-        CompanyExport::dispatch(auth()->user()->getCompany(), auth()->user());
+        $hash = Str::uuid();
+        $url = \Illuminate\Support\Facades\URL::temporarySignedRoute('protected_download', now()->addHour(), ['hash' => $hash]);
+        Cache::put($hash, $url, now()->addHour());
 
-        return response()->json(['message' => 'Processing'], 200);
+        CompanyExport::dispatch(auth()->user()->getCompany(), auth()->user(), $hash);
+
+        return response()->json(['message' => 'Processing', 'url' => $url], 200);
     }
 }

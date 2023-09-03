@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -36,10 +36,9 @@ class CompanyObserver
      */
     public function updated(Company $company)
     {
-        if (Ninja::isHosted() && $company->portal_mode == 'domain' && $company->isDirty('portal_domain')) {
-            //fire event to build new custom portal domain
+        if (Ninja::isHosted() && $company->portal_mode == 'domain' && $company->isDirty('portal_domain')) 
             \Modules\Admin\Jobs\Domain\CustomDomain::dispatch($company->getOriginal('portal_domain'), $company)->onQueue('domain');
-        }
+
     }
 
     /**

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,11 +12,9 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\FilePermissionsFailure;
-use App\Models\Client;
 use App\Utils\Ninja;
 use App\Utils\Traits\AppSetup;
 use App\Utils\Traits\ClientGroupSettingsSaver;
-use Beganovich\Snappdf\Snappdf;
 use Illuminate\Foundation\Bus\DispatchesJobs;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
@@ -26,6 +24,10 @@ class SelfUpdateController extends BaseController
     use DispatchesJobs;
     use ClientGroupSettingsSaver;
     use AppSetup;
+
+    // private bool $use_zip = false;
+
+    private string $filename = 'invoiceninja.tar';
 
     private array $purge_file_list = [
         'bootstrap/cache/compiled.php',
@@ -39,68 +41,6 @@ class SelfUpdateController extends BaseController
     public function __construct()
     {
     }
-
-    /**
-     * @OA\Post(
-     *      path="/api/v1/self-update",
-     *      operationId="selfUpdate",
-     *      tags={"update"},
-     *      summary="Performs a system update",
-     *      description="Performs a system update",
-     *      @OA\Parameter(ref="#/components/parameters/X-Api-Secret"),
-     *      @OA\Parameter(ref="#/components/parameters/X-Api-Token"),
-     *      @OA\Parameter(ref="#/components/parameters/X-Api-Password"),
-     *      @OA\Parameter(ref="#/components/parameters/X-Requested-With"),
-     *      @OA\Parameter(ref="#/components/parameters/include"),
-     *      @OA\Response(
-     *          response=200,
-     *          description="Success/failure response"
-     *       ),
-     *       @OA\Response(
-     *          response=422,
-     *          description="Validation error",
-     *          @OA\JsonContent(ref="#/components/schemas/ValidationError"),
-     *
-     *       ),
-     *       @OA\Response(
-     *           response="default",
-     *           description="Unexpected Error",
-     *           @OA\JsonContent(ref="#/components/schemas/Error"),
-     *       ),
-     *     )
-     */
-    // public function old_update(\Codedge\Updater\UpdaterManager $updater)
-    // {
-    //     set_time_limit(0);
-    //     define('STDIN', fopen('php://stdin', 'r'));
-
-    //     if (Ninja::isHosted()) {
-    //         return response()->json(['message' => ctrans('texts.self_update_not_available')], 403);
-    //     }
-
-    //     $this->testWritable();
-
-    //     // Get the new version available
-    //     $versionAvailable = $updater->source()->getVersionAvailable();
-
-    //     // Create a release
-    //     $release = $updater->source()->fetch($versionAvailable);
-
-    //     $updater->source()->update($release);
-
-    //     $cacheCompiled = base_path('bootstrap/cache/compiled.php');
-    //     if (file_exists($cacheCompiled)) { unlink ($cacheCompiled); }
-    //     $cacheServices = base_path('bootstrap/cache/services.php');
-    //     if (file_exists($cacheServices)) { unlink ($cacheServices); }
-
-    //     Artisan::call('clear-compiled');
-    //     Artisan::call('route:clear');
-    //     Artisan::call('view:clear');
-    //     Artisan::call('optimize');
-
-    //     return response()->json(['message' => 'Update completed'], 200);
-
-    // }
 
     public function update()
     {
@@ -121,28 +61,30 @@ class SelfUpdateController extends BaseController
 
         nlog('copying release file');
 
-        if (copy($this->getDownloadUrl(), storage_path('app/invoiceninja.zip'))) {
-            nlog('Copied file from URL');
-        } else {
+        $file_headers = @get_headers($this->getDownloadUrl());
+
+        if (stripos($file_headers[0], "404 Not Found") >0  || (stripos($file_headers[0], "302 Found") > 0 && stripos($file_headers[7], "404 Not Found") > 0)) {
             return response()->json(['message' => 'Download not yet available. Please try again shortly.'], 410);
+        }
+
+        try {
+            if (copy($this->getDownloadUrl(), storage_path("app/{$this->filename}"))) {
+                nlog('Copied file from URL');
+            }
+        }
+        catch(\Exception $e) {
+            nlog($e->getMessage());
+            return response()->json(['message' => 'File exists on the server, however there was a problem downloading and copying to the local filesystem'], 500);
         }
 
         nlog('Finished copying');
 
-        $file = Storage::disk('local')->path('invoiceninja.zip');
+        $file = Storage::disk('local')->path($this->filename);
 
-        nlog('Extracting zip');
+        nlog('Extracting tar');
 
-        //clean up old snappdf installations
-        $this->cleanOldSnapChromeBinaries();
-
-        $zipFile = new \PhpZip\ZipFile();
-
-        $zipFile->openFile($file);
-
-        $zipFile->extractTo(base_path());
-
-        $zipFile->close();
+        $phar = new \PharData($file);
+        $phar->extractTo(base_path(), null, true);
 
         nlog('Finished extracting files');
 
@@ -163,7 +105,7 @@ class SelfUpdateController extends BaseController
         Artisan::call('route:clear');
         Artisan::call('view:clear');
         Artisan::call('migrate', ['--force' => true]);
-        Artisan::call('optimize');
+        Artisan::call('config:clear');
 
         $this->buildCache(true);
 
@@ -172,68 +114,16 @@ class SelfUpdateController extends BaseController
         return response()->json(['message' => 'Update completed'], 200);
     }
 
-    private function cleanOldSnapChromeBinaries()
-    {
-        $current_revision = base_path('vendor/beganovich/snappdf/versions/revision.txt');
-        $current_revision_text = file_get_contents($current_revision);
-
-        $iterator = new \DirectoryIterator(base_path('vendor/beganovich/snappdf/versions'));
-
-        foreach ($iterator as $file) {
-            if ($file->isDir() && ! $file->isDot() && ($current_revision_text != $file->getFileName())) {
-                $directoryIterator = new \RecursiveDirectoryIterator(base_path('vendor/beganovich/snappdf/versions/'.$file->getFileName()), \RecursiveDirectoryIterator::SKIP_DOTS);
-
-                foreach (new \RecursiveIteratorIterator($directoryIterator) as $filex) {
-                    unlink($filex->getPathName());
-                }
-
-                $this->deleteDirectory(base_path('vendor/beganovich/snappdf/versions/'.$file->getFileName()));
-            }
-        }
-    }
-
-    private function deleteDirectory($dir)
-    {
-        if (! file_exists($dir)) {
-            return true;
-        }
-
-        if (! is_dir($dir) || is_link($dir)) {
-            return unlink($dir);
-        }
-        foreach (scandir($dir) as $item) {
-            if ($item == '.' || $item == '..') {
-                continue;
-            }
-            if (! $this->deleteDirectory($dir.'/'.$item)) {
-                if (! $this->deleteDirectory($dir.'/'.$item)) {
-                    return false;
-                }
-            }
-        }
-
-        return rmdir($dir);
-    }
-
-    private function postHookUpdate()
-    {
-        if (config('ninja.app_version') == '5.3.82') {
-            Client::withTrashed()->cursor()->each(function ($client) {
-                $entity_settings = $this->checkSettingType($client->settings);
-                $entity_settings->md5 = md5(time());
-                $client->settings = $entity_settings;
-                $client->save();
-            });
-        }
-    }
-
     private function clearCacheDir()
     {
         $directoryIterator = new \RecursiveDirectoryIterator(base_path('bootstrap/cache'), \RecursiveDirectoryIterator::SKIP_DOTS);
 
         foreach (new \RecursiveIteratorIterator($directoryIterator) as $file) {
             unlink(base_path('bootstrap/cache/').$file->getFileName());
+            $file = null;
         }
+
+        $directoryIterator = null;
     }
 
     private function testWritable()
@@ -246,13 +136,17 @@ class SelfUpdateController extends BaseController
             }
 
             if ($file->isFile() && ! $file->isWritable()) {
+
                 nlog("Cannot update system because {$file->getFileName()} is not writable");
                 throw new FilePermissionsFailure("Cannot update system because {$file->getFileName()} is not writable");
 
-                return false;
             }
+
+            $file = null;
         }
 
+        $directoryIterator = null;
+        
         return true;
     }
 
@@ -263,8 +157,10 @@ class SelfUpdateController extends BaseController
 
     private function getDownloadUrl()
     {
+
         $version = $this->checkVersion();
 
-        return "https://github.com/invoiceninja/invoiceninja/releases/download/v{$version}/invoiceninja.zip";
+        return "https://github.com/invoiceninja/invoiceninja/releases/download/v{$version}/invoiceninja.tar";
+
     }
 }

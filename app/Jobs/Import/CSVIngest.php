@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -42,7 +42,7 @@ class CSVIngest implements ShouldQueue
 
     public ?string $skip_header;
 
-    public $column_map;
+    public ?array $column_map = [];
 
     public array $request;
 
@@ -74,7 +74,7 @@ class CSVIngest implements ShouldQueue
 
         $engine = $this->bootEngine();
 
-        foreach (['client', 'product', 'invoice', 'payment', 'vendor', 'expense', 'quote'] as $entity) {
+        foreach (['client', 'product', 'invoice', 'payment', 'vendor', 'expense', 'quote', 'bank_transaction', 'recurring_invoice'] as $entity) {
             $engine->import($entity);
         }
 
@@ -104,6 +104,18 @@ class CSVIngest implements ShouldQueue
             $new_contact->is_primary = true;
             $new_contact->save();
         }
+
+        Client::with('contacts')->where('company_id', $this->company->id)->cursor()->each(function ($client) {
+            $contact = $client->contacts()->first();
+            $contact->is_primary = true;
+            $contact->save();
+        });
+
+        Vendor::with('contacts')->where('company_id', $this->company->id)->cursor()->each(function ($vendor) {
+            $contact = $vendor->contacts()->first();
+            $contact->is_primary = true;
+            $contact->save();
+        });
     }
 
     private function bootEngine()

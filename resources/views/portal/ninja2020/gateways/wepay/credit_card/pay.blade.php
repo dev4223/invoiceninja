@@ -7,7 +7,7 @@
 
     <meta name="contact-email" content="{{ $contact->email }}">
     <meta name="client-postal-code" content="{{ $contact->client->postal_code }}">
-
+    <meta name="country_code" content="{{$country_code}}">
     <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
     <script src="{{ asset('js/clients/payments/card-js.min.js') }}"></script>
 
@@ -81,3 +81,23 @@
 
     <script src="{{ asset('js/clients/payments/wepay-credit-card.js') }}"></script>
 @endsection
+
+@push('footer')
+<script defer>
+ 
+$(function() {
+
+    document.getElementsByClassName("expiry")[0].addEventListener('change', function() {
+
+    str = document.getElementsByClassName("expiry")[0].value.replace(/\s/g, '');
+    const expiryArray = str.split("/");
+
+    document.getElementsByName('expiry-month')[0].value = expiryArray[0];
+    document.getElementsByName('expiry-year')[0].value = expiryArray[1];
+
+    });
+
+});
+
+</script>
+@endpush

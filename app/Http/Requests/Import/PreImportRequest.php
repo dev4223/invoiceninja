@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -28,9 +28,10 @@ class PreImportRequest extends Request
     public function rules()
     {
         return [
-            'files.*' => 'file|mimes:csv,txt',
+            'files.*' => 'file|mimetypes:text/csv,text/plain,application/octet-stream',
             'files' => 'required|array|min:1|max:6',
             'import_type' => 'required',
         ];
     }
+
 }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -50,6 +50,21 @@ class UpdatePurchaseOrderRequest extends Request
         $rules['discount'] = 'sometimes|numeric';
         $rules['is_amount_discount'] = ['boolean'];
 
+        if ($this->file('documents') && is_array($this->file('documents'))) {
+            $rules['documents.*'] = $this->file_validation;
+        } elseif ($this->file('documents')) {
+            $rules['documents'] = $this->file_validation;
+        }
+
+        if ($this->file('file') && is_array($this->file('file'))) {
+            $rules['file.*'] = $this->file_validation;
+        } elseif ($this->file('file')) {
+            $rules['file'] = $this->file_validation;
+        }
+
+        $rules['status_id'] = 'sometimes|integer|in:1,2,3,4,5';
+        $rules['exchange_rate'] = 'bail|sometimes|numeric';
+
         return $rules;
     }
 
@@ -63,6 +78,10 @@ class UpdatePurchaseOrderRequest extends Request
 
         if (isset($input['line_items']) && is_array($input['line_items'])) {
             $input['line_items'] = isset($input['line_items']) ? $this->cleanItems($input['line_items']) : [];
+        }
+
+        if (array_key_exists('exchange_rate', $input) && is_null($input['exchange_rate'])) {
+            $input['exchange_rate'] = 1;
         }
 
         $this->replace($input);

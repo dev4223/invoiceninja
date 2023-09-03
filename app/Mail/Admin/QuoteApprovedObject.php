@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -21,16 +21,9 @@ use stdClass;
 
 class QuoteApprovedObject
 {
-    public $quote;
 
-    public $company;
-
-    public $settings;
-
-    public function __construct(Quote $quote, Company $company)
+    public function __construct(public Quote $quote, public Company $company, public bool $use_react_url)
     {
-        $this->quote = $quote;
-        $this->company = $company;
     }
 
     public function build()
@@ -90,7 +83,7 @@ class QuoteApprovedObject
                     'invoice' => $this->quote->number,
                 ]
             ),
-            'url' => $this->quote->invitations->first()->getAdminLink(),
+            'url' => $this->quote->invitations->first()->getAdminLink($this->use_react_url),
             'button' => ctrans('texts.view_quote'),
             'signature' => $settings->email_signature,
             'logo' => $this->company->present()->logo(),

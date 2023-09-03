@@ -17,5 +17,10 @@ module.exports = {
         }
     },
     variants: {},
-    plugins: []
+    plugins: [
+        require('@tailwindcss/line-clamp'),
+        require('@tailwindcss/forms'),
+        require('@tailwindcss/typography'),
+    ]
+
 };

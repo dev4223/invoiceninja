@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -51,7 +51,9 @@ class UploadFile implements ShouldQueue
 
     public $entity;
 
-    public function __construct($file, $type, $user, $company, $entity, $disk = null, $is_public = false)
+    public $disk;
+    
+    public function __construct($file, $type, $user, $company, $entity, $disk = null, $is_public = true)
     {
         $this->file = $file;
         $this->type = $type;
@@ -167,7 +169,7 @@ class UploadFile implements ShouldQueue
                     $previewHeight = $height * Document::DOCUMENT_PREVIEW_SIZE / $width;
                 } else {
                     $previewHeight = Document::DOCUMENT_PREVIEW_SIZE;
-                    $previewWidth = $width * DOCUMENT_PREVIEW_SIZE / $height;
+                    $previewWidth = $width * Document::DOCUMENT_PREVIEW_SIZE / $height;
                 }
 
                 $img->resize($previewWidth, $previewHeight);

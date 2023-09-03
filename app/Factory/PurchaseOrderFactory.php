@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -13,7 +13,6 @@ namespace App\Factory;
 
 use App\Models\Client;
 use App\Models\PurchaseOrder;
-use Illuminate\Database\Eloquent\Model;
 
 class PurchaseOrderFactory
 {
@@ -50,7 +49,8 @@ class PurchaseOrderFactory
         $purchase_order->user_id = $user_id;
         $purchase_order->company_id = $company_id;
         $purchase_order->recurring_id = null;
-
+        $purchase_order->exchange_rate = 1;
+        
         return $purchase_order;
     }
 }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -18,24 +18,12 @@ use App\Services\AbstractService;
 
 class SendEmail extends AbstractService
 {
-    protected $invoice;
-
-    protected $reminder_template;
-
-    protected $contact;
-
-    public function __construct(Invoice $invoice, $reminder_template = null, ClientContact $contact = null)
+    public function __construct(protected Invoice $invoice, protected $reminder_template = null, protected ?ClientContact $contact = null)
     {
-        $this->invoice = $invoice;
-
-        $this->reminder_template = $reminder_template;
-
-        $this->contact = $contact;
     }
 
     /**
      * Builds the correct template to send.
-     * @return void
      */
     public function run()
     {

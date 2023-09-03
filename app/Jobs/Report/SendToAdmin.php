@@ -4,14 +4,13 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Jobs\Report;
 
-use App\Http\Requests\Report\GenericReportRequest;
 use App\Jobs\Mail\NinjaMailerJob;
 use App\Jobs\Mail\NinjaMailerObject;
 use App\Libraries\MultiDB;
@@ -22,6 +21,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 
 class SendToAdmin implements ShouldQueue
 {
@@ -59,5 +59,10 @@ class SendToAdmin implements ShouldQueue
         $nmo->to_user = $this->company->owner();
 
         NinjaMailerJob::dispatch($nmo);
+    }
+
+    public function middleware()
+    {
+        return [new WithoutOverlapping("report-{$this->company->company_key}")];
     }
 }

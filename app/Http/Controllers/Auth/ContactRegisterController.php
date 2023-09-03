@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -39,7 +39,8 @@ class ContactRegisterController extends Controller
         } else {
             $key = request()->session()->has('company_key') ? request()->session()->get('company_key') : $company_key;
         }
-
+        
+        /** @var \App\Models\Company $company **/
         $company = Company::where('company_key', $key)->firstOrFail();
 
         App::forgetInstance('translator');
@@ -58,7 +59,7 @@ class ContactRegisterController extends Controller
 
         Auth::guard('contact')->loginUsingId($client_contact->id, true);
 
-        return redirect()->route('client.dashboard');
+        return redirect()->intended(route('client.dashboard'));
     }
 
     private function getClient(array $data)
@@ -66,7 +67,15 @@ class ContactRegisterController extends Controller
         $client = ClientFactory::create($data['company']->id, $data['company']->owner()->id);
 
         $client->fill($data);
+
         $client->save();
+
+        if (isset($data['currency_id'])) {
+            $settings = $client->settings;
+            $settings->currency_id = isset($data['currency_id']) ? $data['currency_id'] : $data['company']->settings->currency_id;
+            $client->settings = $settings;
+        }
+
         $client->number = $this->getNextClientNumber($client);
         $client->save();
 

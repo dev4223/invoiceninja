@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -13,7 +13,6 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Import\ImportRequest;
 use App\Http\Requests\Import\PreImportRequest;
-use App\Jobs\Import\CSVImport;
 use App\Jobs\Import\CSVIngest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -36,8 +35,7 @@ class ImportController extends Controller
      *      tags={"imports"},
      *      summary="Pre Import checks - returns a reference to the job and the headers of the CSV",
      *      description="Pre Import checks - returns a reference to the job and the headers of the CSV",
-     *      @OA\Parameter(ref="#/components/parameters/X-Api-Secret"),
-     *      @OA\Parameter(ref="#/components/parameters/X-Api-Token"),
+     *      @OA\Parameter(ref="#/components/parameters/X-API-TOKEN"),
      *      @OA\Parameter(ref="#/components/parameters/X-Requested-With"),
      *      @OA\Parameter(ref="#/components/parameters/include"),
      *      @OA\RequestBody(
@@ -83,11 +81,12 @@ class ImportController extends Controller
         /** @var UploadedFile $file */
         foreach ($request->files->get('files') as $entityType => $file) {
             $contents = file_get_contents($file->getPathname());
-            // $contents = mb_convert_encoding($contents, 'UTF-16LE', 'UTF-8');
+
+            $contents = $this->convertEncoding($contents);
 
             // Store the csv in cache with an expiry of 10 minutes
             Cache::put($hash.'-'.$entityType, base64_encode($contents), 600);
-
+            
             // Parse CSV
             $csv_array = $this->getCsvData($contents);
 
@@ -100,6 +99,18 @@ class ImportController extends Controller
         }
 
         return response()->json($data);
+    }
+
+    private function convertEncoding($data)
+    {
+        
+        $enc = mb_detect_encoding($data, mb_list_encodings(), true);
+        
+        if($enc !== false) {
+            $data = mb_convert_encoding($data, "UTF-8", $enc);
+        }
+
+        return $data;
     }
 
     public function import(ImportRequest $request)
@@ -126,7 +137,7 @@ class ImportController extends Controller
 
     private function getEntityMap($entity_type)
     {
-        return sprintf('App\\Import\\Definitions\%sMap', ucfirst($entity_type));
+        return sprintf('App\\Import\\Definitions\%sMap', ucfirst(Str::camel($entity_type)));
     }
 
     private function getCsvData($csvfile)
@@ -136,6 +147,8 @@ class ImportController extends Controller
         }
 
         $csv = Reader::createFromString($csvfile);
+        $csvdelimiter = self::detectDelimiter($csvfile);
+        $csv->setDelimiter($csvdelimiter);
         $stmt = new Statement();
         $data = iterator_to_array($stmt->process($csv));
 
@@ -155,5 +168,29 @@ class ImportController extends Controller
         }
 
         return $data;
+    }
+
+    /**
+     * Returns the best delimiter
+     *
+     * @param string $csvfile
+     * @return string
+     */
+    public function detectDelimiter($csvfile): string
+    {
+        $delimiters = [',', '.', ';'];
+        $bestDelimiter = ' ';
+        $count = 0;
+
+        foreach ($delimiters as $delimiter) {
+
+            if (substr_count(strstr($csvfile, "\n", true), $delimiter) >= $count) {
+                $count = substr_count(strstr($csvfile, "\n", true), $delimiter);
+                $bestDelimiter = $delimiter;        
+            }
+        
+        }
+
+        return $bestDelimiter;
     }
 }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -26,6 +26,6 @@ class QuoteRepository extends BaseRepository
 
     public function getInvitationByKey($key) :?QuoteInvitation
     {
-        return QuoteInvitation::where('key', $key)->first();
+        return QuoteInvitation::query()->where('key', $key)->first();
     }
 }

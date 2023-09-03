@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -23,43 +23,67 @@ class TriggeredActions extends AbstractService
 {
     use GeneratesCounter;
 
-    private $request;
+    private bool $updated = false;
 
-    private $invoice;
-
-    public function __construct(Invoice $invoice, Request $request)
+    public function __construct(private Invoice $invoice, private Request $request)
     {
-        $this->request = $request;
-
-        $this->invoice = $invoice;
     }
 
     public function run()
     {
         if ($this->request->has('auto_bill') && $this->request->input('auto_bill') == 'true') {
-            $this->invoice->service()->autoBill();
+            try {
+                $this->invoice->service()->autoBill();
+            } catch(\Exception $e) {
+                
+            } //update notification sends automatically for this.
         }
 
         if ($this->request->has('paid') && $this->request->input('paid') == 'true') {
-            $this->invoice = $this->invoice->service()->markPaid()->save();
+            $this->invoice = $this->invoice->service()->markPaid($this->request->input('reference'))->save(); //update notification sends automatically for this.
         }
 
+        if ($this->request->has('mark_sent') && $this->request->input('mark_sent') == 'true' && $this->invoice->status_id == Invoice::STATUS_DRAFT) {
+            $this->invoice = $this->invoice->service()->markSent()->save(); //update notification NOT sent
+            $this->updated = false;
+        }
+        
         if ($this->request->has('amount_paid') && is_numeric($this->request->input('amount_paid'))) {
-            $this->invoice = $this->invoice->service()->applyPaymentAmount($this->request->input('amount_paid'))->save();
+            $this->invoice = $this->invoice->service()->applyPaymentAmount($this->request->input('amount_paid'), $this->request->input('reference'))->save();
+            $this->updated = false;
         }
 
         if ($this->request->has('send_email') && $this->request->input('send_email') == 'true') {
-            $this->invoice->service()->markSent()->touchPdf()->save();
+            $this->invoice->service()->markSent()->save();
             $this->sendEmail();
-        }
-
-        if ($this->request->has('mark_sent') && $this->request->input('mark_sent') == 'true') {
-            $this->invoice = $this->invoice->service()->markSent()->save();
+            $this->updated = false;
         }
 
         if ($this->request->has('cancel') && $this->request->input('cancel') == 'true') {
             $this->invoice = $this->invoice->service()->handleCancellation()->save();
+            $this->updated = false;
         }
+
+        if ($this->request->has('save_default_footer') && $this->request->input('save_default_footer') == 'true') {
+            $company = $this->invoice->company;
+            $settings = $company->settings;
+            $settings->invoice_footer = $this->invoice->footer;
+            $company->settings = $settings;
+            $company->save();
+        }
+
+        if ($this->request->has('save_default_terms') && $this->request->input('save_default_terms') == 'true') {
+            $company = $this->invoice->company;
+            $settings = $company->settings;
+            $settings->invoice_terms = $this->invoice->terms;
+            $company->settings = $settings;
+            $company->save();
+        }
+
+        if ($this->updated) {
+            event('eloquent.updated: App\Models\Invoice', $this->invoice);
+        }
+
 
         return $this->invoice;
     }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -20,7 +20,6 @@ use App\Jobs\Mail\NinjaMailer;
 use App\Jobs\Mail\NinjaMailerJob;
 use App\Jobs\Mail\NinjaMailerObject;
 use App\Jobs\Mail\PaymentFailedMailer;
-use App\Jobs\Ninja\TransactionLog;
 use App\Jobs\Util\SystemLogger;
 use App\Mail\Admin\ClientPaymentFailureObject;
 use App\Models\Client;
@@ -31,17 +30,16 @@ use App\Models\GatewayType;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\PaymentHash;
-use App\Models\PaymentType;
 use App\Models\SystemLog;
-use App\Models\TransactionEvent;
 use App\Services\Subscription\SubscriptionService;
+use App\Utils\Helpers;
 use App\Utils\Ninja;
+use App\Utils\Number;
 use App\Utils\Traits\MakesHash;
 use App\Utils\Traits\SystemLogTrait;
-use Checkout\Library\Exceptions\CheckoutHttpException;
-use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Str;
 
 /**
@@ -58,6 +56,13 @@ class BaseDriver extends AbstractPaymentDriver
     /* The Invitation */
     public $invitation;
 
+    /**
+     * The Client
+     *
+     * @var \App\Models\Client|null $client 
+    */
+    public $client;
+
     /* Gateway capabilities */
     public $refundable = false;
 
@@ -67,26 +72,41 @@ class BaseDriver extends AbstractPaymentDriver
     /* Authorise payment methods */
     public $can_authorise_credit_card = false;
 
-    /* The client */
-    public $client;
-
     /* The initialized gateway driver class*/
     public $payment_method;
 
-    /* PaymentHash */
+    /**
+     * @var PaymentHash
+     */
     public $payment_hash;
 
+    /**
+     * @var Helpers`
+     */
+    public $helpers;
+    
     /* Array of payment methods */
     public static $methods = [];
 
     /** @var array */
     public $required_fields = [];
 
-    public function __construct(CompanyGateway $company_gateway, Client $client = null, $invitation = false)
+    public function __construct(CompanyGateway $company_gateway, ?Client $client = null, $invitation = null)
     {
         $this->company_gateway = $company_gateway;
         $this->invitation = $invitation;
         $this->client = $client;
+        $this->helpers = new Helpers();
+    }
+
+    public function init()
+    {
+        return $this;
+    }
+
+    public function updateCustomer()
+    {
+        return $this;
     }
 
     /**
@@ -96,7 +116,63 @@ class BaseDriver extends AbstractPaymentDriver
      */
     public function getClientRequiredFields(): array
     {
-        return [];
+        $fields = [];
+
+        if ($this->company_gateway->require_client_name) {
+            $fields[] = ['name' => 'client_name', 'label' => ctrans('texts.client_name'), 'type' => 'text', 'validation' => 'required'];
+        }
+
+        if ($this->company_gateway->require_contact_name) {
+            $fields[] = ['name' => 'contact_first_name', 'label' => ctrans('texts.first_name'), 'type' => 'text', 'validation' => 'required'];
+            $fields[] = ['name' => 'contact_last_name', 'label' => ctrans('texts.last_name'), 'type' => 'text', 'validation' => 'required'];
+        }
+
+        if ($this->company_gateway->require_contact_email) {
+            $fields[] = ['name' => 'contact_email', 'label' => ctrans('texts.email'), 'type' => 'text', 'validation' => 'required,email:rfc'];
+        }
+
+        if ($this->company_gateway->require_client_phone) {
+            $fields[] = ['name' => 'client_phone', 'label' => ctrans('texts.client_phone'), 'type' => 'tel', 'validation' => 'required'];
+        }
+
+        if ($this->company_gateway->require_billing_address) {
+            $fields[] = ['name' => 'client_address_line_1', 'label' => ctrans('texts.address1'), 'type' => 'text', 'validation' => 'required'];
+            $fields[] = ['name' => 'client_city', 'label' => ctrans('texts.city'), 'type' => 'text', 'validation' => 'required'];
+            $fields[] = ['name' => 'client_state', 'label' => ctrans('texts.state'), 'type' => 'text', 'validation' => 'required'];
+            $fields[] = ['name' => 'client_country_id', 'label' => ctrans('texts.country'), 'type' => 'text', 'validation' => 'required'];
+        }
+
+        if ($this->company_gateway->require_postal_code) {
+            $fields[] = ['name' => 'client_postal_code', 'label' => ctrans('texts.postal_code'), 'type' => 'text', 'validation' => 'required'];
+        }
+
+        if ($this->company_gateway->require_shipping_address) {
+            $fields[] = ['name' => 'client_shipping_address_line_1', 'label' => ctrans('texts.shipping_address1'), 'type' => 'text', 'validation' => 'required'];
+            $fields[] = ['name' => 'client_shipping_city', 'label' => ctrans('texts.shipping_city'), 'type' => 'text', 'validation' => 'required'];
+            $fields[] = ['name' => 'client_shipping_state', 'label' => ctrans('texts.shipping_state'), 'type' => 'text', 'validation' => 'required'];
+            $fields[] = ['name' => 'client_shipping_postal_code', 'label' => ctrans('texts.shipping_postal_code'), 'type' => 'text', 'validation' => 'required'];
+            $fields[] = ['name' => 'client_shipping_country_id', 'label' => ctrans('texts.shipping_country'), 'type' => 'text', 'validation' => 'required'];
+        }
+
+        if ($this->company_gateway->require_custom_value1) {
+            $fields[] = ['name' => 'client_custom_value1', 'label' => $this->helpers->makeCustomField($this->client->company->custom_fields, 'client1'), 'type' => 'text', 'validation' => 'required'];
+        }
+        
+        if ($this->company_gateway->require_custom_value2) {
+            $fields[] = ['name' => 'client_custom_value2', 'label' => $this->helpers->makeCustomField($this->client->company->custom_fields, 'client2'), 'type' => 'text', 'validation' => 'required'];
+        }
+
+
+        if ($this->company_gateway->require_custom_value3) {
+            $fields[] = ['name' => 'client_custom_value3', 'label' => $this->helpers->makeCustomField($this->client->company->custom_fields, 'client3'), 'type' => 'text', 'validation' => 'required'];
+        }
+
+
+        if ($this->company_gateway->require_custom_value4) {
+            $fields[] = ['name' => 'client_custom_value4', 'label' => $this->helpers->makeCustomField($this->client->company->custom_fields, 'client4'), 'type' => 'text', 'validation' => 'required'];
+        }
+
+        return $fields;
     }
 
     /**
@@ -187,6 +263,8 @@ class BaseDriver extends AbstractPaymentDriver
     public function setClient(Client $client)
     {
         $this->client = $client;
+        
+        return $this;
     }
     /************************** Helper methods *************************************/
 
@@ -207,7 +285,7 @@ class BaseDriver extends AbstractPaymentDriver
     public function attachInvoices(Payment $payment, PaymentHash $payment_hash): Payment
     {
         $paid_invoices = $payment_hash->invoices();
-        $invoices = Invoice::whereIn('id', $this->transformKeys(array_column($paid_invoices, 'invoice_id')))->withTrashed()->get();
+        $invoices = Invoice::query()->whereIn('id', $this->transformKeys(array_column($paid_invoices, 'invoice_id')))->withTrashed()->get();
         $payment->invoices()->sync($invoices);
 
         $payment->service()->applyNumber()->save();
@@ -248,7 +326,7 @@ class BaseDriver extends AbstractPaymentDriver
         $payment->company_gateway_id = $this->company_gateway->id;
         $payment->status_id = $status;
         $payment->currency_id = $this->client->getSetting('currency_id');
-        $payment->date = Carbon::now();
+        $payment->date = Carbon::now()->addSeconds($this->client->company->timezone()->utc_offset)->format('Y-m-d');
         $payment->gateway_type_id = $data['gateway_type_id'];
 
         $client_contact = $this->getContact();
@@ -289,7 +367,11 @@ class BaseDriver extends AbstractPaymentDriver
         event(new PaymentWasCreated($payment, $payment->company, Ninja::eventVars()));
 
         if (property_exists($this->payment_hash->data, 'billing_context') && $status == Payment::STATUS_COMPLETED) {
-            $billing_subscription = \App\Models\Subscription::find($this->payment_hash->data->billing_context->subscription_id);
+            if (is_int($this->payment_hash->data->billing_context->subscription_id)) {
+                $billing_subscription = \App\Models\Subscription::find($this->payment_hash->data->billing_context->subscription_id);
+            } else {
+                $billing_subscription = \App\Models\Subscription::find($this->decodePrimaryKey($this->payment_hash->data->billing_context->subscription_id));
+            }
 
             // To access campaign hash => $this->payment_hash->data->billing_context->campaign;
             // To access campaign data => Cache::get(CAMPAIGN_HASH)
@@ -305,12 +387,10 @@ class BaseDriver extends AbstractPaymentDriver
      * When a successful payment is made, we need to append the gateway fee
      * to an invoice.
      *
-     * @param  PaymentResponseRequest $request The incoming payment request
      * @return void                            Success/Failure
      */
     public function confirmGatewayFee() :void
     {
-
         /*Payment invoices*/
         $payment_invoices = $this->payment_hash->invoices();
 
@@ -318,22 +398,12 @@ class BaseDriver extends AbstractPaymentDriver
         $fee_total = $this->payment_hash->fee_total;
 
         /*Hydrate invoices*/
-        $invoices = Invoice::whereIn('id', $this->transformKeys(array_column($payment_invoices, 'invoice_id')))->withTrashed()->get();
+        $invoices = Invoice::query()->whereIn('id', $this->transformKeys(array_column($payment_invoices, 'invoice_id')))->withTrashed()->get();
 
-        $invoices->each(function ($invoice) use ($fee_total) {
+        $invoices->each(function ($invoice) {
             if (collect($invoice->line_items)->contains('type_id', '3')) {
                 $invoice->service()->toggleFeesPaid()->save();
             }
-
-            $transaction = [
-                'invoice' => $invoice->transaction_event(),
-                'payment' => [],
-                'client' => $invoice->client->transaction_event(),
-                'credit' => [],
-                'metadata' => [],
-            ];
-
-            TransactionLog::dispatch(TransactionEvent::INVOICE_FEE_APPLIED, $transaction, $invoice->company->db);
         });
     }
 
@@ -346,7 +416,7 @@ class BaseDriver extends AbstractPaymentDriver
      */
     public function unWindGatewayFees(PaymentHash $payment_hash)
     {
-        $invoices = Invoice::whereIn('id', $this->transformKeys(array_column($payment_hash->invoices(), 'invoice_id')))->withTrashed()->get();
+        $invoices = Invoice::query()->whereIn('id', $this->transformKeys(array_column($payment_hash->invoices(), 'invoice_id')))->withTrashed()->get();
 
         $invoices->each(function ($invoice) {
             $invoice->service()->removeUnpaidGatewayFees();
@@ -356,7 +426,6 @@ class BaseDriver extends AbstractPaymentDriver
     /**
      * Return the contact if possible.
      *
-     * @return ClientContact The ClientContact object
      */
     public function getContact()
     {
@@ -431,7 +500,7 @@ class BaseDriver extends AbstractPaymentDriver
 
     public function sendFailureMail($error)
     {
-        if(is_object($error)){
+        if (is_object($error)) {
             $error = 'Payment Aborted';
         }
 
@@ -459,10 +528,10 @@ class BaseDriver extends AbstractPaymentDriver
             $nmo->company = $this->client->company;
             $nmo->settings = $this->client->company->settings;
 
-            $invoices = Invoice::whereIn('id', $this->transformKeys(array_column($this->payment_hash->invoices(), 'invoice_id')))->withTrashed()->get();
+            $invoices = Invoice::query()->whereIn('id', $this->transformKeys(array_column($this->payment_hash->invoices(), 'invoice_id')))->withTrashed()->get();
 
             $invoices->each(function ($invoice) {
-                $invoice->service()->touchPdf();
+                $invoice->service()->deletePdf();
             });
 
             $invoices->first()->invitations->each(function ($invitation) use ($nmo) {
@@ -504,10 +573,10 @@ class BaseDriver extends AbstractPaymentDriver
         $nmo->company = $this->client->company;
         $nmo->settings = $this->client->company->settings;
 
-        $invoices = Invoice::whereIn('id', $this->transformKeys(array_column($this->payment_hash->invoices(), 'invoice_id')))->withTrashed()->get();
+        $invoices = Invoice::query()->whereIn('id', $this->transformKeys(array_column($this->payment_hash->invoices(), 'invoice_id')))->withTrashed()->get();
 
         $invoices->each(function ($invoice) {
-            $invoice->service()->touchPdf();
+            $invoice->service()->deletePdf();
         });
 
         $invoices->first()->invitations->each(function ($invitation) use ($nmo) {
@@ -601,22 +670,7 @@ class BaseDriver extends AbstractPaymentDriver
                 $this->required_fields[] = 'phone';
             }
         }
-
-        if ($this->company_gateway->require_contact_email) {
-            if ($this->checkRequiredResource($this->email)) {
-                $this->required_fields[] = 'contact_email';
-            }
-        }
-
-        // if ($this->company_gateway->require_contact_name) {
-        //     if ($this->checkRequiredResource($this->first_name)) {
-        //         $this->required_fields[] = 'contact_first_name';
-        //     }
-
-        //     if ($this->checkRequiredResource($this->last_name)) {
-        //         $this->required_fields[] = 'contact_last_name';
-        //     }
-        // }
+        
 
         if ($this->company_gateway->require_postal_code) {
             // In case "require_postal_code" is true, we don't need billing address.
@@ -672,22 +726,72 @@ class BaseDriver extends AbstractPaymentDriver
         return $types;
     }
 
+    public function getStatementDescriptor(): string
+    {
+        App::forgetInstance('translator');
+        $t = app('translator');
+        $t->replace(Ninja::transformTranslations($this->client->getMergedSettings()));
+        App::setLocale($this->client->company->locale());
+        
+        if (! $this->payment_hash || !$this->client) 
+            return 'Descriptor';
+
+        $invoices_string = \implode(', ', collect($this->payment_hash->invoices())->pluck('invoice_number')->toArray()) ?: null;
+
+        if (!$invoices_string) 
+            return str_replace(["*","<",">","'",'"'], "", $this->client->company->present()->name());
+
+        $invoices_string = str_replace(["*","<",">","'",'"'], "-", $invoices_string);
+        
+        $invoices_string = "I-".$invoices_string;
+
+        $invoices_string = substr($invoices_string,0,22);
+        
+        $invoices_string = str_pad($invoices_string, 5, ctrans('texts.invoice'), STR_PAD_LEFT);
+
+        return $invoices_string;
+
+    }
     /**
      * Generic description handler
      */
     public function getDescription(bool $abbreviated = true)
     {
-        if (! $this->payment_hash) {
-            return '';
+        App::forgetInstance('translator');
+        $t = app('translator');
+        $t->replace(Ninja::transformTranslations($this->client->getMergedSettings()));
+        App::setLocale($this->client->company->locale());
+
+        if (! $this->payment_hash || !$this->client) {
+            return 'No description';
         }
 
-        if ($abbreviated) {
-            return \implode(', ', collect($this->payment_hash->invoices())->pluck('invoice_number')->toArray());
+        $invoices_string = \implode(', ', collect($this->payment_hash->invoices())->pluck('invoice_number')->toArray()) ?: null;
+        $amount = Number::formatMoney($this->payment_hash?->amount_with_fee() ?? 0, $this->client);
+
+        if($abbreviated && $invoices_string){
+            return $invoices_string;
+        } elseif ($abbreviated || ! $invoices_string) {
+            return ctrans('texts.gateway_payment_text_no_invoice', [
+                'amount' => $amount,
+                'client' => $this->client->present()->name(),
+            ]);
         }
+
+        return ctrans('texts.gateway_payment_text', [
+            'invoices' => $invoices_string,
+            'amount' => $amount,
+            'client' => $this->client->present()->name(),
+        ]);
 
         return sprintf('%s: %s', ctrans('texts.invoices'), \implode(', ', collect($this->payment_hash->invoices())->pluck('invoice_number')->toArray()));
     }
-
+    
+    /**
+     * Stub for disconnecting from the gateway.
+     *
+     * @return void
+     */
     public function disconnect()
     {
         return true;

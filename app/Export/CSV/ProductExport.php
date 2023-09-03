@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,9 +12,7 @@
 namespace App\Export\CSV;
 
 use App\Libraries\MultiDB;
-use App\Models\Client;
 use App\Models\Company;
-use App\Models\Credit;
 use App\Models\Document;
 use App\Models\Product;
 use App\Transformers\ProductTransformer;
@@ -24,15 +22,13 @@ use League\Csv\Writer;
 
 class ProductExport extends BaseExport
 {
-    private Company $company;
-
-    protected array $input;
-
     private $entity_transformer;
 
-    protected $date_key = 'created_at';
+    public string $date_key = 'created_at';
 
-    protected array $entity_keys = [
+    public Writer $csv;
+
+    public array $entity_keys = [
         'project' => 'project_id',
         'vendor' => 'vendor_id',
         'custom_value1' => 'custom_value1',
@@ -82,7 +78,10 @@ class ProductExport extends BaseExport
         //insert the header
         $this->csv->insertOne($this->buildHeader());
 
-        $query = Product::query()->where('company_id', $this->company->id)->where('is_deleted', 0);
+        $query = Product::query()
+                        ->withTrashed()
+                        ->where('company_id', $this->company->id)
+                        ->where('is_deleted', 0);
 
         $query = $this->addDateRange($query);
 
@@ -119,9 +118,9 @@ class ProductExport extends BaseExport
             $entity['vendor'] = $product->vendor()->exists() ? $product->vendor->name : '';
         }
 
-        if (array_key_exists('project_id', $this->input['report_keys'])) {
-            $entity['project'] = $product->project()->exists() ? $product->project->name : '';
-        }
+        // if (array_key_exists('project_id', $this->input['report_keys'])) {
+        //     $entity['project'] = $product->project()->exists() ? $product->project->name : '';
+        // }
 
         return $entity;
     }

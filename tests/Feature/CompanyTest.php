@@ -47,6 +47,40 @@ class CompanyTest extends TestCase
         $this->makeTestData();
     }
 
+    public function testUpdateCompanyPropertyInvoiceTaskHours()
+    {
+        $company_update = [
+            'invoice_task_hours' => true
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->putJson('/api/v1/companies/'.$this->encodePrimaryKey($this->company->id), $company_update)
+            ->assertStatus(200);
+
+
+        $arr = $response->json();
+
+        $this->assertTrue($arr['data']['invoice_task_hours']);
+
+
+        $company_update = [
+            'invoice_task_hours' => false
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->putJson('/api/v1/companies/'.$this->encodePrimaryKey($this->company->id), $company_update)
+            ->assertStatus(200);
+
+
+        $arr = $response->json();
+
+        $this->assertFalse($arr['data']['invoice_task_hours']);
+    }
+
     public function testCompanyList()
     {
         $this->withoutMiddleware(PasswordProtection::class);
@@ -108,6 +142,8 @@ class CompanyTest extends TestCase
         $settings->quote_design_id = '1';
 
         $company->settings = $settings;
+
+        // nlog($company->toArray());
 
         $response = $this->withHeaders([
             'X-API-SECRET' => config('ninja.api_secret'),

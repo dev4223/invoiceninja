@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -15,16 +15,19 @@ use App\Jobs\Cron\AutoBillCron;
 use App\Jobs\Cron\RecurringExpensesCron;
 use App\Jobs\Cron\RecurringInvoicesCron;
 use App\Jobs\Cron\SubscriptionCron;
-use App\Jobs\Ledger\LedgerBalanceUpdate;
+use App\Jobs\Cron\UpdateCalculatedFields;
+use App\Jobs\Invoice\InvoiceCheckLateWebhook;
 use App\Jobs\Ninja\AdjustEmailQuota;
+use App\Jobs\Ninja\BankTransactionSync;
 use App\Jobs\Ninja\CompanySizeCheck;
 use App\Jobs\Ninja\QueueSize;
 use App\Jobs\Ninja\SystemMaintenance;
 use App\Jobs\Ninja\TaskScheduler;
+use App\Jobs\Quote\QuoteCheckExpired;
+use App\Jobs\Subscription\CleanStaleInvoiceOrder;
 use App\Jobs\Util\DiskCleanup;
 use App\Jobs\Util\ReminderJob;
 use App\Jobs\Util\SchedulerCheck;
-use App\Jobs\Util\SendFailedEmails;
 use App\Jobs\Util\UpdateExchangeRates;
 use App\Jobs\Util\VersionCheck;
 use App\Models\Account;
@@ -42,31 +45,56 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
+        /* Check for the latest version of Invoice Ninja */
         $schedule->job(new VersionCheck)->daily();
 
-        $schedule->job(new DiskCleanup)->daily()->withoutOverlapping();
+        /* Returns the number of jobs in the queue */
+        $schedule->job(new QueueSize)->everyFiveMinutes()->withoutOverlapping()->name('queue-size-job')->onOneServer();
 
-        $schedule->job(new ReminderJob)->hourly()->withoutOverlapping();
+        /* Send reminders */
+        $schedule->job(new ReminderJob)->hourly()->withoutOverlapping()->name('reminder-job')->onOneServer();
 
-        $schedule->job(new QueueSize)->everyFiveMinutes()->withoutOverlapping();
+        /* Sends recurring invoices*/
+        $schedule->job(new RecurringInvoicesCron)->hourly()->withoutOverlapping()->name('recurring-invoice-job')->onOneServer();
 
-        $schedule->job(new CompanySizeCheck)->daily()->withoutOverlapping();
+        /* Checks for scheduled tasks */
+        $schedule->job(new TaskScheduler())->hourlyAt(10)->withoutOverlapping()->name('task-scheduler-job')->onOneServer();
 
-        $schedule->job(new UpdateExchangeRates)->daily()->withoutOverlapping();
+        /* Stale Invoice Cleanup*/
+        $schedule->job(new CleanStaleInvoiceOrder)->hourlyAt(30)->withoutOverlapping()->name('stale-invoice-job')->onOneServer();
 
-        $schedule->job(new SubscriptionCron)->daily()->withoutOverlapping();
+        /* Stale Invoice Cleanup*/
+        $schedule->job(new UpdateCalculatedFields)->hourlyAt(40)->withoutOverlapping()->name('update-calculated-fields-job')->onOneServer();
 
-        $schedule->job(new RecurringInvoicesCron)->hourly()->withoutOverlapping();
+        /* Checks for large companies and marked them as is_large */
+        $schedule->job(new CompanySizeCheck)->dailyAt('23:20')->withoutOverlapping()->name('company-size-job')->onOneServer();
 
-        $schedule->job(new RecurringExpensesCron)->dailyAt('00:10')->withoutOverlapping();
+        /* Pulls in the latest exchange rates */
+        $schedule->job(new UpdateExchangeRates)->dailyAt('23:30')->withoutOverlapping()->name('exchange-rate-job')->onOneServer();
 
-        $schedule->job(new AutoBillCron)->dailyAt('06:00')->withoutOverlapping();
+        /* Runs cleanup code for subscriptions */
+        $schedule->job(new SubscriptionCron)->dailyAt('00:01')->withoutOverlapping()->name('subscription-job')->onOneServer();
 
-        $schedule->job(new SchedulerCheck)->daily()->withoutOverlapping();
+        /* Sends recurring invoices*/
+        $schedule->job(new RecurringExpensesCron)->dailyAt('00:10')->withoutOverlapping()->name('recurring-expense-job')->onOneServer();
 
-        $schedule->job(new TaskScheduler())->daily()->withoutOverlapping();
+        /* Checks the status of the scheduler */
+        $schedule->job(new SchedulerCheck)->dailyAt('01:10')->withoutOverlapping();
 
-        $schedule->job(new SystemMaintenance)->weekly()->withoutOverlapping();
+        /* Checks and cleans redundant files */
+        $schedule->job(new DiskCleanup)->dailyAt('02:10')->withoutOverlapping()->name('disk-cleanup-job')->onOneServer();
+
+        /* Performs system maintenance such as pruning the backup table */
+        $schedule->job(new SystemMaintenance)->sundays()->at('02:30')->withoutOverlapping()->name('system-maintenance-job')->onOneServer();
+
+        /* Fires notifications for expired Quotes */
+        $schedule->job(new QuoteCheckExpired)->dailyAt('05:10')->withoutOverlapping()->name('quote-expired-job')->onOneServer();
+
+        /* Performs auto billing */
+        $schedule->job(new AutoBillCron)->dailyAt('06:20')->withoutOverlapping()->name('auto-bill-job')->onOneServer();
+
+        /* Fires webhooks for overdue Invoice */
+        $schedule->job(new InvoiceCheckLateWebhook)->dailyAt('07:00')->withoutOverlapping()->name('invoice-overdue-job')->onOneServer();
 
         if (Ninja::isSelfHost()) {
             $schedule->call(function () {
@@ -78,13 +106,14 @@ class Kernel extends ConsoleKernel
         if (Ninja::isHosted()) {
             $schedule->job(new AdjustEmailQuota)->dailyAt('23:30')->withoutOverlapping();
 
-            $schedule->job(new SendFailedEmails)->daily()->withoutOverlapping();
+            /* Pulls in bank transactions from third party services */
+            $schedule->job(new BankTransactionSync)->dailyAt('04:10')->withoutOverlapping()->name('bank-trans-sync-job')->onOneServer();
 
-            $schedule->command('ninja:check-data --database=db-ninja-01')->daily('02:00')->withoutOverlapping();
+            $schedule->command('ninja:check-data --database=db-ninja-01')->dailyAt('02:10')->withoutOverlapping()->name('check-data-db-1-job')->onOneServer();
 
-            $schedule->command('ninja:check-data --database=db-ninja-02')->dailyAt('02:05')->withoutOverlapping();
+            $schedule->command('ninja:check-data --database=db-ninja-02')->dailyAt('02:20')->withoutOverlapping()->name('check-data-db-2-job')->onOneServer();
 
-            $schedule->command('ninja:s3-cleanup')->dailyAt('23:15')->withoutOverlapping();
+            $schedule->command('ninja:s3-cleanup')->dailyAt('23:15')->withoutOverlapping()->name('s3-cleanup-job')->onOneServer();
         }
 
         if (config('queue.default') == 'database' && Ninja::isSelfHost() && config('ninja.internal_queue_enabled') && ! config('ninja.is_docker')) {

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -39,8 +39,15 @@ class ACH implements MethodInterface
 
     public function authorizeView(array $data)
     {
-        $data['gateway'] = $this->braintree;
-        $data['client_token'] = $this->braintree->gateway->clientToken()->generate();
+        try {
+            $data['gateway'] = $this->braintree;
+            $data['client_token'] = $this->braintree->gateway->clientToken()->generate();
+        }
+        catch(\Exception $e){
+            
+            throw new PaymentFailed("Unable to generate client token, check your Braintree credentials. Error: " . $e->getMessage(), 500);
+            
+        }
 
         return render('gateways.braintree.ach.authorize', $data);
     }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -50,8 +50,6 @@ class ProfileController extends Controller
 
         $client_contact->save();
 
-        // auth()->user()->fresh();
-
         return back()->withSuccess(
             ctrans('texts.profile_updated_successfully')
         );
@@ -63,7 +61,7 @@ class ProfileController extends Controller
 
         //update avatar if needed
         if ($request->file('logo')) {
-            $path = (new UploadAvatar($request->file('logo'), auth()->user()->client->client_hash))->handle();
+            $path = (new UploadAvatar($request->file('logo'), $client->client_hash))->handle();
 
             if ($path) {
                 $client->logo = $path;

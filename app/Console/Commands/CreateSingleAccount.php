@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -25,6 +25,9 @@ use App\Helpers\Invoice\InvoiceSum;
 use App\Jobs\Company\CreateCompanyTaskStatuses;
 use App\Libraries\MultiDB;
 use App\Models\Account;
+use App\Models\BankIntegration;
+use App\Models\BankTransaction;
+use App\Models\BankTransactionRule;
 use App\Models\Client;
 use App\Models\ClientContact;
 use App\Models\Company;
@@ -50,8 +53,8 @@ use Carbon\Carbon;
 use Faker\Factory;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 use stdClass;
 
 class CreateSingleAccount extends Command
@@ -75,19 +78,16 @@ class CreateSingleAccount extends Command
      */
     public function handle()
     {
-
-        if(config('ninja.is_docker'))
+        if (Ninja::isHosted() || config('ninja.is_docker') || !$this->confirm('Are you sure you want to inject dummy data?')) {
             return;
-        
-        if (!$this->confirm('Are you sure you want to inject dummy data?'))
-            return;
+        }
 
         $this->invoice_repo = new InvoiceRepository();
 
         MultiDB::setDb($this->option('database'));
 
         $this->info(date('r').' Create Single Sample Account...');
-        $this->count = 1;
+        $this->count = 5;
         $this->gateway = $this->argument('gateway');
 
         $this->info('Warming up cache');
@@ -101,6 +101,10 @@ class CreateSingleAccount extends Command
     {
         $this->info('Creating Small Account and Company');
 
+        if ($user = User::where('email', 'small@example.com')->first()) {
+            $user->account->delete();
+        }
+
         $account = Account::factory()->create();
         $company = Company::factory()->create([
             'account_id' => $account->id,
@@ -110,11 +114,32 @@ class CreateSingleAccount extends Command
             'portal_domain' => 'http://ninja.test:8000',
             'track_inventory' => true
         ]);
+        $faker = \Faker\Factory::create();
 
         $settings = $company->settings;
         $settings->invoice_terms = 'Default company invoice terms';
         $settings->quote_terms = 'Default company quote terms';
         $settings->invoice_footer = 'Default invoice footer';
+
+        $settings->company_logo = 'https://pdf.invoicing.co/favicon-v2.png';
+        $settings->name = $faker->name();
+        $settings->email = $faker->safeEmail();
+        $settings->phone = $faker->phoneNumber();
+        $settings->website = $faker->url();
+
+        $settings->address1 = $faker->streetName();
+        $settings->address2 = $faker->streetAddress();
+        $settings->city = $faker->city();
+        $settings->state = $faker->state();
+        $settings->postal_code = $faker->postcode();
+
+        $settings->country_id = '840';
+        $settings->vat_number = 'vat number';
+        $settings->id_number = 'id number';
+        $settings->use_credits_payment = 'always';
+        $settings->timezone_id = '1';
+        $settings->entity_send_time = 0;
+        $settings->name = $faker->name();
 
         $company->settings = $settings;
         $company->client_registration_fields = ClientRegistrationFields::generate();
@@ -178,6 +203,39 @@ class CreateSingleAccount extends Command
             'name' => 'CA Sales Tax',
             'rate' => 5
         ]);
+
+        $bi = BankIntegration::factory()->create([
+            'account_id' => $account->id,
+            'company_id' => $company->id,
+            'user_id' => $user->id,
+        ]);
+
+        BankTransaction::factory()->count(50)->create([
+            'bank_integration_id' => $bi->id,
+            'user_id' => $user->id,
+            'company_id' => $company->id,
+        ]);
+
+        $btr = BankTransactionRule::factory()->create([
+            'user_id' => $user->id,
+            'company_id' => $company->id,
+            'applies_to' => (bool)rand(0, 1) ? 'CREDIT' : 'DEBIT',
+        ]);
+
+        $client = Client::factory()->create([
+                'user_id' => $user->id,
+                'company_id' => $company->id,
+                'name' => 'cypress'
+            ]);
+
+        ClientContact::factory()->create([
+                    'user_id' => $user->id,
+                    'client_id' => $client->id,
+                    'company_id' => $company->id,
+                    'is_primary' => 1,
+                    'email' => 'cypress@example.com',
+                    'password' => Hash::make('password'),
+                ]);
 
 
         $this->info('Creating '.$this->count.' clients');
@@ -285,8 +343,8 @@ class CreateSingleAccount extends Command
 
         $webhook_config = [
             'post_purchase_url' => 'http://ninja.test:8000/api/admin/plan',
-            'post_purchase_rest_method' => 'POST',
-            'post_purchase_headers' => [],
+            'post_purchase_rest_method' => 'post',
+            'post_purchase_headers' => [config('ninja.ninja_hosted_header') => config('ninja.ninja_hosted_secret')],
         ];
 
         $sub = SubscriptionFactory::create($company->id, $user->id);
@@ -319,7 +377,6 @@ class CreateSingleAccount extends Command
 
     private function createClient($company, $user)
     {
-
         // dispatch(function () use ($company, $user) {
 
         // });
@@ -333,7 +390,7 @@ class CreateSingleAccount extends Command
                     'client_id' => $client->id,
                     'company_id' => $company->id,
                     'is_primary' => 1,
-                    'email' => 'user@example.com'
+                    'email' => 'user@example.com',
                 ]);
 
         ClientContact::factory()->count(rand(1, 2))->create([
@@ -358,7 +415,7 @@ class CreateSingleAccount extends Command
 
     private function createExpense($client)
     {
-        Expense::factory()->count(rand(1, 2))->create([
+        Expense::factory()->count(rand(1, 20))->create([
                 'user_id' => $client->user->id,
                 'client_id' => $client->id,
                 'company_id' => $client->company->id,
@@ -590,24 +647,22 @@ class CreateSingleAccount extends Command
         $cached_tables = config('ninja.cached_tables');
 
         foreach ($cached_tables as $name => $class) {
-            if (! Cache::has($name)) {
-                // check that the table exists in case the migration is pending
-                if (! Schema::hasTable((new $class())->getTable())) {
-                    continue;
-                }
-                if ($name == 'payment_terms') {
-                    $orderBy = 'num_days';
-                } elseif ($name == 'fonts') {
-                    $orderBy = 'sort_order';
-                } elseif (in_array($name, ['currencies', 'industries', 'languages', 'countries', 'banks'])) {
-                    $orderBy = 'name';
-                } else {
-                    $orderBy = 'id';
-                }
-                $tableData = $class::orderBy($orderBy)->get();
-                if ($tableData->count()) {
-                    Cache::forever($name, $tableData);
-                }
+            // check that the table exists in case the migration is pending
+            if (! Schema::hasTable((new $class())->getTable())) {
+                continue;
+            }
+            if ($name == 'payment_terms') {
+                $orderBy = 'num_days';
+            } elseif ($name == 'fonts') {
+                $orderBy = 'sort_order';
+            } elseif (in_array($name, ['currencies', 'industries', 'languages', 'countries', 'banks'])) {
+                $orderBy = 'name';
+            } else {
+                $orderBy = 'id';
+            }
+            $tableData = $class::orderBy($orderBy)->get();
+            if ($tableData->count()) {
+                Cache::forever($name, $tableData);
             }
         }
     }
@@ -615,7 +670,6 @@ class CreateSingleAccount extends Command
     private function createGateways($company, $user)
     {
         if (config('ninja.testvars.stripe') && ($this->gateway == 'all' || $this->gateway == 'stripe')) {
-
             $cg = new CompanyGateway;
             $cg->company_id = $company->id;
             $cg->user_id = $user->id;
@@ -634,8 +688,6 @@ class CreateSingleAccount extends Command
 
             $cg->fees_and_limits = $fees_and_limits;
             $cg->save();
-
-
         }
 
         if (config('ninja.testvars.paypal') && ($this->gateway == 'all' || $this->gateway == 'paypal')) {
@@ -658,6 +710,29 @@ class CreateSingleAccount extends Command
             $cg->fees_and_limits = $fees_and_limits;
             $cg->save();
         }
+
+        if (config('ninja.testvars.paypal_rest') && ($this->gateway == 'all' || $this->gateway == 'paypal_rest')) {
+            $cg = new CompanyGateway;
+            $cg->company_id = $company->id;
+            $cg->user_id = $user->id;
+            $cg->gateway_key = '80af24a6a691230bbec33e930ab40665';
+            $cg->require_cvv = true;
+            $cg->require_billing_address = true;
+            $cg->require_shipping_address = true;
+            $cg->update_details = true;
+            $cg->config = encrypt(config('ninja.testvars.paypal_rest'));
+            $cg->save();
+
+            // $gateway_types = $cg->driver()->gatewayTypes();
+
+            $fees_and_limits = new stdClass;
+            $fees_and_limits->{3} = new FeesAndLimits;
+
+            $cg->fees_and_limits = $fees_and_limits;
+            $cg->save();
+        }
+
+
 
         if (config('ninja.testvars.checkout') && ($this->gateway == 'all' || $this->gateway == 'checkout')) {
             $cg = new CompanyGateway;

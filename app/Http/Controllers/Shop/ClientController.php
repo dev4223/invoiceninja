@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -53,6 +53,7 @@ class ClientController extends BaseController
 
     public function show(Request $request, string $contact_key)
     {
+        /** @var \App\Models\Company $company */
         $company = Company::where('company_key', $request->header('X-API-COMPANY-KEY'))->first();
 
         if (! $company->enable_shop_api) {
@@ -69,6 +70,7 @@ class ClientController extends BaseController
 
     public function store(StoreShopClientRequest $request)
     {
+        /** @var \App\Models\Company $company */
         $company = Company::where('company_key', $request->header('X-API-COMPANY-KEY'))->first();
 
         if (! $company->enable_shop_api) {

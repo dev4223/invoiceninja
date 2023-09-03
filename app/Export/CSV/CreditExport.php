@@ -4,41 +4,42 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Export\CSV;
 
-use App\Libraries\MultiDB;
-use App\Models\Client;
-use App\Models\Company;
-use App\Models\Credit;
-use App\Transformers\CreditTransformer;
 use App\Utils\Ninja;
-use Illuminate\Support\Facades\App;
+use App\Utils\Number;
+use App\Models\Credit;
 use League\Csv\Writer;
+use App\Models\Company;
+use App\Libraries\MultiDB;
+use Illuminate\Support\Facades\App;
+use App\Transformers\CreditTransformer;
+use Illuminate\Contracts\Database\Eloquent\Builder;
 
 class CreditExport extends BaseExport
 {
-    private Company $company;
-
-    protected array $input;
 
     private CreditTransformer $credit_transformer;
 
-    protected string $date_key = 'created_at';
+    public string $date_key = 'created_at';
 
-    protected array $entity_keys = [
+    public Writer $csv;
+
+    public array $entity_keys = [
         'amount' => 'amount',
         'balance' => 'balance',
         'client' => 'client_id',
+        'country' => 'country_id',
         'custom_surcharge1' => 'custom_surcharge1',
         'custom_surcharge2' => 'custom_surcharge2',
         'custom_surcharge3' => 'custom_surcharge3',
         'custom_surcharge4' => 'custom_surcharge4',
-        'country' => 'country_id',
+        'currency' => 'currency',
         'custom_value1' => 'custom_value1',
         'custom_value2' => 'custom_value2',
         'custom_value3' => 'custom_value3',
@@ -65,7 +66,6 @@ class CreditExport extends BaseExport
         'tax_rate3' => 'tax_rate3',
         'terms' => 'terms',
         'total_taxes' => 'total_taxes',
-        'currency' => 'currency',
     ];
 
     private array $decorate_keys = [
@@ -82,23 +82,67 @@ class CreditExport extends BaseExport
         $this->credit_transformer = new CreditTransformer();
     }
 
-    public function run()
+    public function returnJson()
     {
+        $query = $this->init();
+
+        $header = $this->buildHeader();
+
+        $report = $query->cursor()
+                ->map(function ($credit) {
+                    $row = $this->buildRow($credit);
+                    return $this->processMetaData($row, $credit);
+                })->toArray();
+
+        return array_merge([$header], $report);
+    }
+
+    private function processMetaData(array $row, Credit $credit): array
+    {
+        $clean_row = [];
+
+        foreach ($this->input['report_keys'] as $key => $value) {
+            
+            $report_keys = explode(".", $value);
+            
+            $column_key = str_replace("credit.", "", $value);
+            $column_key = array_search($column_key, $this->entity_keys);
+
+            $clean_row[$key]['entity'] = $report_keys[0];
+            $clean_row[$key]['id'] = $report_keys[1] ?? $report_keys[0];
+            $clean_row[$key]['hashed_id'] = $report_keys[0] == 'credit' ? null : $credit->{$report_keys[0]}->hashed_id ?? null;
+            $clean_row[$key]['value'] = $row[$column_key];
+
+            if(in_array($clean_row[$key]['id'], ['amount', 'balance', 'partial', 'refunded', 'applied','unit_cost','cost','price']))
+                $clean_row[$key]['display_value'] = Number::formatMoney($row[$column_key], $credit->client);
+            else
+                $clean_row[$key]['display_value'] = $row[$column_key];
+
+        }
+
+        return $clean_row;
+    }
+
+    private function init(): Builder
+    {
+
         MultiDB::setDb($this->company->db);
         App::forgetInstance('translator');
         App::setLocale($this->company->locale());
         $t = app('translator');
         $t->replace(Ninja::transformTranslations($this->company->settings));
 
-        //load the CSV document from a string
-        $this->csv = Writer::createFromString();
-
         if (count($this->input['report_keys']) == 0) {
             $this->input['report_keys'] = array_values($this->entity_keys);
-        }
+            // $this->input['report_keys'] = collect(array_values($this->entity_keys))->map(function ($value){
 
-        //insert the header
-        $this->csv->insertOne($this->buildHeader());
+            //     // if(in_array($value,['client_id','country_id']))
+            //     //     return $value;
+            //     // else
+            //         return 'credit.'.$value;
+            // })->toArray();
+            
+        }
 
         $query = Credit::query()
                         ->withTrashed()
@@ -107,8 +151,22 @@ class CreditExport extends BaseExport
 
         $query = $this->addDateRange($query);
 
+        return $query;
+    }
+
+    public function run(): string
+    {
+        $query = $this->init();
+        //load the CSV document from a string
+        $this->csv = Writer::createFromString();
+
+        //insert the header
+        $this->csv->insertOne($this->buildHeader());
+        // nlog($this->input['report_keys']);
+
         $query->cursor()
             ->each(function ($credit) {
+                // nlog($this->buildRow($credit));
                 $this->csv->insertOne($this->buildRow($credit));
             });
 
@@ -124,10 +182,19 @@ class CreditExport extends BaseExport
         foreach (array_values($this->input['report_keys']) as $key) {
             $keyval = array_search($key, $this->entity_keys);
 
+            if(!$keyval)
+                $keyval = array_search(str_replace("credit.", "", $key), $this->entity_keys) ?? $key;
+
+            if(!$keyval)
+                $keyval = $key;
+                
             if (array_key_exists($key, $transformed_credit)) {
                 $entity[$keyval] = $transformed_credit[$key];
-            } else {
-                $entity[$keyval] = '';
+            } elseif (array_key_exists($keyval, $transformed_credit)) {
+                $entity[$keyval] = $transformed_credit[$keyval];
+            }
+            else {
+                $entity[$keyval] = $this->resolveKey($keyval, $credit, $this->credit_transformer);
             }
         }
 
@@ -139,9 +206,9 @@ class CreditExport extends BaseExport
         if (in_array('country_id', $this->input['report_keys'])) {
             $entity['country'] = $credit->client->country ? ctrans("texts.country_{$credit->client->country->name}") : '';
         }
-
+        
         if (in_array('currency_id', $this->input['report_keys'])) {
-            $entity['currency_id'] = $credit->client->currency() ? $credit->client->currency()->code : $invoice->company->currency()->code;
+            $entity['currency_id'] = $credit->client->currency() ? $credit->client->currency()->code : $credit->company->currency()->code;
         }
 
         if (in_array('invoice_id', $this->input['report_keys'])) {
@@ -154,6 +221,10 @@ class CreditExport extends BaseExport
 
         if (in_array('status_id', $this->input['report_keys'])) {
             $entity['status'] = $credit->stringStatus($credit->status_id);
+        }
+
+        if(in_array('credit.status', $this->input['report_keys'])) {
+            $entity['credit.status'] = $credit->stringStatus($credit->status_id);
         }
 
         return $entity;

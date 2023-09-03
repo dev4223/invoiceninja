@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -18,7 +18,6 @@ use App\Models\Document;
 use App\Models\Invoice;
 use App\Models\InvoiceInvitation;
 use App\Models\Payment;
-use App\Transformers\ActivityTransformer;
 use App\Utils\Traits\MakesHash;
 
 class InvoiceTransformer extends EntityTransformer
@@ -88,7 +87,7 @@ class InvoiceTransformer extends EntityTransformer
 
     public function transform(Invoice $invoice)
     {
-        return [
+        $data = [
             'id' => $this->encodePrimaryKey($invoice->id),
             'user_id' => $this->encodePrimaryKey($invoice->user_id),
             'project_id' => $this->encodePrimaryKey($invoice->project_id),
@@ -97,7 +96,7 @@ class InvoiceTransformer extends EntityTransformer
             'balance' => (float) $invoice->balance,
             'client_id' => (string) $this->encodePrimaryKey($invoice->client_id),
             'vendor_id' => (string) $this->encodePrimaryKey($invoice->vendor_id),
-            'status_id' => (string) ($invoice->status_id ?: 1),
+            'status_id' => (string) ($invoice->status_id ?: '1'),
             'design_id' => (string) $this->encodePrimaryKey($invoice->design_id),
             'recurring_id' => (string) $this->encodePrimaryKey($invoice->recurring_id),
             'created_at' => (int) $invoice->created_at,
@@ -150,6 +149,14 @@ class InvoiceTransformer extends EntityTransformer
             'paid_to_date' => (float) $invoice->paid_to_date,
             'subscription_id' => $this->encodePrimaryKey($invoice->subscription_id),
             'auto_bill_enabled' => (bool) $invoice->auto_bill_enabled,
+            'tax_info' => $invoice->tax_data ?: new \stdClass,
         ];
+
+        if (request()->has('reminder_schedule') && request()->query('reminder_schedule') == 'true') {
+            $data['reminder_schedule'] = (string) $invoice->reminderSchedule();
+        }
+
+        return $data;
+
     }
 }

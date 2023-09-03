@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,10 +12,7 @@
 namespace App\Services\Invoice;
 
 use App\Events\Invoice\InvoiceWasCancelled;
-use App\Jobs\Ninja\TransactionLog;
-use App\Models\Client;
 use App\Models\Invoice;
-use App\Models\TransactionEvent;
 use App\Services\AbstractService;
 use App\Utils\Ninja;
 use App\Utils\Traits\GeneratesCounter;
@@ -25,9 +22,7 @@ class HandleCancellation extends AbstractService
 {
     use GeneratesCounter;
 
-    private $invoice;
-
-    public function __construct(Invoice $invoice)
+    public function __construct(private Invoice $invoice)
     {
         $this->invoice = $invoice;
     }
@@ -49,23 +44,13 @@ class HandleCancellation extends AbstractService
         $this->invoice->balance = 0;
         $this->invoice = $this->invoice->service()->setStatus(Invoice::STATUS_CANCELLED)->save();
 
-        //adjust client balance
         $this->invoice->client->service()->updateBalance($adjustment)->save();
-        $this->invoice->fresh();
 
         $this->invoice->service()->workFlow()->save();
 
         event(new InvoiceWasCancelled($this->invoice, $this->invoice->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
 
-        $transaction = [
-            'invoice' => $this->invoice->transaction_event(),
-            'payment' => [],
-            'client' => $this->invoice->client->transaction_event(),
-            'credit' => [],
-            'metadata' => [],
-        ];
-
-        TransactionLog::dispatch(TransactionEvent::INVOICE_CANCELLED, $transaction, $this->invoice->company->db);
+        event('eloquent.updated: App\Models\Invoice', $this->invoice);
 
         return $this->invoice;
     }

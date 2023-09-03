@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -13,9 +13,6 @@
 namespace App\Services\PdfMaker;
 
 use App\Models\Credit;
-use App\Models\GatewayType;
-use App\Models\Invoice;
-use App\Models\Payment;
 use App\Models\Quote;
 use App\Services\PdfMaker\Designs\Utilities\BaseDesign;
 use App\Services\PdfMaker\Designs\Utilities\DesignHelpers;
@@ -29,13 +26,13 @@ class Design extends BaseDesign
 {
     use MakesInvoiceValues, DesignHelpers, MakesDates;
 
-    /** @var App\Models\Invoice || @var App\Models\Quote */
+    /** @var \App\Models\Invoice | \App\Models\Quote | \App\Models\Credit | \App\Models\PurchaseOrder | \App\Models\RecurringInvoice */
     public $entity;
 
-    /** @var App\Models\Client */
+    /** @var \App\Models\Client */
     public $client;
 
-    /** @var App\Models\Vendor */
+    /** @var \App\Models\Vendor */
     public $vendor;
 
     /** Global state of the design, @var array */
@@ -52,13 +49,15 @@ class Design extends BaseDesign
 
     public $invoices;
 
+    public $credits;
+
     public $payments;
 
     public $settings_object;
 
     public $company;
 
-    public $client_or_vendor_entity;
+    public float $payment_amount_total = 0;
 
     /** @var array */
     public $aging = [];
@@ -73,7 +72,8 @@ class Design extends BaseDesign
     const PLAIN = 'plain';
     const PLAYFUL = 'playful';
     const CUSTOM = 'custom';
-
+    const CALM = 'calm';
+    
     const DELIVERY_NOTE = 'delivery_note';
     const STATEMENT = 'statement';
     const PURCHASE_ORDER = 'purchase_order';
@@ -84,7 +84,6 @@ class Design extends BaseDesign
         Str::endsWith('.html', $design) ? $this->design = $design : $this->design = "{$design}.html";
 
         $this->options = $options;
-
     }
 
     public function html(): ?string
@@ -123,6 +122,10 @@ class Design extends BaseDesign
                 'id' => 'client-details',
                 'elements' => $this->clientDetails(),
             ],
+            'shipping-details' => [
+                'id' => 'shipping-details',
+                'elements' => $this->shippingDetails(),
+            ],
             'vendor-details' => [
                 'id' => 'vendor-details',
                 'elements' => $this->vendorDetails(),
@@ -142,6 +145,14 @@ class Design extends BaseDesign
             'task-table' => [
                 'id' => 'task-table',
                 'elements' => $this->taskTable(),
+            ],
+            'statement-credit-table' => [
+                'id' => 'statement-credit-table',
+                'elements' => $this->statementCreditTable(),
+            ],
+            'statement-credit-table-totals' => [
+                'id' => 'statement-credit-table-totals',
+                'elements' => $this->statementInvoiceTableTotals(),
             ],
             'statement-invoice-table' => [
                 'id' => 'statement-invoice-table',
@@ -173,25 +184,23 @@ class Design extends BaseDesign
                     $this->sharedFooterElements(),
                 ],
             ],
-            // 'swiss-qr' => [
-            //     'id' => 'swiss-qr',
-            //     'elements' => $this->swissQrCodeElement(),
-            // ]
         ];
     }
 
 
     public function swissQrCodeElement() :array
     {
-        if($this->type == self::DELIVERY_NOTE)
+        if ($this->type == self::DELIVERY_NOTE) {
             return [];
+        }
 
         $elements = [];
 
-        if(strlen($this->company->getSetting('qr_iban')) > 5 && strlen($this->company->getSetting('besr_id')) > 1)
+        if (strlen($this->company->getSetting('qr_iban')) > 5 && strlen($this->company->getSetting('besr_id')) > 1) {
             $elements[] = ['element' => 'qr_code', 'content' => '$swiss_qr', 'show_empty' => false, 'properties' => ['data-ref' => 'swiss-qr-code']];
+        }
 
-        return $elements; 
+        return $elements;
     }
 
     public function companyDetails(): array
@@ -224,8 +233,9 @@ class Design extends BaseDesign
     {
         $elements = [];
 
-        if(!$this->vendor)
+        if (!$this->vendor) {
             return $elements;
+        }
 
         $variables = $this->context['pdf_variables']['vendor_details'];
 
@@ -236,12 +246,48 @@ class Design extends BaseDesign
         return $elements;
     }
 
+    public function shippingDetails(): array
+    {
+        $elements = [];
+
+        if (!$this->client || $this->type == self::DELIVERY_NOTE) {
+            return $elements;
+        }
+
+        $address_variables = [
+            '$client.address1',
+            '$client.address2',
+            '$client.city_state_postal',
+            '$client.country',
+            '$client.postal_city_state',
+            '$client.postal_city',
+        ];
+
+        $variables = $this->context['pdf_variables']['client_details'];
+
+        $elements = collect($variables)->filter(function ($variable) use ($address_variables){
+            return in_array($variable, $address_variables);
+        })->map(function ($variable){
+
+            $variable = str_replace('$client.', '$client.shipping_', $variable);
+            return ['element' => 'p', 'content' => $variable, 'show_empty' => false, 'properties' => ['data-ref' => "client_details-shipping-" . substr($variable, 1)]];
+            
+        })->toArray();
+
+        $header = [];
+        $header[] = ['element' => 'p', 'content' => ctrans('texts.shipping_address'), 'properties' => ['data-ref' => 'shipping_address-label', 'style' => 'font-weight: bold; text-transform: uppercase']];
+
+        return array_merge($header, $elements);
+
+    }
+
     public function clientDetails(): array
     {
         $elements = [];
 
-        if(!$this->client)
+        if (!$this->client) {
             return $elements;
+        }
 
         if ($this->type == self::DELIVERY_NOTE) {
             $elements = [
@@ -275,12 +321,11 @@ class Design extends BaseDesign
 
     public function entityDetails(): array
     {
-
-
         if ($this->type === 'statement') {
-
-            $s_date = $this->translateDate(now(), $this->client->date_format(), $this->client->locale());
+            // $s_date = $this->translateDate(now(), $this->client->date_format(), $this->client->locale());
             
+            $s_date = $this->translateDate($this->options['start_date'], $this->client->date_format(), $this->client->locale()) . " - " . $this->translateDate($this->options['end_date'], $this->client->date_format(), $this->client->locale());
+
             return [
                 ['element' => 'tr', 'properties' => ['data-ref' => 'statement-label'], 'elements' => [
                     ['element' => 'th', 'properties' => [], 'content' => ""],
@@ -311,10 +356,8 @@ class Design extends BaseDesign
             $variables = $this->context['pdf_variables']['credit_details'];
         }
 
-        if($this->vendor){
-
+        if ($this->vendor) {
             $variables = $this->context['pdf_variables']['purchase_order_details'];
-
         }
 
         $elements = [];
@@ -348,6 +391,7 @@ class Design extends BaseDesign
 
         return $elements;
     }
+
 
     public function deliveryNoteTable(): array
     {
@@ -500,25 +544,74 @@ class Design extends BaseDesign
         //24-03-2022 show payments per invoice
         foreach ($this->invoices as $invoice) {
             foreach ($invoice->payments as $payment) {
-
-                if($payment->is_deleted)
+                if ($payment->is_deleted) {
                     continue;
+                }
 
                 $element = ['element' => 'tr', 'elements' => []];
 
                 $element['elements'][] = ['element' => 'td', 'content' => $invoice->number];
                 $element['elements'][] = ['element' => 'td', 'content' => $this->translateDate($payment->date, $this->client->date_format(), $this->client->locale()) ?: '&nbsp;'];
-                $element['elements'][] = ['element' => 'td', 'content' => $payment->type ? $payment->type->name : ctrans('texts.manual_entry')];
+                $element['elements'][] = ['element' => 'td', 'content' => $payment->translatedType()];
                 $element['elements'][] = ['element' => 'td', 'content' => Number::formatMoney($payment->pivot->amount, $this->client) ?: '&nbsp;'];
 
                 $tbody[] = $element;
                 
+                $this->payment_amount_total += $payment->pivot->amount;
             }
         }
 
         return [
             ['element' => 'thead', 'elements' => $this->buildTableHeader('statement_payment')],
             ['element' => 'tbody', 'elements' => $tbody],
+        ];
+    }
+
+    /**
+     * Parent method for building payments table within statement.
+     *
+     * @return array
+     */
+    public function statementCreditTable(): array
+    {
+        if (is_null($this->credits) && $this->type !== self::STATEMENT) {
+            return [];
+        }
+
+        if (\array_key_exists('show_credits_table', $this->options) && $this->options['show_credits_table'] === false) {
+            return [];
+        }
+
+        $tbody = [];
+
+        foreach ($this->credits as $credit) {
+            $element = ['element' => 'tr', 'elements' => []];
+
+            $element['elements'][] = ['element' => 'td', 'content' => $credit->number];
+            $element['elements'][] = ['element' => 'td', 'content' => $this->translateDate($credit->date, $this->client->date_format(), $this->client->locale()) ?: ' '];
+            $element['elements'][] = ['element' => 'td', 'content' => Number::formatMoney($credit->amount, $this->client)];
+            $element['elements'][] = ['element' => 'td', 'content' => Number::formatMoney($credit->balance, $this->client)];
+
+            $tbody[] = $element;
+        }
+
+        return [
+            ['element' => 'thead', 'elements' => $this->buildTableHeader('statement_credit')],
+            ['element' => 'tbody', 'elements' => $tbody],
+        ];
+
+    }
+
+    public function statementCreditTableTotals(): array
+    {
+        if ($this->type !== self::STATEMENT) {
+            return [];
+        }
+
+        $outstanding = $this->credits->sum('balance');
+
+        return [
+            ['element' => 'p', 'content' => '$credit.balance_label: ' . Number::formatMoney($outstanding, $this->client)],
         ];
     }
 
@@ -535,7 +628,8 @@ class Design extends BaseDesign
         $payment = $this->payments->first();
 
         return [
-            ['element' => 'p', 'content' => \sprintf('%s: %s', ctrans('texts.amount_paid'), Number::formatMoney($this->payments->sum('amount'), $this->client))],
+            // ['element' => 'p', 'content' => \sprintf('%s: %s', ctrans('texts.amount_paid'), Number::formatMoney($this->payments->sum('amount'), $this->client))],
+            ['element' => 'p', 'content' => \sprintf('%s: %s', ctrans('texts.amount_paid'), Number::formatMoney($this->payment_amount_total, $this->client))],
         ];
     }
 
@@ -572,8 +666,6 @@ class Design extends BaseDesign
      */
     public function buildTableHeader(string $type): array
     {
-        $this->processTaxColumns($type);
-        // $this->processCustomColumns($type);
 
         $elements = [];
 
@@ -584,7 +676,19 @@ class Design extends BaseDesign
             '$task.rate' => '$task.cost',
         ];
 
-        foreach ($this->context['pdf_variables']["{$type}_columns"] as $column) {
+        $table_type = "{$type}_columns";
+
+        $column_type = $type;
+
+        if ($type == 'product' && $this->entity instanceof Quote && !$this->settings_object->getSetting('sync_invoice_quote_columns')) {
+            $table_type = "product_quote_columns";
+            $column_type = 'product_quote';
+        }
+
+        $this->processTaxColumns($column_type);
+
+
+        foreach ($this->context['pdf_variables'][$table_type] as $column) {
             if (array_key_exists($column, $aliases)) {
                 $elements[] = ['element' => 'th', 'content' => $aliases[$column] . '_label', 'properties' => ['data-ref' => "{$type}_table-" . substr($aliases[$column], 1) . '-th', 'hidden' => $this->settings_object->getSetting('hide_empty_columns_on_pdf')]];
             } elseif ($column == '$product.discount' && !$this->company->enable_product_discount) {
@@ -653,6 +757,13 @@ class Design extends BaseDesign
             return $elements;
         }
 
+        $_type = Str::startsWith($type, '$') ? ltrim($type, '$') : $type;
+        $table_type = "{$_type}_columns";
+        
+        if ($_type == 'product' && $this->entity instanceof Quote && !$this->settings_object->getSetting('sync_invoice_quote_columns')) {
+            $table_type = "product_quote_columns";
+        }
+
         foreach ($items as $row) {
             $element = ['element' => 'tr', 'elements' => []];
 
@@ -680,9 +791,7 @@ class Design extends BaseDesign
                     }
                 }
             } else {
-                $_type = Str::startsWith($type, '$') ? ltrim($type, '$') : $type;
-
-                foreach ($this->context['pdf_variables']["{$_type}_columns"] as $key => $cell) {
+                foreach ($this->context['pdf_variables'][$table_type] as $key => $cell) {
                     // We want to keep aliases like these:
                     // $task.cost => $task.rate
                     // $task.quantity => $task.hours
@@ -701,7 +810,7 @@ class Design extends BaseDesign
                         $element['elements'][] = ['element' => 'td', 'content' => $row[$cell], 'properties' => ['data-ref' => 'product_table-product.tax2-td']];
                     } elseif ($cell == '$product.tax_rate3') {
                         $element['elements'][] = ['element' => 'td', 'content' => $row[$cell], 'properties' => ['data-ref' => 'product_table-product.tax3-td']];
-                    } else if ($cell == '$product.unit_cost' || $cell == '$task.rate') {
+                    } elseif ($cell == '$product.unit_cost' || $cell == '$task.rate') {
                         $element['elements'][] = ['element' => 'td', 'content' => $row[$cell], 'properties' => ['style' => 'white-space: nowrap;', 'data-ref' => "{$_type}_table-" . substr($cell, 1) . '-td']];
                     } else {
                         $element['elements'][] = ['element' => 'td', 'content' => $row[$cell], 'properties' => ['data-ref' => "{$_type}_table-" . substr($cell, 1) . '-td']];
@@ -712,6 +821,8 @@ class Design extends BaseDesign
             $elements[] = $element;
         }
 
+        $document = null;
+        
         return $elements;
     }
 
@@ -720,8 +831,8 @@ class Design extends BaseDesign
         if ($this->type === self::STATEMENT) {
             return [
                 ['element' => 'div', 'properties' => ['style' => 'display: flex; flex-direction: column;'], 'elements' => [
-                    ['element' => 'div', 'properties' => ['style' => 'margin-top: 1.5rem; display: block; align-items: flex-start; page-break-inside: avoid; visible !important;'], 'elements' => [
-                        ['element' => 'img', 'properties' => ['src' => '$invoiceninja.whitelabel', 'style' => 'height: 2.5rem;', 'hidden' => $this->entity->user->account->isPaid() ? 'true' : 'false', 'id' => 'invoiceninja-whitelabel-logo']],
+                    ['element' => 'div', 'properties' => ['style' => 'display: block; align-items: flex-start; page-break-inside: avoid; visible !important;'], 'elements' => [
+                        ['element' => 'img', 'properties' => ['src' => '$invoiceninja.whitelabel', 'style' => 'height: 2.5rem; margin-top: 1.5rem;', 'hidden' => $this->entity->user->account->isPaid() ? 'true' : 'false', 'id' => 'invoiceninja-whitelabel-logo']],
                     ]],
                 ]],
             ];
@@ -733,7 +844,6 @@ class Design extends BaseDesign
 
         $variables = $this->context['pdf_variables']['total_columns'];
 
-
         $elements = [
             ['element' => 'div', 'properties' => ['style' => 'display: flex; flex-direction: column;'], 'elements' => [
                 ['element' => 'p', 'content' => strtr(str_replace(["labels","values"], ["",""], $_variables['values']['$entity.public_notes']), $_variables), 'properties' => ['data-ref' => 'total_table-public_notes', 'style' => 'text-align: left;']],
@@ -742,8 +852,8 @@ class Design extends BaseDesign
                     ['element' => 'span', 'content' => strtr(str_replace("labels", "", $_variables['values']['$entity.terms']), $_variables['labels']), 'properties' => ['data-ref' => 'total_table-terms', 'style' => 'text-align: left;']],
                 ]],
                 ['element' => 'img', 'properties' => ['style' => 'max-width: 50%; height: auto;', 'src' => '$contact.signature', 'id' => 'contact-signature']],
-                ['element' => 'div', 'properties' => ['style' => 'margin-top: 1.5rem; display: flex; align-items: flex-start; page-break-inside: auto;'], 'elements' => [
-                    ['element' => 'img', 'properties' => ['src' => '$invoiceninja.whitelabel', 'style' => 'height: 2.5rem;', 'hidden' => $this->entity->user->account->isPaid() ? 'true' : 'false', 'id' => 'invoiceninja-whitelabel-logo']],
+                ['element' => 'div', 'properties' => ['style' => 'display: flex; align-items: flex-start; page-break-inside: auto;'], 'elements' => [
+                    ['element' => 'img', 'properties' => ['src' => '$invoiceninja.whitelabel', 'style' => 'height: 2.5rem; margin-top: 1.5rem;', 'hidden' => $this->entity->user->account->isPaid() ? 'true' : 'false', 'id' => 'invoiceninja-whitelabel-logo']],
                 ]],
             ]],
             ['element' => 'div', 'properties' => ['class' => 'totals-table-right-side', 'dir' => '$dir'], 'elements' => []],
@@ -763,6 +873,10 @@ class Design extends BaseDesign
             if ($this->entity->partial > 0) {
                 $variables[] = '$partial_due';
             }
+
+            if (in_array('$paid_to_date', $variables)) {
+                $variables = \array_diff($variables, ['$paid_to_date']);
+            }
         }
 
         if ($this->entity instanceof Credit) {
@@ -770,7 +884,6 @@ class Design extends BaseDesign
             if (in_array('$paid_to_date', $variables)) {
                 $variables = \array_diff($variables, ['$paid_to_date']);
             }
-
         }
 
         foreach (['discount'] as $property) {
@@ -800,7 +913,7 @@ class Design extends BaseDesign
                 foreach ($taxes as $i => $tax) {
                     $elements[1]['elements'][] = ['element' => 'div', 'elements' => [
                         ['element' => 'span', 'content', 'content' => $tax['name'], 'properties' => ['data-ref' => 'totals-table-total_tax_' . $i . '-label']],
-                        ['element' => 'span', 'content', 'content' => Number::formatMoney($tax['total'], $this->entity instanceof \App\Models\PurchaseOrder ? $this->company : $this->client_or_vendor_entity), 'properties' => ['data-ref' => 'totals-table-total_tax_' . $i]],
+                        ['element' => 'span', 'content', 'content' => Number::formatMoney($tax['total'], $this->entity instanceof \App\Models\PurchaseOrder ? $this->vendor : $this->client), 'properties' => ['data-ref' => 'totals-table-total_tax_' . $i]],
                     ]];
                 }
             } elseif ($variable == '$line_taxes') {
@@ -813,7 +926,7 @@ class Design extends BaseDesign
                 foreach ($taxes as $i => $tax) {
                     $elements[1]['elements'][] = ['element' => 'div', 'elements' => [
                         ['element' => 'span', 'content', 'content' => $tax['name'], 'properties' => ['data-ref' => 'totals-table-line_tax_' . $i . '-label']],
-                        ['element' => 'span', 'content', 'content' => Number::formatMoney($tax['total'], $this->entity instanceof \App\Models\PurchaseOrder ? $this->company : $this->client_or_vendor_entity), 'properties' => ['data-ref' => 'totals-table-line_tax_' . $i]],
+                        ['element' => 'span', 'content', 'content' => Number::formatMoney($tax['total'], $this->entity instanceof \App\Models\PurchaseOrder ? $this->vendor : $this->client), 'properties' => ['data-ref' => 'totals-table-line_tax_' . $i]],
                     ]];
                 }
             } elseif (Str::startsWith($variable, '$custom_surcharge')) {

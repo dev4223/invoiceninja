@@ -4,21 +4,16 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\PurchaseOrder;
 
-use App\Events\Invoice\InvoiceWasEmailed;
-use App\Events\PurchaseOrder\PurchaseOrderWasEmailed;
-use App\Jobs\Entity\EmailEntity;
 use App\Jobs\PurchaseOrder\PurchaseOrderEmail;
-use App\Models\Invoice;
 use App\Models\PurchaseOrder;
 use App\Services\AbstractService;
-use App\Utils\Ninja;
 use App\Utils\Traits\GeneratesCounter;
 use Illuminate\Http\Request;
 
@@ -48,9 +43,21 @@ class TriggeredActions extends AbstractService
             $this->purchase_order = $this->purchase_order->service()->markSent()->touchPdf()->save();
         }
 
-        // if ($this->request->has('cancel') && $this->request->input('cancel') == 'true') {
-        //     $this->purchase_order = $this->purchase_order->service()->handleCancellation()->save();
-        // }
+        if ($this->request->has('save_default_footer') && $this->request->input('save_default_footer') == 'true') {
+            $company = $this->purchase_order->company;
+            $settings = $company->settings;
+            $settings->purchase_order_footer = $this->purchase_order->footer;
+            $company->settings = $settings;
+            $company->save();
+        }
+
+        if ($this->request->has('save_default_terms') && $this->request->input('save_default_terms') == 'true') {
+            $company = $this->purchase_order->company;
+            $settings = $company->settings;
+            $settings->purchase_order_terms = $this->purchase_order->terms;
+            $company->settings = $settings;
+            $company->save();
+        }
 
         return $this->purchase_order;
     }

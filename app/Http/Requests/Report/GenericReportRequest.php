@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -22,18 +22,22 @@ class GenericReportRequest extends Request
      */
     public function authorize() : bool
     {
-        return auth()->user()->isAdmin();
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        return $user->isAdmin() || $user->hasPermission('view_reports');
+        
     }
 
     public function rules()
     {
         return [
-            'start_date' => 'string|date',
-            'end_date' => 'string|date',
-            'date_key' => 'string',
-            'date_range' => 'sometimes|string',
+            'date_range' => 'bail|required|string',
+            'end_date' => 'bail|required_if:date_range,custom|nullable|date',
+            'start_date' => 'bail|required_if:date_range,custom|nullable|date',
             'report_keys' => 'present|array',
             'send_email' => 'required|bool',
+            // 'status' => 'sometimes|string|nullable|in:all,draft,sent,viewed,paid,unpaid,overdue',
         ];
     }
 
@@ -41,7 +45,7 @@ class GenericReportRequest extends Request
     {
         $input = $this->all();
 
-        if (! array_key_exists('date_range', $input)) {
+        if (! array_key_exists('date_range', $input) || $input['date_range'] == '') {
             $input['date_range'] = 'all';
         }
 
@@ -51,6 +55,11 @@ class GenericReportRequest extends Request
 
         if (! array_key_exists('send_email', $input)) {
             $input['send_email'] = true;
+        }
+
+        if (array_key_exists('date_range', $input) && $input['date_range'] != 'custom') {
+            $input['start_date'] = null;
+            $input['end_date'] = null;
         }
 
         $this->replace($input);

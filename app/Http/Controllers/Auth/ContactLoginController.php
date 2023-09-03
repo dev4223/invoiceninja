@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -24,7 +24,6 @@ use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Route;
 
 class ContactLoginController extends Controller
 {
@@ -45,15 +44,15 @@ class ContactLoginController extends Controller
         if ($request->session()->has('company_key')) {
             MultiDB::findAndSetDbByCompanyKey($request->session()->get('company_key'));
             $company = Company::where('company_key', $request->input('company_key'))->first();
-        }
-        elseif($request->has('company_key')){
-             MultiDB::findAndSetDbByCompanyKey($request->input('company_key'));
+        } elseif ($request->has('company_key')) {
+            MultiDB::findAndSetDbByCompanyKey($request->input('company_key'));
             $company = Company::where('company_key', $request->input('company_key'))->first();
-        }elseif($company_key){
-             MultiDB::findAndSetDbByCompanyKey($company_key);
+        } elseif ($company_key) {
+            MultiDB::findAndSetDbByCompanyKey($company_key);
             $company = Company::where('company_key', $company_key)->first();
         }
 
+        /** @var \App\Models\Company $company **/
         if ($company) {
             $account = $company->account;
         } elseif (! $company && strpos($request->getHost(), 'invoicing.co') !== false) {
@@ -65,6 +64,7 @@ class ContactLoginController extends Controller
 
             $company = Company::where('portal_domain', $request->getSchemeAndHttpHost())->first();
         } elseif (Ninja::isSelfHost()) {
+            /** @var \App\Models\Account $account **/
             $account = Account::first();
             $company = $account->default_company;
         } else {
@@ -99,6 +99,7 @@ class ContactLoginController extends Controller
         }
 
         if (Ninja::isHosted() && $request->has('password') && $company = Company::where('company_key', $request->input('company_key'))->first()) {
+            /** @var \App\Models\Company $company **/
             $contact = ClientContact::where(['email' => $request->input('email'), 'company_id' => $company->id])
                                      ->whereHas('client', function ($query) {
                                          $query->where('is_deleted', 0);

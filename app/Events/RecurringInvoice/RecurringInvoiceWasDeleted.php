@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -21,27 +21,8 @@ use Illuminate\Queue\SerializesModels;
 class RecurringInvoiceWasDeleted
 {
     use SerializesModels;
-
-    /**
-     * @var RecurringInvoice
-     */
-    public $recurring_invoice;
-
-    public $company;
-
-    public $event_vars;
-
-    /**
-     * Create a new event instance.
-     *
-     * @param Invoice $invoice
-     * @param Company $company
-     * @param array $event_vars
-     */
-    public function __construct(RecurringInvoice $recurring_invoice, Company $company, array $event_vars)
+    
+    public function __construct(public RecurringInvoice $recurring_invoice, public Company $company, public array $event_vars)
     {
-        $this->recurring_invoice = $recurring_invoice;
-        $this->company = $company;
-        $this->event_vars = $event_vars;
     }
 }

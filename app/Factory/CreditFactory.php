@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -49,7 +49,7 @@ class CreditFactory
         $credit->user_id = $user_id;
         $credit->company_id = $company_id;
         $credit->recurring_id = null;
-
+        $credit->exchange_rate = 1;
         return $credit;
     }
 }

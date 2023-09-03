@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -14,6 +14,7 @@ namespace App\Http\Livewire;
 
 use App\Libraries\MultiDB;
 use App\Models\Client;
+use App\Models\Company;
 use App\Models\Credit;
 use App\Models\Document;
 use App\Models\Expense;
@@ -31,21 +32,27 @@ class DocumentsTable extends Component
 {
     use WithPagination, WithSorting;
 
-    public $client;
+    public Company $company;
 
-    public $per_page = 10;
+    public Client $client;
 
-    public $company;
+    public int $client_id;
+
+    public int $per_page = 10;
 
     public string $tab = 'documents';
 
+    public string $db;
+
     protected $query;
 
-    public function mount($client)
+    public function mount()
     {
-        MultiDB::setDb($this->company->db);
+        MultiDB::setDb($this->db);
 
-        $this->client = $client;
+        $this->client = Client::query()->withTrashed()->with('company')->find($this->client_id);
+
+        $this->company = $this->client->company;
 
         $this->query = $this->documents();
     }
@@ -76,7 +83,7 @@ class DocumentsTable extends Component
                 break;
 
             case 'expenses':
-               // $this->query = $this->expenses();
+                // $this->query = $this->expenses();
                 break;
 
             case 'invoices':
@@ -111,12 +118,14 @@ class DocumentsTable extends Component
 
     protected function documents()
     {
-        return $this->client->documents();
+        return $this->client->documents()
+            ->where('is_public', true);
     }
 
     protected function credits()
     {
         return Document::query()
+            ->where('is_public', true)
             ->whereHasMorph('documentable', [Credit::class], function ($query) {
                 $query->where('client_id', $this->client->id);
             });
@@ -125,6 +134,7 @@ class DocumentsTable extends Component
     protected function expenses()
     {
         return Document::query()
+            ->where('is_public', true)
             ->whereHasMorph('documentable', [Expense::class], function ($query) {
                 $query->where('client_id', $this->client->id);
             });
@@ -133,6 +143,7 @@ class DocumentsTable extends Component
     protected function invoices()
     {
         return Document::query()
+            ->where('is_public', true)
             ->whereHasMorph('documentable', [Invoice::class], function ($query) {
                 $query->where('client_id', $this->client->id);
             });
@@ -141,6 +152,7 @@ class DocumentsTable extends Component
     protected function payments()
     {
         return Document::query()
+            ->where('is_public', true)
             ->whereHasMorph('documentable', [Payment::class], function ($query) {
                 $query->where('client_id', $this->client->id);
             });
@@ -149,6 +161,7 @@ class DocumentsTable extends Component
     protected function projects()
     {
         return Document::query()
+            ->where('is_public', true)
             ->whereHasMorph('documentable', [Project::class], function ($query) {
                 $query->where('client_id', $this->client->id);
             });
@@ -157,6 +170,7 @@ class DocumentsTable extends Component
     protected function quotes()
     {
         return Document::query()
+            ->where('is_public', true)
             ->whereHasMorph('documentable', [Quote::class], function ($query) {
                 $query->where('client_id', $this->client->id);
             });
@@ -165,6 +179,7 @@ class DocumentsTable extends Component
     protected function recurringInvoices()
     {
         return Document::query()
+            ->where('is_public', true)
             ->whereHasMorph('documentable', [RecurringInvoice::class], function ($query) {
                 $query->where('client_id', $this->client->id);
             });
@@ -173,6 +188,7 @@ class DocumentsTable extends Component
     protected function tasks()
     {
         return Document::query()
+            ->where('is_public', true)
             ->whereHasMorph('documentable', [Task::class], function ($query) {
                 $query->where('client_id', $this->client->id);
             });

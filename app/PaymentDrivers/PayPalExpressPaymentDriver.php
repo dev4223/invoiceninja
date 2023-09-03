@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -41,6 +41,11 @@ class PayPalExpressPaymentDriver extends BaseDriver
         return [
             GatewayType::PAYPAL,
         ];
+    }
+
+    public function init()
+    {
+        return $this;
     }
 
     /**
@@ -95,7 +100,7 @@ class PayPalExpressPaymentDriver extends BaseDriver
             return $response->redirect();
         }
 
-        $this->sendFailureMail($response->getMessage() ?: '');
+        // $this->sendFailureMail($response->getMessage() ?: '');
 
         $message = [
             'server_response' => $response->getMessage(),
@@ -122,8 +127,11 @@ class PayPalExpressPaymentDriver extends BaseDriver
             ->completePurchase(['amount' => $this->payment_hash->data->amount, 'currency' => $this->client->getCurrencyCode()])
             ->send();
 
-        if ($response->isCancelled()) {
+        if ($response->isCancelled() && $this->client->getSetting('enable_client_portal')) {
             return redirect()->route('client.invoices.index')->with('warning', ctrans('texts.status_cancelled'));
+        }
+        elseif($response->isCancelled() && !$this->client->getSetting('enable_client_portal')){
+            redirect()->route('client.invoices.show', ['invoice' => $this->payment_hash->fee_invoice])->with('warning', ctrans('texts.status_cancelled'));
         }
 
         if ($response->isSuccessful()) {
@@ -190,7 +198,7 @@ class PayPalExpressPaymentDriver extends BaseDriver
                 'payment_hash' => $this->payment_hash->hash,
                 'payment_method_id' => GatewayType::PAYPAL,
             ]),
-            'cancelUrl' => $this->client->company->domain().'/client/invoices',
+            'cancelUrl' => $this->client->company->domain()."/client/invoices/{$invoice->hashed_id}",
             'description' => implode(',', collect($this->payment_hash->data->invoices)
                 ->map(function ($invoice) {
                     return sprintf('%s: %s', ctrans('texts.invoice_number'), $invoice->invoice_number);

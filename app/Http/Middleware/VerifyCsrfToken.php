@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -29,17 +29,8 @@ class VerifyCsrfToken extends Middleware
      * @var array
      */
     protected $except = [
-        // 'livewire/message/*'
+        'setup/*',
+        'setup'
     ];
 
-    // public function handle($request, \Closure $next) {
-
-    //     try {
-    //         return parent::handle($request, $next);
-    //     } catch (TokenMismatchException $ex) {
-
-    //         throw new TokenMismatchException('CSRF token mismatch.');
-
-    //     }
-    // }
 }

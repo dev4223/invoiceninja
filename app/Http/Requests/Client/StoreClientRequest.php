@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -33,23 +33,31 @@ class StoreClientRequest extends Request
      */
     public function authorize() : bool
     {
-        return auth()->user()->can('create', Client::class);
+        /** @var  \App\Models\User $user */
+        $user = auth()->user();
+
+        return $user->can('create', Client::class);
     }
 
     public function rules()
     {
-        if ($this->input('documents') && is_array($this->input('documents'))) {
-            $documents = count($this->input('documents'));
+        /** @var  \App\Models\User $user */
+        $user = auth()->user();
 
-            foreach (range(0, $documents) as $index) {
-                $rules['documents.'.$index] = 'file|mimes:png,ai,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
-            }
-        } elseif ($this->input('documents')) {
-            $rules['documents'] = 'file|mimes:png,ai,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx|max:20000';
+        if ($this->file('documents') && is_array($this->file('documents'))) {
+            $rules['documents.*'] = $this->file_validation;
+        } elseif ($this->file('documents')) {
+            $rules['documents'] = $this->file_validation;
+        }
+
+        if ($this->file('file') && is_array($this->file('file'))) {
+            $rules['file.*'] = $this->file_validation;
+        } elseif ($this->file('file')) {
+            $rules['file'] = $this->file_validation;
         }
 
         if (isset($this->number)) {
-            $rules['number'] = Rule::unique('clients')->where('company_id', auth()->user()->company()->id);
+            $rules['number'] = Rule::unique('clients')->where('company_id', $user->company()->id);
         }
 
         $rules['country_id'] = 'integer|nullable';
@@ -79,12 +87,12 @@ class StoreClientRequest extends Request
             //'regex:/[@$!%*#?&.]/', // must contain a special character
         ];
 
-        if (auth()->user()->company()->account->isFreeHostedClient()) {
-            $rules['id'] = new CanStoreClientsRule(auth()->user()->company()->id);
+        if ($user->company()->account->isFreeHostedClient()) {
+            $rules['id'] = new CanStoreClientsRule($user->company()->id);
         }
 
-        $rules['number'] = ['bail', 'nullable', Rule::unique('clients')->where('company_id', auth()->user()->company()->id)];
-        $rules['id_number'] = ['bail', 'nullable', Rule::unique('clients')->where('company_id', auth()->user()->company()->id)];
+        $rules['number'] = ['bail', 'nullable', Rule::unique('clients')->where('company_id', $user->company()->id)];
+        $rules['id_number'] = ['bail', 'nullable', Rule::unique('clients')->where('company_id', $user->company()->id)];
 
         return $rules;
     }
@@ -92,29 +100,32 @@ class StoreClientRequest extends Request
     public function prepareForValidation()
     {
         $input = $this->all();
-
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+        
         /* Default settings */
         $settings = (array)ClientSettings::defaults();
 
         /* Stub settings if they don't exist */
-        if(!array_key_exists('settings', $input))
+        if (!array_key_exists('settings', $input)) {
             $input['settings'] = [];
-        elseif(is_object($input['settings']))
+        } elseif (is_object($input['settings'])) {
             $input['settings'] = (array)$input['settings'];
+        }
         
         /* Merge default into base settings */
         $input['settings'] = array_merge($input['settings'], $settings);
 
         /* Type and property enforcement */
-        foreach ($input['settings'] as $key => $value) 
-        {
+        foreach ($input['settings'] as $key => $value) {
             if ($key == 'default_task_rate') {
                 $value = floatval($value);
                 $input['settings'][$key] = $value;
             }
 
-            if($key == 'translations')
+            if ($key == 'translations') {
                 unset($input['settings']['translations']);
+            }
         }
 
         /* Convert hashed IDs to IDs*/
@@ -127,11 +138,10 @@ class StoreClientRequest extends Request
             if ($group_settings && property_exists($group_settings->settings, 'currency_id') && isset($group_settings->settings->currency_id)) {
                 $input['settings']['currency_id'] = (string) $group_settings->settings->currency_id;
             } else {
-                $input['settings']['currency_id'] = (string) auth()->user()->company()->settings->currency_id;
+                $input['settings']['currency_id'] = (string) $user->company()->settings->currency_id;
             }
-
         } elseif (! array_key_exists('currency_id', $input['settings'])) {
-            $input['settings']['currency_id'] = (string) auth()->user()->company()->settings->currency_id;
+            $input['settings']['currency_id'] = (string) $user->company()->settings->currency_id;
         }
 
         if (isset($input['currency_code'])) {
@@ -141,8 +151,9 @@ class StoreClientRequest extends Request
         if (isset($input['language_code'])) {
             $input['settings']['language_id'] = $this->getLanguageId($input['language_code']);
 
-            if(strlen($input['settings']['language_id']) == 0)
+            if (strlen($input['settings']['language_id']) == 0) {
                 unset($input['settings']['language_id']);
+            }
         }
 
         if (isset($input['country_code'])) {
@@ -156,6 +167,10 @@ class StoreClientRequest extends Request
         /* If there is a client number, just unset it here. */
         if (array_key_exists('number', $input) && (is_null($input['number']) || empty($input['number']))) {
             unset($input['number']);
+        }
+
+        if (array_key_exists('name', $input)) {
+            $input['name'] = strip_tags($input['name']);
         }
 
         $this->replace($input);

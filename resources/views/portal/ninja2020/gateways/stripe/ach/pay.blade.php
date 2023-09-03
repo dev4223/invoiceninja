@@ -180,9 +180,11 @@
                 let bank_account_response = document.getElementById('bank_account_response');
                 bank_account_response.value = JSON.stringify(paymentIntent);
 
-              confirmPayment(stripe, clientSecret);
+                confirmPayment(stripe, clientSecret);
             }
 
+                  resetButtons();
+                  return;
         });
     });
 
@@ -207,8 +209,14 @@
                 gateway_response.value = JSON.stringify(paymentIntent);
                 document.getElementById('server-response').submit();
 
-            } else if (paymentIntent.next_action?.type === "verify_with_microdeposits") {
+            } else if (paymentIntent.next_action?.type === "verify_with_microdeposits" || paymentIntent.next_action?.type === "requires_source_action") {
+                  errors.textContent = "You will receive an email with details on how to verify your bank account and process payment.";
+                  errors.hidden = false;
+                  document.getElementById('new-bank').style.visibility = 'hidden'
 
+                    let gateway_response = document.getElementById('gateway_response');
+                    gateway_response.value = JSON.stringify(paymentIntent);
+                    document.getElementById('server-response').submit();
             }
           });
     

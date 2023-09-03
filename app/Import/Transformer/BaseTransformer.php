@@ -4,33 +4,34 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Import\Transformer;
 
-use App\Factory\ExpenseCategoryFactory;
-use App\Factory\ProjectFactory;
-use App\Factory\VendorFactory;
-use App\Models\ClientContact;
-use App\Models\Country;
-use App\Models\ExpenseCategory;
-use App\Models\PaymentType;
-use App\Models\User;
-use App\Models\Expense;
-use App\Models\Project;
-use App\Models\Invoice;
 use App\Models\Quote;
-use App\Models\Client;
-use App\Models\TaxRate;
-use App\Models\Product;
-use App\Models\Vendor;
 use App\Utils\Number;
-use Exception;
+use App\Models\Client;
+use App\Models\Vendor;
+use App\Models\Country;
+use App\Models\Expense;
+use App\Models\Invoice;
+use App\Models\Product;
+use App\Models\Project;
+use App\Models\TaxRate;
+use App\Models\PaymentType;
+use App\Models\ClientContact;
+use App\Factory\ClientFactory;
+use App\Factory\VendorFactory;
 use Illuminate\Support\Carbon;
+use App\Factory\ProjectFactory;
+use App\Models\ExpenseCategory;
+use App\Models\RecurringInvoice;
 use Illuminate\Support\Facades\Cache;
+use App\Repositories\ClientRepository;
+use App\Factory\ExpenseCategoryFactory;
 
 /**
  * Class BaseTransformer.
@@ -42,6 +43,33 @@ class BaseTransformer
     public function __construct($company)
     {
         $this->company = $company;
+    }
+
+    public function parseDate($date)
+    {
+        try {
+            $parsed_date = Carbon::parse($date);
+
+            return $parsed_date->format('Y-m-d');
+        } catch(\Exception $e) {
+            $parsed_date = date('Y-m-d', strtotime($date));
+
+            if ($parsed_date == '1970-01-01') {
+                return now()->format('Y-m-d');
+            }
+
+            return $parsed_date;
+        }
+    }
+
+    public function getInvoiceTypeId($data, $field)
+    {
+        return isset($data[$field]) && $data[$field] ? (string)$data[$field] : '1';
+    }
+
+    public function getNumber($data, $field)
+    {
+        return (isset($data->$field) && $data->$field) ? (int)$data->$field : 0;
     }
 
     public function getString($data, $field)
@@ -71,11 +99,84 @@ class BaseTransformer
             : $this->company->settings->currency_id;
     }
 
-    public function getClient($client_name, $client_email)
+    public function getFrequency($frequency = RecurringInvoice::FREQUENCY_MONTHLY): int
+    {
+
+        switch ($frequency) {
+            case RecurringInvoice::FREQUENCY_DAILY:
+            case 'daily':
+                return RecurringInvoice::FREQUENCY_DAILY;
+            case RecurringInvoice::FREQUENCY_WEEKLY:
+            case 'weekly':
+                return RecurringInvoice::FREQUENCY_WEEKLY;
+            case RecurringInvoice::FREQUENCY_TWO_WEEKS:
+            case 'biweekly':
+                return RecurringInvoice::FREQUENCY_TWO_WEEKS;
+            case RecurringInvoice::FREQUENCY_FOUR_WEEKS:
+            case '4weeks':
+                return RecurringInvoice::FREQUENCY_FOUR_WEEKS;
+            case RecurringInvoice::FREQUENCY_MONTHLY:
+            case 'monthly':
+                return RecurringInvoice::FREQUENCY_MONTHLY;
+            case RecurringInvoice::FREQUENCY_TWO_MONTHS:
+            case 'bimonthly':
+                return RecurringInvoice::FREQUENCY_TWO_MONTHS;
+            case RecurringInvoice::FREQUENCY_THREE_MONTHS:
+            case 'quarterly':
+                return RecurringInvoice::FREQUENCY_THREE_MONTHS;
+            case RecurringInvoice::FREQUENCY_FOUR_MONTHS:
+            case '4months':
+                return RecurringInvoice::FREQUENCY_FOUR_MONTHS;
+            case RecurringInvoice::FREQUENCY_SIX_MONTHS:
+            case '6months':
+                return RecurringInvoice::FREQUENCY_SIX_MONTHS;
+            case RecurringInvoice::FREQUENCY_ANNUALLY:
+            case 'yearly':
+                return RecurringInvoice::FREQUENCY_ANNUALLY;
+            case RecurringInvoice::FREQUENCY_TWO_YEARS:
+            case '2years':
+                return RecurringInvoice::FREQUENCY_TWO_YEARS;
+            case RecurringInvoice::FREQUENCY_THREE_YEARS:
+            case '3years':
+                return RecurringInvoice::FREQUENCY_THREE_YEARS;
+            default:
+                return RecurringInvoice::FREQUENCY_MONTHLY;
+        }
+
+    }
+
+    public function getRemainingCycles($remaining_cycles = -1): int
     {
         
+        if ($remaining_cycles == 'endless') {
+            return -1;
+        }
+
+        return (int)$remaining_cycles;
+    }
+
+    public function getAutoBillFlag(string $option): string
+    {
+        switch ($option) {
+            case 'off':
+            case 'false':
+                return 'off';
+            case 'always':
+            case 'true':
+                return 'always';
+            case 'optin':
+                return 'opt_in';
+            case 'optout':
+                return 'opt_out';
+            default:
+                return 'off';
+        }
+    }
+
+    public function getClient($client_name, $client_email)
+    {
         if (! empty($client_name)) {
-            $client_id_search = Client::where('company_id', $this->company->id)
+            $client_id_search = Client::query()->where('company_id', $this->company->id)
                 ->where('is_deleted', false)
                 ->where('id_number', $client_name);
 
@@ -83,7 +184,7 @@ class BaseTransformer
                 return $client_id_search->first()->id;
             }
 
-            $client_name_search = Client::where('company_id', $this->company->id)
+            $client_name_search = Client::query()->where('company_id', $this->company->id)
                 ->where('is_deleted', false)
                 ->whereRaw("LOWER(REPLACE(`name`, ' ' ,''))  = ?", [
                     strtolower(str_replace(' ', '', $client_name)),
@@ -94,7 +195,7 @@ class BaseTransformer
             }
         }
         if (! empty($client_email)) {
-            $contacts = ClientContact::whereHas('client', function ($query) {
+            $contacts = ClientContact::query()->whereHas('client', function ($query) {
                 $query->where('is_deleted', false);
             })
             ->where('company_id', $this->company->id)
@@ -105,7 +206,28 @@ class BaseTransformer
             }
         }
 
-        return null;
+        $client_repository = app()->make(ClientRepository::class);
+        $client_repository->import_mode = true;
+
+        $client = $client_repository->save(
+            [
+                'name' => $client_name,
+                'contacts' => [
+                    [
+                        'first_name' => $client_name,
+                        'email' => $client_email,
+                    ],
+                ],
+            ],
+            ClientFactory::create(
+                $this->company->id,
+                $this->company->owner()->id
+            )
+        );
+
+        $client_repository = null;
+        
+        return $client->id;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
@@ -116,13 +238,22 @@ class BaseTransformer
      */
     public function hasClient($name)
     {
-        return Client::where('company_id', $this->company->id)
+        return Client::query()->where('company_id', $this->company->id)
             ->where('is_deleted', false)
             ->whereRaw("LOWER(REPLACE(`name`, ' ' ,''))  = ?", [
                 strtolower(str_replace(' ', '', $name)),
             ])
             ->exists();
     }
+
+    public function hasClientIdNumber($id_number)
+    {
+        return Client::query()->where('company_id', $this->company->id)
+            ->where('is_deleted', false)
+            ->where('id_number', trim($id_number))
+            ->exists();
+    }
+
 
     /**
      * @param $name
@@ -131,7 +262,7 @@ class BaseTransformer
      */
     public function hasVendor($name)
     {
-        return Vendor::where('company_id', $this->company->id)
+        return Vendor::query()->where('company_id', $this->company->id)
             ->where('is_deleted', false)
             ->whereRaw("LOWER(REPLACE(`name`, ' ' ,''))  = ?", [
                 strtolower(str_replace(' ', '', $name)),
@@ -146,7 +277,7 @@ class BaseTransformer
      */
     public function hasProject($name)
     {
-        return Project::where('company_id', $this->company->id)
+        return Project::query()->where('company_id', $this->company->id)
             ->where('is_deleted', false)
             ->whereRaw("LOWER(REPLACE(`name`, ' ' ,''))  = ?", [
                 strtolower(str_replace(' ', '', $name)),
@@ -161,7 +292,7 @@ class BaseTransformer
      */
     public function hasProduct($key)
     {
-        return Product::where('company_id', $this->company->id)
+        return Product::query()->where('company_id', $this->company->id)
             ->where('is_deleted', false)
             ->whereRaw("LOWER(REPLACE(`product_key`, ' ' ,''))  = ?", [
                 strtolower(str_replace(' ', '', $key)),
@@ -189,13 +320,28 @@ class BaseTransformer
     }
 
     /**
+     * @param $data
+     * @param $field
+     *
+     * @return float
+     */
+    public function getFloatOrOne($data, $field)
+    {
+        if (array_key_exists($field, $data)) 
+            return Number::parseStringFloat($data[$field]) > 0 ? Number::parseStringFloat($data[$field]) : 1;
+ 
+        return 1;    
+
+    }
+
+    /**
      * @param $name
      *
      * @return int|null
      */
     public function getClientId($name)
     {
-        $client = Client::where('company_id', $this->company->id)
+        $client = Client::query()->where('company_id', $this->company->id)
             ->where('is_deleted', false)
             ->whereRaw("LOWER(REPLACE(`name`, ' ' ,''))  = ?", [
                 strtolower(str_replace(' ', '', $name)),
@@ -212,7 +358,7 @@ class BaseTransformer
      */
     public function getProduct($key)
     {
-        $product = Product::where('company_id', $this->company->id)
+        $product = Product::query()->where('company_id', $this->company->id)
             ->where('is_deleted', false)
             ->whereRaw("LOWER(REPLACE(`product_key`, ' ' ,''))  = ?", [
                 strtolower(str_replace(' ', '', $key)),
@@ -225,11 +371,11 @@ class BaseTransformer
     /**
      * @param $email
      *
-     * @return ?Contact
+     * @return ?ClientContact
      */
-    public function getContact($email)
+    public function getContact($email): ?ClientContact
     {
-        $contact = ClientContact::where('company_id', $this->company->id)
+        $contact = ClientContact::query()->where('company_id', $this->company->id)
             ->whereRaw("LOWER(REPLACE(`email`, ' ' ,''))  = ?", [
                 strtolower(str_replace(' ', '', $email)),
             ])
@@ -249,11 +395,12 @@ class BaseTransformer
      */
     public function getCountryId($name)
     {
-        if (strlen($name) == 2) {
+
+        if (strlen(trim($name)) == 2) {
             return $this->getCountryIdBy2($name);
         }
 
-        $country = Country::whereRaw("LOWER(REPLACE(`name`, ' ' ,''))  = ?", [
+        $country = Country::query()->whereRaw("LOWER(REPLACE(`name`, ' ' ,''))  = ?", [
             strtolower(str_replace(' ', '', $name)),
         ])->first();
 
@@ -267,21 +414,21 @@ class BaseTransformer
      */
     public function getCountryIdBy2($name)
     {
-        return Country::where('iso_3166_2', $name)->exists()
-            ? Country::where('iso_3166_2', $name)->first()->id
+        return Country::query()->where('iso_3166_2', $name)->exists()
+            ? Country::query()->where('iso_3166_2', $name)->first()->id
             : null;
     }
 
     /**
      * @param $name
      *
-     * @return int
+     * @return float
      */
     public function getTaxRate($name)
     {
         $name = strtolower(trim($name));
 
-        $tax_rate = TaxRate::where('company_id', $this->company->id)
+        $tax_rate = TaxRate::query()->where('company_id', $this->company->id)
             ->where('is_deleted', false)
             ->whereRaw("LOWER(REPLACE(`name`, ' ' ,''))  = ?", [
                 strtolower(str_replace(' ', '', $name)),
@@ -300,7 +447,7 @@ class BaseTransformer
     {
         $name = strtolower(trim($name));
 
-        $tax_rate = TaxRate::where('company_id', $this->company->id)
+        $tax_rate = TaxRate::query()->where('company_id', $this->company->id)
             ->where('is_deleted', false)
             ->whereRaw("LOWER(REPLACE(`name`, ' ' ,''))  = ?", [
                 strtolower(str_replace(' ', '', $name)),
@@ -311,12 +458,11 @@ class BaseTransformer
     }
 
     /**
-     * @param $date
-     * @param string $format
+     *
      * @param mixed  $data
      * @param mixed  $field
      *
-     * @return null
+     * @return ?string
      */
     public function getDate($data, $field)
     {
@@ -349,7 +495,7 @@ class BaseTransformer
      */
     public function getInvoiceId($invoice_number)
     {
-        $invoice = Invoice::where('company_id', $this->company->id)
+        $invoice = Invoice::query()->where('company_id', $this->company->id)
             ->where('is_deleted', false)
             ->whereRaw("LOWER(REPLACE(`number`, ' ' ,''))  = ?", [
                 strtolower(str_replace(' ', '', $invoice_number)),
@@ -366,7 +512,23 @@ class BaseTransformer
      */
     public function hasInvoice($invoice_number)
     {
-        return Invoice::where('company_id', $this->company->id)
+        return Invoice::query()->where('company_id', $this->company->id)
+            ->where('is_deleted', false)
+            ->whereRaw("LOWER(REPLACE(`number`, ' ' ,''))  = ?", [
+                strtolower(str_replace(' ', '', $invoice_number)),
+            ])
+            ->exists();
+    }
+
+
+    /**
+     * @param $invoice_number
+     *
+     * @return bool
+     */
+    public function hasRecurringInvoice($invoice_number)
+    {
+        return RecurringInvoice::query()->where('company_id', $this->company->id)
             ->where('is_deleted', false)
             ->whereRaw("LOWER(REPLACE(`number`, ' ' ,''))  = ?", [
                 strtolower(str_replace(' ', '', $invoice_number)),
@@ -379,7 +541,7 @@ class BaseTransformer
      */
     public function hasExpense($expense_number)
     {
-        return Expense::where('company_id', $this->company->id)
+        return Expense::query()->where('company_id', $this->company->id)
             ->where('is_deleted', false)
             ->whereRaw("LOWER(REPLACE(`number`, ' ' ,''))  = ?", [
                 strtolower(str_replace(' ', '', $expense_number)),
@@ -394,7 +556,7 @@ class BaseTransformer
      */
     public function hasQuote($quote_number)
     {
-        return Quote::where('company_id', $this->company->id)
+        return Quote::query()->where('company_id', $this->company->id)
             ->where('is_deleted', false)
             ->whereRaw("LOWER(REPLACE(`number`, ' ' ,''))  = ?", [
                 strtolower(str_replace(' ', '', $quote_number)),
@@ -409,7 +571,7 @@ class BaseTransformer
      */
     public function getInvoiceClientId($invoice_number)
     {
-        $invoice = Invoice::where('company_id', $this->company->id)
+        $invoice = Invoice::query()->where('company_id', $this->company->id)
             ->where('is_deleted', false)
             ->whereRaw("LOWER(REPLACE(`number`, ' ' ,''))  = ?", [
                 strtolower(str_replace(' ', '', $invoice_number)),
@@ -426,7 +588,7 @@ class BaseTransformer
      */
     public function getVendorId($name)
     {
-        $vendor = Vendor::where('company_id', $this->company->id)
+        $vendor = Vendor::query()->where('company_id', $this->company->id)
             ->where('is_deleted', false)
             ->whereRaw("LOWER(REPLACE(`name`, ' ' ,''))  = ?", [
                 strtolower(str_replace(' ', '', $name)),
@@ -462,13 +624,22 @@ class BaseTransformer
      */
     public function getExpenseCategoryId($name)
     {
-        $ec = ExpenseCategory::where('company_id', $this->company->id)
+        /** @var \App\Models\ExpenseCategory $ec */
+        
+        $ec = ExpenseCategory::query()->where('company_id', $this->company->id)
             ->where('is_deleted', false)
             ->whereRaw("LOWER(REPLACE(`name`, ' ' ,''))  = ?", [
                 strtolower(str_replace(' ', '', $name)),
             ])
             ->first();
 
+        if($ec)
+            return $ec->id;
+
+        $ec = \App\Factory\ExpenseCategoryFactory::create($this->company->id, $this->company->owner()->id);
+        $ec->name = $name;
+        $ec->save();
+        
         return $ec ? $ec->id : null;
     }
 
@@ -498,7 +669,7 @@ class BaseTransformer
      */
     public function getProjectId($name, $clientId = null)
     {
-        $project = Project::where('company_id', $this->company->id)
+        $project = Project::query()->where('company_id', $this->company->id)
             ->where('is_deleted', false)
             ->whereRaw("LOWER(REPLACE(`name`, ' ' ,''))  = ?", [
                 strtolower(str_replace(' ', '', $name)),
@@ -529,7 +700,7 @@ class BaseTransformer
      */
     public function getPaymentTypeId($name)
     {
-        $pt = PaymentType::whereRaw("LOWER(REPLACE(`name`, ' ' ,''))  = ?", [
+        $pt = PaymentType::query()->whereRaw("LOWER(REPLACE(`name`, ' ' ,''))  = ?", [
             strtolower(str_replace(' ', '', $name)),
         ])->first();
 

@@ -1,13 +1,6 @@
 @extends('portal.ninja2020.layout.app')
 @section('meta_title', ctrans('texts.view_credit'))
 
-@push('head')
-    <meta name="pdf-url" content="{{ $credit->pdf_file_path(null, 'url', true) }}">
-    @include('portal.ninja2020.components.no-cache')
-    
-    <script src="{{ asset('js/vendor/pdf.js/pdf.min.js') }}"></script>
-@endpush
-
 @section('body')
     <div class="bg-white shadow sm:rounded-lg mb-4" translate>
         <div class="px-4 py-5 sm:p-6">
@@ -31,10 +24,8 @@
         </div>
     </div>
 
-    @include('portal.ninja2020.components.entity-documents', ['entity' => $credit])
-
-    @include('portal.ninja2020.components.pdf-viewer', ['entity' => $credit, 'invitation' => $invitation])
-
+@include('portal.ninja2020.components.entity-documents', ['entity' => $credit])
+@livewire('pdf-slot', ['entity' => $credit, 'invitation' => $invitation, 'db' => $invitation->company->db])
     
 @endsection
 
@@ -44,19 +35,6 @@
     <script type="text/javascript">
 
         var clipboard = new ClipboardJS('.btn');
-
-            // clipboard.on('success', function(e) {
-            //     console.info('Action:', e.action);
-            //     console.info('Text:', e.text);
-            //     console.info('Trigger:', e.trigger);
-
-            //     e.clearSelection();
-            // });
-
-            // clipboard.on('error', function(e) {
-            //     console.error('Action:', e.action);
-            //     console.error('Trigger:', e.trigger);
-            // });
 
     </script>
 @endsection

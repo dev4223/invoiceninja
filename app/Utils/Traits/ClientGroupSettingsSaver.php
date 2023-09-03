@@ -4,14 +4,13 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Utils\Traits;
 
-use App\DataMapper\ClientSettings;
 use App\DataMapper\CompanySettings;
 use stdClass;
 
@@ -30,9 +29,9 @@ trait ClientGroupSettingsSaver
      * Saves a setting object.
      *
      * Works for groups|clients|companies
-     * @param  array $settings The request input settings array
+     * @param  array|object $settings The request input settings array
      * @param  object $entity   The entity which the settings belongs to
-     * @return void
+     * @return array|object
      */
     public function saveSettings($settings, $entity)
     {
@@ -63,9 +62,6 @@ trait ClientGroupSettingsSaver
         foreach ($settings as $key => $value) {
             $entity_settings->{$key} = $value;
         }
-
-        $entity->settings = $entity_settings;
-        $entity->save();
 
         return $entity_settings;
     }
@@ -237,7 +233,7 @@ trait ClientGroupSettingsSaver
             case 'json':
                 json_decode($value);
 
-                    return json_last_error() == JSON_ERROR_NONE;
+                return json_last_error() == JSON_ERROR_NONE;
             default:
                 return false;
         }

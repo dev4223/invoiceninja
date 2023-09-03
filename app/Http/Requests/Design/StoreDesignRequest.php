@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,6 +12,7 @@
 namespace App\Http\Requests\Design;
 
 use App\Http\Requests\Request;
+use App\Models\Account;
 
 class StoreDesignRequest extends Request
 {
@@ -22,7 +23,8 @@ class StoreDesignRequest extends Request
      */
     public function authorize() : bool
     {
-        return auth()->user()->isAdmin();
+        return auth()->user()->isAdmin() && auth()->user()->account->hasFeature(Account::FEATURE_API);
+        ;
     }
 
     public function rules()
@@ -30,13 +32,18 @@ class StoreDesignRequest extends Request
         return [
             //'name' => 'required',
             'name' => 'required|unique:designs,name,null,null,company_id,'.auth()->user()->companyId(),
-            'design' => 'required',
+            'design' => 'required|array',
+            'design.header' => 'required|min:1',
+            'design.body' => 'required|min:1',
+            'design.footer' => 'required|min:1',
+            'design.includes' => 'required|min:1',
         ];
     }
 
     public function prepareForValidation()
     {
         $input = $this->all();
+        $input['design'] = (isset($input['design']) && is_array($input['design'])) ? $input['design'] : [];
 
         if (! array_key_exists('product', $input['design']) || is_null($input['design']['product'])) {
             $input['design']['product'] = '';

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2022. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,7 +12,6 @@
 namespace App\Http\Controllers;
 
 use App\DataMapper\FeesAndLimits;
-use App\Exceptions\SystemError;
 use App\Factory\CompanyGatewayFactory;
 use App\Http\Requests\StripeConnect\InitializeStripeConnectRequest;
 use App\Libraries\MultiDB;
@@ -20,10 +19,7 @@ use App\Models\Client;
 use App\Models\Company;
 use App\Models\CompanyGateway;
 use App\Models\GatewayType;
-use App\PaymentDrivers\Stripe\Connect\Account;
 use App\PaymentDrivers\Stripe\Jobs\StripeWebhook;
-use Exception;
-use Illuminate\Http\Request;
 use Stripe\Exception\ApiErrorException;
 
 class StripeConnectController extends BaseController
@@ -36,15 +32,12 @@ class StripeConnectController extends BaseController
      */
     public function initialize(InitializeStripeConnectRequest $request, string $token)
     {
-        // Should we check if company has set country in the ap? Otherwise this will fail.
 
         if (! is_array($request->getTokenContent())) {
             abort(400, 'Invalid token');
         }
 
         MultiDB::findAndSetDbByCompanyKey($request->getTokenContent()['company_key']);
-
-        $company = Company::where('company_key', $request->getTokenContent()['company_key'])->first();
 
         $company_gateway = CompanyGateway::query()
             ->where('gateway_key', 'd14dd26a47cecc30fdd65700bfb67b34')
@@ -54,7 +47,7 @@ class StripeConnectController extends BaseController
         if ($company_gateway) {
             $config = $company_gateway->getConfig();
 
-            if (property_exists($config, 'account_id') && strlen($config->account_id) > 1) {
+            if (property_exists($config, 'account_id') && strlen($config->account_id) > 5) {
                 return view('auth.connect.existing');
             }
         }
@@ -70,19 +63,36 @@ class StripeConnectController extends BaseController
     {
         \Stripe\Stripe::setApiKey(config('ninja.ninja_stripe_key'));
 
+        if ($request->has('error') && $request->error == 'access_denied') {
+            return view('auth.connect.access_denied');
+        }
+
         try {
+            /** @class \stdClass $response
+             *  @property string $scope
+             *  @property string $stripe_user_id
+             *  @property string $stripe_publishable_key
+             *  @property string $refresh_token
+             *  @property string $livemode
+             *  @property string $access_token
+             *  @property string $token_type
+             *  @property string $stripe_user
+             *  @property string $stripe_account
+             *  @property string $error
+            */
+
+            /** @var  \stdClass $response */
             $response = \Stripe\OAuth::token([
                 'grant_type' => 'authorization_code',
                 'code' => $request->input('code'),
             ]);
         } catch (\Exception $e) {
-            nlog($e->getMessage());
-            throw new SystemError($e->getMessage(), 500);
+            return view('auth.connect.access_denied');
         }
 
         MultiDB::findAndSetDbByCompanyKey($request->getTokenContent()['company_key']);
 
-        $company = Company::where('company_key', $request->getTokenContent()['company_key'])->first();
+        $company = Company::query()->where('company_key', $request->getTokenContent()['company_key'])->first();
 
         $company_gateway = CompanyGateway::query()
             ->where('gateway_key', 'd14dd26a47cecc30fdd65700bfb67b34')
@@ -97,7 +107,6 @@ class StripeConnectController extends BaseController
             $company_gateway->fees_and_limits = $fees_and_limits;
             $company_gateway->setConfig([]);
             $company_gateway->token_billing = 'always';
-            // $company_gateway->save();
         }
 
         $payload = [
@@ -116,39 +125,14 @@ class StripeConnectController extends BaseController
         $company_gateway->save();
 
         // StripeWebhook::dispatch($company->company_key, $company_gateway->id);
+        // if(isset($request->getTokenContent()['is_react']) && $request->getTokenContent()['is_react']) {
+            $redirect_uri = 'https://app.invoicing.co/#/settings/online_payments';
+        // } else {
+        //     $redirect_uri = 'https://invoicing.co/stripe/completed';
+        // }
 
         //response here
-        return view('auth.connect.completed');
+        return view('auth.connect.completed', ['url' => $redirect_uri]);
     }
 
-    private function checkAccountAlreadyLinkToEmail($company_gateway, $email)
-    {
-        $client = Client::first() ? Client::first() : new Client;
-
-        //Pull the list of Stripe Accounts and see if we match
-        $accounts = $company_gateway->driver($client)->getAllConnectedAccounts()->data;
-
-        foreach ($accounts as $account) {
-            if ($account['email'] == $email) {
-                return $account['id'];
-            }
-        }
-
-        return false;
-    }
-
-    /*********************************
-    * Stripe OAuth
-    */
-
-   //  public function initialize(InitializeStripeConnectRequest $request, string $token)
-   // {
-
-   //  $stripe_key = config('ninja.ninja_stripe_key');
-
-   //  $endpoint = "https://connect.stripe.com/oauth/authorize?response_type=code&client_id={$stripe_key}&scope=read_write";
-
-   //  return redirect($endpoint);
-
-   // }
 }

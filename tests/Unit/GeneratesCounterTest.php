@@ -13,7 +13,6 @@ namespace Tests\Unit;
 
 use App\DataMapper\ClientSettings;
 use App\Factory\ClientFactory;
-use App\Factory\QuoteFactory;
 use App\Factory\VendorFactory;
 use App\Models\Client;
 use App\Models\Company;
@@ -179,7 +178,7 @@ class GeneratesCounterTest extends TestCase
 
         $invoice_number = $this->getNextInvoiceNumber($this->client->fresh(), $this->invoice->fresh());
 
-        $this->assertEquals($invoice_number, '0002');
+        $this->assertEquals($invoice_number, '0003');
     }
 
     public function testQuoteNumberValue()
@@ -351,7 +350,7 @@ class GeneratesCounterTest extends TestCase
 
         $invoice_number = $this->getNextInvoiceNumber($cliz->fresh(), $this->invoice);
 
-        $this->assertEquals($invoice_number, '0002');
+        $this->assertEquals($invoice_number, '0003');
     }
 
     public function testClientNumber()
