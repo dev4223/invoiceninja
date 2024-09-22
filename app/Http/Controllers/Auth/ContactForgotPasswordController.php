@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -80,6 +80,7 @@ class ContactForgotPasswordController extends Controller
             'passwordEmailRoute' => 'client.password.email',
             'account' => $account,
             'company' => $company,
+            'is_react' => false,
         ]);
     }
 
@@ -101,7 +102,7 @@ class ContactForgotPasswordController extends Controller
 
         $this->validateEmail($request);
 
-        
+
         if (Ninja::isHosted() && $company = Company::where('company_key', $request->input('company_key'))->first()) {
             /** @var \App\Models\Company $company **/
 
@@ -117,7 +118,7 @@ class ContactForgotPasswordController extends Controller
                                     })->first();
         }
 
-        $response = false;
+        // $response = false;
 
         if ($contact) {
             /* Update all instances of the client */
@@ -130,16 +131,16 @@ class ContactForgotPasswordController extends Controller
         }
 
         if ($request->ajax()) {
-            if ($response == Password::RESET_THROTTLED) {
+            if ($response == Password::RESET_THROTTLED) { // @phpstan-ignore-line
                 return response()->json(['message' => ctrans('passwords.throttled'), 'status' => false], 429);
             }
 
-            return $response == Password::RESET_LINK_SENT
+            return $response == Password::RESET_LINK_SENT // @phpstan-ignore-line
                 ? response()->json(['message' => 'Reset link sent to your email.', 'status' => true], 201)
                 : response()->json(['message' => 'Email not found', 'status' => false], 401);
         }
 
-        return $response == Password::RESET_LINK_SENT
+        return $response == Password::RESET_LINK_SENT // @phpstan-ignore-line
             ? $this->sendResetLinkResponse($request, $response)
             : $this->sendResetLinkFailedResponse($request, $response);
     }

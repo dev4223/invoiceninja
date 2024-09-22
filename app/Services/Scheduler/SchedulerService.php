@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,9 +12,8 @@
 namespace App\Services\Scheduler;
 
 use App\Models\Scheduler;
-use App\Utils\Traits\MakesHash;
 use App\Utils\Traits\MakesDates;
-use App\Services\Scheduler\EmailReport;
+use App\Utils\Traits\MakesHash;
 
 class SchedulerService
 {

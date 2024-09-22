@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -54,13 +54,6 @@ class PostUpdate extends Command
 
         info('finished migrating');
 
-        $output = [];
-
-        // exec('vendor/bin/composer install --no-dev -o', $output);
-
-        info(print_r($output, 1));
-        info('finished running composer install ');
-
         try {
             // Artisan::call('optimize');
             Artisan::call('config:clear');
@@ -86,8 +79,7 @@ class PostUpdate extends Command
 
         info('queue restarted');
 
-        $this->buildCache(true);
-
+        Artisan::call('cache:clear');
         VersionCheck::dispatch();
 
         info('Sent for version check');

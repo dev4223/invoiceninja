@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -65,15 +65,27 @@ class ApplyPaymentAmount extends AbstractService
             'amount' => $payment->amount,
         ]);
 
-        $this->invoice->next_send_date = null;
 
-        $this->invoice->service()
+        $has_partial = $this->invoice->hasPartial();
+
+        $invoice_service = $this->invoice->service()
                 ->setExchangeRate()
                 ->updateBalance($payment->amount * -1)
                 ->updatePaidToDate($payment->amount)
                 ->setCalculatedStatus()
-                ->applyNumber()
-                ->save();
+                ->applyNumber();
+
+
+        if ($has_partial) {
+            $this->invoice->partial = max(0, $this->invoice->partial - $payment->amount);
+            $invoice_service->checkReminderStatus();
+        }
+
+        if($this->invoice->balance == 0) {
+            $this->invoice->next_send_date = null;
+        }
+
+        $this->invoice = $invoice_service->save();
 
         $this->invoice
             ->client
@@ -89,7 +101,7 @@ class ApplyPaymentAmount extends AbstractService
         /* Update Invoice balance */
 
         $payment->ledger()
-                ->updatePaymentBalance($payment->amount * -1);
+                ->updatePaymentBalance($payment->amount * -1, "ApplyPaymentInvoice-");
 
         $this->invoice->service()->workFlow()->save();
 

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -60,7 +60,7 @@ trait DesignCalculator
         if ($default_design_id == 'recurring_invoice_design_id') {
             $default_design_id = 'invoice_design_id';
         }
-        
+
         $design_id = $this->settings->{$default_design_id};
 
         if (array_key_exists($design_id, $design_map)) {

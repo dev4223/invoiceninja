@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -31,7 +31,10 @@ use League\Fractal\Resource\Item;
 
 class WebhookSingle implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     private $entity;
 
@@ -46,7 +49,7 @@ class WebhookSingle implements ShouldQueue
     private string $includes;
 
     private Company $company;
-    
+
     /**
      * Create a new job instance.
      *
@@ -63,9 +66,7 @@ class WebhookSingle implements ShouldQueue
 
     public function backoff()
     {
-        // return [15, 35, 65, 185, 3605];
         return [rand(10, 15), rand(30, 40), rand(60, 79), rand(160, 200), rand(3000, 5000)];
-
     }
 
     /**
@@ -78,15 +79,9 @@ class WebhookSingle implements ShouldQueue
 
         $subscription = Webhook::query()->with('company')->find($this->subscription_id);
 
-        if ($subscription) {
-            // nlog("firing event ID {$subscription->event_id} company_id {$subscription->company_id}");
-        }
-        
         if (!$subscription) {
             $this->fail();
-            
             nlog("failed to fire event, could not find webhook ID {$this->subscription_id}");
-
             return;
         }
 
@@ -105,7 +100,7 @@ class WebhookSingle implements ShouldQueue
 
         $resource = new Item($this->entity, $transformer, $this->entity->getEntityType());
         $data = $manager->createData($resource)->toArray();
-        
+
         $headers = is_array($subscription->headers) ? $subscription->headers : [];
 
         $this->postData($subscription, $data, $headers);
@@ -128,7 +123,7 @@ class WebhookSingle implements ShouldQueue
             ]);
 
             (new SystemLogger(
-                array_merge((array) $response, $data),
+                ['message' => $response->getHeaders(), 'body' => $data],
                 SystemLog::CATEGORY_WEBHOOK,
                 SystemLog::EVENT_WEBHOOK_SUCCESS,
                 SystemLog::TYPE_WEBHOOK_RESPONSE,
@@ -141,7 +136,7 @@ class WebhookSingle implements ShouldQueue
             nlog($e->getMessage());
 
             (new SystemLogger(
-                ['message' => "Error connecting to ". $subscription->target_url],
+                ['message' => "Error connecting to ". $subscription->target_url, 'body' => $data],
                 SystemLog::CATEGORY_WEBHOOK,
                 SystemLog::EVENT_WEBHOOK_FAILURE,
                 SystemLog::TYPE_WEBHOOK_RESPONSE,
@@ -150,12 +145,32 @@ class WebhookSingle implements ShouldQueue
             ))->handle();
         } catch (BadResponseException $e) {
             if ($e->getResponse()->getStatusCode() >= 400 && $e->getResponse()->getStatusCode() < 500) {
+
+                /* Some 400's should never be repeated */
+                if (in_array($e->getResponse()->getStatusCode(), [404, 410, 405])) {
+
+                    $message = "There was a problem when connecting to {$subscription->target_url} => status code ". $e->getResponse()->getStatusCode(). " This webhook call will be suspended until further action is taken.";
+
+                    (new SystemLogger(
+                        ['message' => $message, 'body' => $data],
+                        SystemLog::CATEGORY_WEBHOOK,
+                        SystemLog::EVENT_WEBHOOK_FAILURE,
+                        SystemLog::TYPE_WEBHOOK_RESPONSE,
+                        $this->resolveClient(),
+                        $this->company
+                    ))->handle();
+
+                    $subscription->delete();
+                    $this->fail();
+                    return;
+                }
+
                 $message = "There was a problem when connecting to {$subscription->target_url} => status code ". $e->getResponse()->getStatusCode();
-                
+
                 nlog($message);
 
                 (new SystemLogger(
-                    ['message' => $message],
+                    ['message' => $message, 'body' => $data],
                     SystemLog::CATEGORY_WEBHOOK,
                     SystemLog::EVENT_WEBHOOK_FAILURE,
                     SystemLog::TYPE_WEBHOOK_RESPONSE,
@@ -163,13 +178,12 @@ class WebhookSingle implements ShouldQueue
                     $this->company
                 ))->handle();
 
-                /* Some 400's should never be repeated */
-                if (in_array($e->getResponse()->getStatusCode(), [404, 410])) {
+                if (in_array($e->getResponse()->getStatusCode(), [400])) {
                     $this->fail();
                     return;
                 }
 
-                $this->release($this->backoff()[$this->attempts()-1]);
+                $this->release($this->backoff()[$this->attempts() - 1]);
             }
 
             if ($e->getResponse()->getStatusCode() >= 500) {
@@ -178,7 +192,7 @@ class WebhookSingle implements ShouldQueue
                 $message = "There was a problem when connecting to {$subscription->target_url} => status code ". $e->getResponse()->getStatusCode(). " no retry attempted.";
 
                 (new SystemLogger(
-                    ['message' => $message],
+                    ['message' => $message, 'body' => $data],
                     SystemLog::CATEGORY_WEBHOOK,
                     SystemLog::EVENT_WEBHOOK_FAILURE,
                     SystemLog::TYPE_WEBHOOK_RESPONSE,
@@ -194,7 +208,7 @@ class WebhookSingle implements ShouldQueue
             $error = json_decode($e->getResponse()->getBody()->getContents());
 
             (new SystemLogger(
-                ['message' => $error],
+                ['message' => $error, 'body' => $data],
                 SystemLog::CATEGORY_WEBHOOK,
                 SystemLog::EVENT_WEBHOOK_FAILURE,
                 SystemLog::TYPE_WEBHOOK_RESPONSE,
@@ -206,7 +220,7 @@ class WebhookSingle implements ShouldQueue
             $error = json_decode($e->getResponse()->getBody()->getContents());
 
             (new SystemLogger(
-                ['message' => $error],
+                ['message' => $error, 'body' => $data],
                 SystemLog::CATEGORY_WEBHOOK,
                 SystemLog::EVENT_WEBHOOK_FAILURE,
                 SystemLog::TYPE_WEBHOOK_RESPONSE,
@@ -218,7 +232,7 @@ class WebhookSingle implements ShouldQueue
             nlog($e->getCode());
 
             (new SystemLogger(
-                $e->getMessage(),
+                ['message' => $e->getMessage(), 'body' => $data],
                 SystemLog::CATEGORY_WEBHOOK,
                 SystemLog::EVENT_WEBHOOK_FAILURE,
                 SystemLog::TYPE_WEBHOOK_RESPONSE,
@@ -229,7 +243,7 @@ class WebhookSingle implements ShouldQueue
             //add some entropy to the retry
             sleep(rand(0, 3));
 
-            $this->release($this->backoff()[$this->attempts()-1]);
+            $this->release($this->backoff()[$this->attempts() - 1]);
         }
     }
 

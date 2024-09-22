@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -16,7 +16,6 @@ use Illuminate\Notifications\Notification;
 
 class GenericNinjaAdminNotification extends Notification
 {
-
     public function __construct(protected array $message_array)
     {
     }
@@ -56,13 +55,13 @@ class GenericNinjaAdminNotification extends Notification
 
     public function toSlack($notifiable)
     {
-        $content = '';  
+        $content = '';
 
         foreach($this->message_array as $message) {
             $content .= $message . "\n";
         }
 
-        return (new SlackMessage)
+        return (new SlackMessage())
                 ->success()
                 ->from(ctrans('texts.notification_bot'))
                 ->image('https://app.invoiceninja.com/favicon.png')

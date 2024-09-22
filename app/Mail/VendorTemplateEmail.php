@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -13,6 +13,7 @@ namespace App\Mail;
 
 use App\Models\VendorContact;
 use App\Services\PdfMaker\Designs\Utilities\DesignHelpers;
+use App\Utils\Ninja;
 use App\Utils\VendorHtmlEngine;
 use Illuminate\Mail\Mailable;
 
@@ -65,13 +66,17 @@ class VendorTemplateEmail extends Mailable
 
         return $link_string;
     }
-    
+
     public function build()
     {
         $template_name = 'email.template.'.$this->build_email->getTemplate();
 
-        if ($this->build_email->getTemplate() == 'light' || $this->build_email->getTemplate() == 'dark') {
+        if (in_array($this->build_email->getTemplate(), ['light', 'dark'])) {
             $template_name = 'email.template.client';
+        }
+
+        if($this->build_email->getTemplate() == 'premium') {
+            $template_name = 'email.template.client_premium';
         }
 
         if ($this->build_email->getTemplate() == 'custom') {
@@ -102,8 +107,19 @@ class VendorTemplateEmail extends Mailable
         $this->from(config('mail.from.address'), $email_from_name);
 
         if (strlen($settings->bcc_email) > 1) {
-            $this->bcc(explode(',', str_replace(' ', '', $settings->bcc_email)));
-        }//remove whitespace if any has been inserted.
+
+            if (Ninja::isHosted()) {
+
+                if($this->company->account->isPaid()) {
+                    $bccs = explode(',', str_replace(' ', '', $settings->bcc_email));
+                    $this->bcc(array_slice($bccs, 0, 5));
+                }
+
+            } else {
+                $this->bcc(explode(',', str_replace(' ', '', $settings->bcc_email)));
+            }
+
+        }
 
         $this->subject($this->build_email->getSubject())
             ->text('email.template.text', [

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -30,8 +30,8 @@ class UpdateInvoiceRequest extends Request
      *
      * @return bool
      */
-    public function authorize() : bool
-    {   
+    public function authorize(): bool
+    {
         /** @var \App\Models\User $user */
         $user = auth()->user();
 
@@ -46,27 +46,31 @@ class UpdateInvoiceRequest extends Request
         $rules = [];
 
         if ($this->file('documents') && is_array($this->file('documents'))) {
-            $rules['documents.*'] = $this->file_validation;
+            $rules['documents.*'] = $this->fileValidation();
         } elseif ($this->file('documents')) {
-            $rules['documents'] = $this->file_validation;
+            $rules['documents'] = $this->fileValidation();
+        } else {
+            $rules['documents'] = 'bail|sometimes|array';
         }
 
         if ($this->file('file') && is_array($this->file('file'))) {
-            $rules['file.*'] = $this->file_validation;
+            $rules['file.*'] = $this->fileValidation();
         } elseif ($this->file('file')) {
-            $rules['file'] = $this->file_validation;
+            $rules['file'] = $this->fileValidation();
         }
 
-        $rules['id'] = new LockedInvoiceRule($this->invoice);
+        // $rules['id'] = new LockedInvoiceRule($this->invoice);
 
-        if ($this->number) {
-            $rules['number'] = Rule::unique('invoices')->where('company_id', $user->company()->id)->ignore($this->invoice->id);
-        }
+        $rules['number'] = ['bail', 'sometimes', 'nullable', Rule::unique('invoices')->where('company_id', $user->company()->id)->ignore($this->invoice->id)];
 
         $rules['is_amount_discount'] = ['boolean'];
-
+        $rules['client_id'] = ['bail', 'sometimes', Rule::in([$this->invoice->client_id])];
         $rules['line_items'] = 'array';
-        $rules['discount'] = 'sometimes|numeric';
+
+        $rules['invitations'] = 'sometimes|bail|array';
+        $rules['invitations.*.client_contact_id'] = 'bail|required|distinct';
+
+        $rules['discount'] = 'sometimes|numeric|max:99999999999999';
         $rules['project_id'] = ['bail', 'sometimes', new ValidProjectForClient($this->all())];
         $rules['tax_rate1'] = 'bail|sometimes|numeric';
         $rules['tax_rate2'] = 'bail|sometimes|numeric';
@@ -76,6 +80,13 @@ class UpdateInvoiceRequest extends Request
         $rules['tax_name3'] = 'bail|sometimes|string|nullable';
         $rules['status_id'] = 'bail|sometimes|not_in:5'; //do not allow cancelled invoices to be modfified.
         $rules['exchange_rate'] = 'bail|sometimes|numeric';
+        $rules['partial'] = 'bail|sometimes|nullable|numeric';
+        $rules['amount'] = ['sometimes', 'bail', 'numeric', 'max:99999999999999'];
+
+        $rules['date'] = 'bail|sometimes|date:Y-m-d';
+
+        $rules['partial_due_date'] = ['bail', 'sometimes', 'nullable', 'exclude_if:partial,0', 'date', 'before:due_date', 'after_or_equal:date'];
+        $rules['due_date'] = ['bail', 'sometimes', 'nullable', 'after:partial_due_date', 'after_or_equal:date', Rule::requiredIf(fn () => strlen($this->partial_due_date) > 1), 'date'];
 
         return $rules;
     }
@@ -88,8 +99,13 @@ class UpdateInvoiceRequest extends Request
 
         $input['id'] = $this->invoice->id;
 
+        if(isset($input['partial']) && $input['partial'] == 0) {
+            $input['partial_due_date'] = null;
+        }
+
         if (isset($input['line_items']) && is_array($input['line_items'])) {
             $input['line_items'] = isset($input['line_items']) ? $this->cleanItems($input['line_items']) : [];
+            $input['amount'] = $this->entityTotalAmount($input['line_items']);
         }
 
         if (array_key_exists('documents', $input)) {
@@ -98,6 +114,12 @@ class UpdateInvoiceRequest extends Request
 
         if (array_key_exists('exchange_rate', $input) && is_null($input['exchange_rate'])) {
             $input['exchange_rate'] = 1;
+        }
+
+        //handles edge case where we need for force set the due date of the invoice.
+        if((isset($input['partial_due_date']) && strlen($input['partial_due_date']) > 1) && (!array_key_exists('due_date', $input) || (empty($input['due_date']) && empty($this->invoice->due_date)))) {
+            $client = \App\Models\Client::withTrashed()->find($input['client_id']);
+            $input['due_date'] = \Illuminate\Support\Carbon::parse($input['date'])->addDays((int)$client->getSetting('payment_terms'))->format('Y-m-d');
         }
 
         $this->replace($input);

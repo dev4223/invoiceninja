@@ -4,33 +4,30 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
 
-use App\Models\GatewayType;
-use App\Utils\Traits\AppSetup;
-use App\Utils\Traits\MakesHash;
-use App\Utils\Traits\MakesDates;
-use App\DataMapper\FeesAndLimits;
-use App\Models\Traits\Excludable;
 use App\DataMapper\ClientSettings;
 use App\DataMapper\CompanySettings;
-use Illuminate\Support\Facades\Cache;
-use App\Services\Client\ClientService;
-use App\Utils\Traits\GeneratesCounter;
-use Laracasts\Presenter\PresentableTrait;
-use App\Models\Presenters\ClientPresenter;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Utils\Traits\ClientGroupSettingsSaver;
+use App\DataMapper\FeesAndLimits;
 use App\Libraries\Currency\Conversion\CurrencyApi;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
+use App\Models\Presenters\ClientPresenter;
+use App\Models\Traits\Excludable;
+use App\Services\Client\ClientService;
+use App\Utils\Traits\AppSetup;
+use App\Utils\Traits\ClientGroupSettingsSaver;
+use App\Utils\Traits\GeneratesCounter;
+use App\Utils\Traits\MakesDates;
+use App\Utils\Traits\MakesHash;
 use Illuminate\Contracts\Translation\HasLocalePreference;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Laracasts\Presenter\PresentableTrait;
 
 /**
  * App\Models\Client
@@ -53,6 +50,7 @@ use Illuminate\Contracts\Translation\HasLocalePreference;
  * @property int|null $last_login
  * @property int|null $industry_id
  * @property int|null $size_id
+ * @property object|null $e_invoice
  * @property string|null $address1
  * @property string|null $address2
  * @property string|null $city
@@ -111,7 +109,7 @@ use Illuminate\Contracts\Translation\HasLocalePreference;
  * @property string $payment_balance
  * @property mixed $tax_data
  * @property int $is_tax_exempt
- * @property int $has_valid_vat_number
+ * @property bool $has_valid_vat_number
  * @mixin \Eloquent
  */
 class Client extends BaseModel implements HasLocalePreference
@@ -125,7 +123,7 @@ class Client extends BaseModel implements HasLocalePreference
     use AppSetup;
     use ClientGroupSettingsSaver;
     use Excludable;
-
+    
     protected $presenter = ClientPresenter::class;
 
     protected $hidden = [
@@ -169,6 +167,7 @@ class Client extends BaseModel implements HasLocalePreference
         'routing_id',
         'is_tax_exempt',
         'has_valid_vat_number',
+        'classification',
     ];
 
     protected $with = [
@@ -186,6 +185,7 @@ class Client extends BaseModel implements HasLocalePreference
         'deleted_at' => 'timestamp',
         'last_login' => 'timestamp',
         'tax_data' => 'object',
+        'e_invoice' => 'object',
     ];
 
     protected $touches = [];
@@ -221,12 +221,17 @@ class Client extends BaseModel implements HasLocalePreference
         'routing_id',
     ];
 
-    // public function scopeExclude($query)
-    // {
-    //     $query->makeHidden(['balance','paid_to_date']);
+    public static array $bulk_update_columns = [
+        'public_notes',
+        'industry_id',
+        'size_id',
+        'country_id',
+        'custom_value1',
+        'custom_value2',
+        'custom_value3',
+        'custom_value4',
+    ];
 
-    //     return $query;
-    // }
 
     public function getEntityType()
     {
@@ -295,105 +300,103 @@ class Client extends BaseModel implements HasLocalePreference
         return $this->hasMany(Activity::class)->take(50)->orderBy('id', 'desc');
     }
 
-    public function contacts() :HasMany
+    public function contacts(): HasMany
     {
         return $this->hasMany(ClientContact::class)->orderBy('is_primary', 'desc');
     }
 
-    public function primary_contact():HasMany
+    public function primary_contact(): HasMany
     {
         return $this->hasMany(ClientContact::class)->where('is_primary', true);
     }
 
-    public function company() :BelongsTo
+    public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
     }
 
-    public function user() :BelongsTo
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class)->withTrashed();
     }
 
-    public function assigned_user() :BelongsTo
+    public function assigned_user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_user_id', 'id')->withTrashed();
     }
 
-    public function country() :BelongsTo
+    public function country(): BelongsTo
     {
         return $this->belongsTo(Country::class);
     }
 
-    public function invoices() :HasMany
+    public function invoices(): HasMany
     {
         return $this->hasMany(Invoice::class)->withTrashed();
     }
 
-    public function quotes() :HasMany
+    public function quotes(): HasMany
     {
         return $this->hasMany(Quote::class)->withTrashed();
     }
 
-    public function tasks() :HasMany
+    public function tasks(): HasMany
     {
         return $this->hasMany(Task::class)->withTrashed();
     }
 
-    public function payments() :HasMany
+    public function payments(): HasMany
     {
         return $this->hasMany(Payment::class)->withTrashed();
     }
 
-    public function recurring_invoices() :HasMany
+    public function recurring_invoices(): HasMany
     {
         return $this->hasMany(RecurringInvoice::class)->withTrashed();
     }
 
-    public function recurring_expenses() :HasMany
+    public function recurring_expenses(): HasMany
     {
         return $this->hasMany(RecurringExpense::class)->withTrashed();
     }
 
-    public function shipping_country():\Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function shipping_country(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Country::class, 'shipping_country_id', 'id');
     }
 
-    public function system_logs() :HasMany
+    public function system_logs(): HasMany
     {
         return $this->hasMany(SystemLog::class)->take(50)->orderBy('id', 'desc');
     }
 
-    public function timezone() :Timezone
+    public function timezone(): Timezone
     {
         return Timezone::find($this->getSetting('timezone_id'));
     }
 
     public function language()
     {
-        $languages = Cache::get('languages');
 
-        if (! $languages) {
-            $this->buildCache(true);
-        }
+        /** @var \Illuminate\Support\Collection<\App\Models\Language> */
+        $languages = app('languages');
 
-        return $languages->filter(function ($item) {
+        return $languages->first(function ($item) {
             return $item->id == $this->getSetting('language_id');
-        })->first();
+        });
     }
 
-    public function industry() :BelongsTo
+    public function industry(): BelongsTo
     {
         return $this->belongsTo(Industry::class);
     }
 
-    public function size() :BelongsTo
+    public function size(): BelongsTo
     {
         return $this->belongsTo(Size::class);
     }
 
-    public function locale() :string
+    public function locale(): string
     {
         if (! $this->language()) {
             return 'en';
@@ -404,36 +407,31 @@ class Client extends BaseModel implements HasLocalePreference
 
     public function date_format()
     {
-        $date_formats = Cache::get('date_formats');
+        /** @var \Illuminate\Support\Collection<DateFormat> */
+        $date_formats = app('date_formats');
 
-        if (! $date_formats) {
-            $this->buildCache(true);
-        }
-
-        return $date_formats->filter(function ($item) {
+        return $date_formats->first(function ($item) {
             return $item->id == $this->getSetting('date_format_id');
-        })->first()->format;
+        })->format;
     }
 
     public function currency()
     {
-        $currencies = Cache::get('currencies');
 
-        if (! $currencies) {
-            $this->buildCache(true);
-        }
+        /** @var \Illuminate\Support\Collection<Currency> */
+        $currencies = app('currencies');
 
-        return $currencies->filter(function ($item) {
+        return $currencies->first(function ($item) {
             return $item->id == $this->getSetting('currency_id');
-        })->first();
+        });
     }
 
-    public function service() :ClientService
+    public function service(): ClientService
     {
         return new ClientService($this);
     }
 
-    public function updateBalance($amount) :ClientService
+    public function updateBalance($amount): ClientService
     {
         return $this->service()->updateBalance($amount);
     }
@@ -445,7 +443,7 @@ class Client extends BaseModel implements HasLocalePreference
      *
      * @return \stdClass stdClass object of settings
      */
-    public function getMergedSettings() :object
+    public function getMergedSettings(): object
     {
         if ($this->group_settings !== null) {
             $group_settings = ClientSettings::buildClientSettings($this->group_settings->settings, $this->settings);
@@ -464,7 +462,7 @@ class Client extends BaseModel implements HasLocalePreference
      * @param  string $setting The Setting parameter
      * @return mixed          The setting requested
      */
-    public function getSetting($setting) :mixed
+    public function getSetting($setting): mixed
     {
         /*Client Settings*/
         if ($this->settings && property_exists($this->settings, $setting) && isset($this->settings->{$setting})) {
@@ -473,9 +471,9 @@ class Client extends BaseModel implements HasLocalePreference
                 return $this->settings->{$setting};
             } elseif (is_bool($this->settings->{$setting})) {
                 return $this->settings->{$setting};
-            } elseif (is_int($this->settings->{$setting})) { 
+            } elseif (is_int($this->settings->{$setting})) {
                 return $this->settings->{$setting};
-            } elseif(is_float($this->settings->{$setting})) { 
+            } elseif(is_float($this->settings->{$setting})) {
                 return $this->settings->{$setting};
             }
         }
@@ -486,7 +484,7 @@ class Client extends BaseModel implements HasLocalePreference
         }
 
         /*Company Settings*/
-        elseif ((property_exists($this->company->settings, $setting) != false) && (isset($this->company->settings->{$setting}) !== false)) {
+        elseif ((property_exists($this->company->settings, $setting) !== false) && (isset($this->company->settings->{$setting}) !== false)) {
             return $this->company->settings->{$setting};
         } elseif (property_exists(CompanySettings::defaults(), $setting)) {
             return CompanySettings::defaults()->{$setting};
@@ -522,12 +520,12 @@ class Client extends BaseModel implements HasLocalePreference
     /**
      * @return \Illuminate\Database\Eloquent\Relations\MorphMany<Document>
      */
-    public function documents() :\Illuminate\Database\Eloquent\Relations\MorphMany
+    public function documents(): \Illuminate\Database\Eloquent\Relations\MorphMany
     {
         return $this->morphMany(Document::class, 'documentable');
     }
 
-    public function group_settings() :BelongsTo
+    public function group_settings(): BelongsTo
     {
         return $this->belongsTo(GroupSetting::class);
     }
@@ -537,23 +535,27 @@ class Client extends BaseModel implements HasLocalePreference
      *
      * @return null|CompanyGateway The Priority Credit Card gateway
      */
-    public function getCreditCardGateway() :?CompanyGateway
+    public function getCreditCardGateway(): ?CompanyGateway
     {
         $pms = $this->service()->getPaymentMethods(-1);
 
         foreach ($pms as $pm) {
             if ($pm['gateway_type_id'] == GatewayType::CREDIT_CARD) {
-                
+
                 $cg = CompanyGateway::query()->find($pm['company_gateway_id']);
 
-                if ($cg && ! property_exists($cg->fees_and_limits, strval(GatewayType::CREDIT_CARD))) {
+                if($cg->gateway_key == '80af24a6a691230bbec33e930ab40666') { //ensure we don't attempt to authorize paypal platform - yet.
+                    continue;
+                }
+
+                if ($cg && is_object($cg->fees_and_limits) && ! property_exists($cg->fees_and_limits, strval(GatewayType::CREDIT_CARD))) {
                     $fees_and_limits = $cg->fees_and_limits;
-                    $fees_and_limits->{GatewayType::CREDIT_CARD} = new FeesAndLimits;
+                    $fees_and_limits->{GatewayType::CREDIT_CARD} = new FeesAndLimits();
                     $cg->fees_and_limits = $fees_and_limits;
                     $cg->save();
                 }
 
-                if ($cg && $cg->fees_and_limits->{GatewayType::CREDIT_CARD}->is_enabled) {
+                if ($cg && is_object($cg->fees_and_limits) && $cg->fees_and_limits->{GatewayType::CREDIT_CARD}->is_enabled) {
                     return $cg;
                 }
             }
@@ -561,7 +563,8 @@ class Client extends BaseModel implements HasLocalePreference
 
         return null;
     }
-    public function getBACSGateway() :?CompanyGateway
+
+    public function getBACSGateway(): ?CompanyGateway
     {
         $pms = $this->service()->getPaymentMethods(-1);
 
@@ -569,9 +572,9 @@ class Client extends BaseModel implements HasLocalePreference
             if ($pm['gateway_type_id'] == GatewayType::BACS) {
                 $cg = CompanyGateway::query()->find($pm['company_gateway_id']);
 
-                if ($cg && ! property_exists($cg->fees_and_limits, GatewayType::BACS)) {
+                if ($cg && ! property_exists($cg->fees_and_limits, GatewayType::BACS)) { //@phpstan-ignore-line
                     $fees_and_limits = $cg->fees_and_limits;
-                    $fees_and_limits->{GatewayType::BACS} = new FeesAndLimits;
+                    $fees_and_limits->{GatewayType::BACS} = new FeesAndLimits();
                     $cg->fees_and_limits = $fees_and_limits;
                     $cg->save();
                 }
@@ -585,8 +588,33 @@ class Client extends BaseModel implements HasLocalePreference
         return null;
     }
 
+    public function getACSSGateway(): ?CompanyGateway
+    {
+        $pms = $this->service()->getPaymentMethods(-1);
+
+        foreach ($pms as $pm) {
+            if ($pm['gateway_type_id'] == GatewayType::ACSS) {
+                $cg = CompanyGateway::query()->find($pm['company_gateway_id']);
+
+                if ($cg && ! property_exists($cg->fees_and_limits, GatewayType::ACSS)) { //@phpstan-ignore-line
+                    $fees_and_limits = $cg->fees_and_limits;
+                    $fees_and_limits->{GatewayType::ACSS} = new FeesAndLimits();
+                    $cg->fees_and_limits = $fees_and_limits;
+                    $cg->save();
+                }
+
+                if ($cg && $cg->fees_and_limits->{GatewayType::ACSS}->is_enabled) {
+                    return $cg;
+                }
+            }
+        }
+
+        return null;
+    }
+
+
     //todo refactor this  - it is only searching for existing tokens
-    public function getBankTransferGateway() :?CompanyGateway
+    public function getBankTransferGateway(): ?CompanyGateway
     {
         $pms = $this->service()->getPaymentMethods(-1);
 
@@ -595,9 +623,9 @@ class Client extends BaseModel implements HasLocalePreference
                 if ($pm['gateway_type_id'] == GatewayType::BANK_TRANSFER) {
                     $cg = CompanyGateway::query()->find($pm['company_gateway_id']);
 
-                    if ($cg && ! property_exists($cg->fees_and_limits, GatewayType::BANK_TRANSFER)) {
+                    if ($cg && ! property_exists($cg->fees_and_limits, GatewayType::BANK_TRANSFER)) { //@phpstan-ignore-line
                         $fees_and_limits = $cg->fees_and_limits;
-                        $fees_and_limits->{GatewayType::BANK_TRANSFER} = new FeesAndLimits;
+                        $fees_and_limits->{GatewayType::BANK_TRANSFER} = new FeesAndLimits();
                         $cg->fees_and_limits = $fees_and_limits;
                         $cg->save();
                     }
@@ -633,6 +661,19 @@ class Client extends BaseModel implements HasLocalePreference
             }
         }
 
+        if ($this->currency()->code == 'CAD' && in_array(GatewayType::ACSS, array_column($pms, 'gateway_type_id'))) {
+            foreach ($pms as $pm) {
+                if ($pm['gateway_type_id'] == GatewayType::ACSS) {
+                    $cg = CompanyGateway::query()->find($pm['company_gateway_id']);
+
+                    if ($cg && $cg->fees_and_limits->{GatewayType::ACSS}->is_enabled) {
+                        return $cg;
+                    }
+                }
+            }
+        }
+
+
         return null;
     }
 
@@ -646,8 +687,17 @@ class Client extends BaseModel implements HasLocalePreference
             return GatewayType::SEPA;
         }
 
+        //Special handler for GoCardless
+        if($this->currency()->code == 'CAD' && ($this->getBankTransferGateway()->gateway_key == 'b9886f9257f0c6ee7c302f1c74475f6c') ?? false) {
+            return GatewayType::DIRECT_DEBIT;
+        }
+
         if (in_array($this->currency()->code, ['EUR', 'GBP','DKK','SEK','AUD','NZD','USD'])) {
             return GatewayType::DIRECT_DEBIT;
+        }
+
+        if(in_array($this->currency()->code, ['CAD'])) {
+            return GatewayType::ACSS;
         }
     }
 
@@ -660,7 +710,7 @@ class Client extends BaseModel implements HasLocalePreference
         return 'USD';
     }
 
-    public function validGatewayForAmount($fees_and_limits_for_payment_type, $amount) :bool
+    public function validGatewayForAmount($fees_and_limits_for_payment_type, $amount): bool
     {
         if (isset($fees_and_limits_for_payment_type)) {
             $fees_and_limits = $fees_and_limits_for_payment_type;
@@ -681,79 +731,74 @@ class Client extends BaseModel implements HasLocalePreference
 
     public function preferredLocale()
     {
-        $languages = Cache::get('languages');
-
-        if (! $languages) {
-            $this->buildCache(true);
-        }
-
-        return $languages->filter(function ($item) {
-            return $item->id == $this->getSetting('language_id');
-        })->first()->locale;
+        $this->language()->locale ?? 'en';
     }
 
-    public function backup_path() :string
+    public function backup_path(): string
     {
         return $this->company->company_key.'/'.$this->client_hash.'/backups';
     }
 
-    public function invoice_filepath($invitation) :string
+    public function invoice_filepath($invitation): string
     {
         $contact_key = $invitation->contact->contact_key;
 
         return $this->company->company_key.'/'.$this->client_hash.'/'.$contact_key.'/invoices/';
     }
-    public function e_invoice_filepath($invitation) :string
+    public function e_document_filepath($invitation): string
     {
         $contact_key = $invitation->contact->contact_key;
 
         return $this->company->company_key.'/'.$this->client_hash.'/'.$contact_key.'/e_invoice/';
     }
 
-    public function quote_filepath($invitation) :string
+    public function quote_filepath($invitation): string
     {
         $contact_key = $invitation->contact->contact_key;
 
         return $this->company->company_key.'/'.$this->client_hash.'/'.$contact_key.'/quotes/';
     }
 
-    public function credit_filepath($invitation) :string
+    public function credit_filepath($invitation): string
     {
         $contact_key = $invitation->contact->contact_key;
 
         return $this->company->company_key.'/'.$this->client_hash.'/'.$contact_key.'/credits/';
     }
 
-    public function recurring_invoice_filepath($invitation) :string
+    public function recurring_invoice_filepath($invitation): string
     {
         $contact_key = $invitation->contact->contact_key;
 
         return $this->company->company_key.'/'.$this->client_hash.'/'.$contact_key.'/recurring_invoices/';
     }
 
-    public function company_filepath() :string
+    public function company_filepath(): string
     {
         return $this->company->company_key.'/';
     }
 
-    public function document_filepath() :string
+    public function document_filepath(): string
     {
         return $this->company->company_key.'/documents/';
     }
 
-    public function setCompanyDefaults($data, $entity_name) :array
+    public function setCompanyDefaults($data, $entity_name): array
     {
         $defaults = [];
 
-        if (! (array_key_exists('terms', $data) && is_string($data['terms']) && strlen($data['terms']) > 1)) {
+        $terms = &$data['terms'];
+        $footer = &$data['footer'];
+
+        if (!$terms || ($terms && strlen((string)$terms) == 0)) {
             $defaults['terms'] = $this->getSetting($entity_name.'_terms');
-        } elseif (array_key_exists('terms', $data)) {
+        } elseif ($terms) {
             $defaults['terms'] = $data['terms'];
         }
 
-        if (! (array_key_exists('footer', $data) && is_string($data['footer']) && strlen($data['footer']) > 1)) {
+        if (!$footer || ($footer && strlen((string)$footer) == 0)) {
             $defaults['footer'] = $this->getSetting($entity_name.'_footer');
-        } elseif (array_key_exists('footer', $data)) {
+        } elseif ($footer) {
             $defaults['footer'] = $data['footer'];
         }
 
@@ -762,12 +807,35 @@ class Client extends BaseModel implements HasLocalePreference
         }
 
         $exchange_rate = new CurrencyApi();
-        $defaults['exchange_rate'] = 1/$exchange_rate->exchangeRate($this->getSetting('currency_id'), $this->company->settings->currency_id);
+        $defaults['exchange_rate'] = 1 / $exchange_rate->exchangeRate($this->getSetting('currency_id'), $this->company->settings->currency_id);
 
         return $defaults;
     }
 
-    public function timezone_offset() :int 
+    public function setExchangeRate()
+    {
+
+        $converter = new CurrencyApi();
+
+        return 1 / $converter->convert(1, $this->currency()->id, $this->company->settings->currency_id);
+
+    }
+
+    public function utc_offset(): int
+    {
+
+        $offset = 0;
+        $timezone = $this->timezone();
+
+        date_default_timezone_set('GMT');
+        $date = new \DateTime("now", new \DateTimeZone($timezone->name));
+        $offset = $date->getOffset();
+
+        return $offset;
+
+    }
+
+    public function timezone_offset(): int
     {
         $offset = 0;
 
@@ -777,9 +845,8 @@ class Client extends BaseModel implements HasLocalePreference
             return 0;
         }
 
-        $timezone = $this->company->timezone();
+        $offset -= $this->company->utc_offset();
 
-        $offset -= $timezone->utc_offset;
         $offset += ($entity_send_time * 3600);
 
         return $offset;
@@ -797,13 +864,13 @@ class Client extends BaseModel implements HasLocalePreference
         ];
     }
 
-    public function translate_entity() :string
+    public function translate_entity(): string
     {
         return ctrans('texts.client');
     }
 
     public function portalUrl(bool $use_react_url): string
     {
-        return $use_react_url ? config('ninja.react_url'). "/#/clients/{$this->hashed_id}": config('ninja.app_url');
+        return $use_react_url ? config('ninja.react_url'). "/#/clients/{$this->hashed_id}" : config('ninja.app_url');
     }
 }

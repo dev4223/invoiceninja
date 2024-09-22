@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -20,7 +20,7 @@ interface RuleInterface
     public function taxByType($type);
 
     public function taxExempt($item);
-    
+
     public function taxDigital($item);
 
     public function taxService($item);
@@ -36,4 +36,10 @@ interface RuleInterface
     public function override($item);
 
     public function calculateRates();
+
+    public function regionWithNoTaxCoverage(string $iso_3166_2): bool;
+
+    public function setEntity($entity): self;
+
+    public function shouldCalcTax(): bool;
 }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -50,9 +50,9 @@ class S3Cleanup extends Command
      */
     public function handle()
     {
-        if (!Ninja::isHosted()) {
-            return;
-        }
+        // if (!Ninja::isHosted()) {
+        //     return;
+        // }
 
         $c1 = Company::on('db-ninja-01')->pluck('company_key');
         $c2 = Company::on('db-ninja-02')->pluck('company_key');

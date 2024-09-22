@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,7 +12,6 @@
 namespace App\Notifications\Admin;
 
 use App\Utils\Number;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Messages\SlackMessage;
 use Illuminate\Notifications\Notification;
 
@@ -57,7 +56,7 @@ class NewPaymentNotification extends Notification
      * Get the mail representation of the notification.
      *
      * @param  mixed  $notifiable
-     * 
+     *
      */
     public function toMail($notifiable)
     {
@@ -88,7 +87,7 @@ class NewPaymentNotification extends Notification
 
         $invoice_texts = substr($invoice_texts, 0, -1);
 
-        return (new SlackMessage)
+        return (new SlackMessage())
                 ->success()
                 //->to("#devv2")
                 ->from('System')

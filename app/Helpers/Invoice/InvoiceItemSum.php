@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,8 +12,10 @@
 namespace App\Helpers\Invoice;
 
 use App\Models\Quote;
+use App\Utils\Number;
 use App\Models\Client;
 use App\Models\Credit;
+use App\Models\Vendor;
 use App\Models\Invoice;
 use App\Models\PurchaseOrder;
 use App\Models\RecurringQuote;
@@ -29,6 +31,7 @@ class InvoiceItemSum
     use Discounter;
     use Taxer;
 
+    //@phpstan-ignore-next-line
     private array $eu_tax_jurisdictions = [
         'AT', // Austria
         'BE', // Belgium
@@ -119,21 +122,21 @@ class InvoiceItemSum
 
     private $tax_collection;
 
-    private ?Client $client;
+    private Client | Vendor $client;
 
     private bool $calc_tax = false;
 
     private RuleInterface $rule;
 
-    public function __construct( RecurringInvoice | Invoice | Quote | Credit | PurchaseOrder | RecurringQuote $invoice)
+    public function __construct(RecurringInvoice | Invoice | Quote | Credit | PurchaseOrder | RecurringQuote $invoice)
     {
         $this->tax_collection = collect([]);
 
         $this->invoice = $invoice;
+        $this->client = $invoice->client ?? $invoice->vendor;
 
         if ($this->invoice->client) {
             $this->currency = $this->invoice->client->currency();
-            $this->client = $this->invoice->client;
             $this->shouldCalculateTax();
         } else {
             $this->currency = $this->invoice->vendor->currency();
@@ -144,7 +147,7 @@ class InvoiceItemSum
 
     public function process(): self
     {
-        if (!$this->invoice->line_items || !is_array($this->invoice->line_items)) {
+        if (!$this->invoice->line_items || !is_iterable($this->invoice->line_items)) {
             $this->items = [];
             return $this;
         }
@@ -169,36 +172,39 @@ class InvoiceItemSum
 
     private function shouldCalculateTax(): self
     {
-        
-        if (!$this->invoice->company?->calculate_taxes || $this->invoice->company->account->isFreeHostedClient()) {
+
+        if (!$this->invoice->company?->calculate_taxes || $this->invoice->company->account->isFreeHostedClient()) { //@phpstan-ignore-line
             $this->calc_tax = false;
             return $this;
         }
-        
-        if (in_array($this->client->company->country()->iso_3166_2, $this->tax_jurisdictions) ) { //only calculate for supported tax jurisdictions
-            
+
+        if (in_array($this->client->company->country()->iso_3166_2, $this->tax_jurisdictions)) { //only calculate for supported tax jurisdictions
+
+
+            /** @var \App\DataMapper\Tax\BaseRule $class */
             $class = "App\DataMapper\Tax\\".$this->client->company->country()->iso_3166_2."\\Rule";
 
             $this->rule = new $class();
 
-        if($this->rule->regionWithNoTaxCoverage($this->client->country->iso_3166_2))
-            return $this;
+            if($this->rule->regionWithNoTaxCoverage($this->client->country->iso_3166_2)) {
+                return $this;
+            }
 
             $this->rule
                  ->setEntity($this->invoice)
                  ->init();
-                 
+
             $this->calc_tax = $this->rule->shouldCalcTax();
 
             return $this;
         }
-        
+
         return $this;
     }
 
     private function push(): self
     {
-        $this->sub_total += $this->getLineTotal();
+        $this->sub_total += round($this->getLineTotal(), $this->currency->precision);
 
         $this->gross_sub_total += $this->getGrossLineTotal();
 
@@ -237,7 +243,7 @@ class InvoiceItemSum
     private function calcTaxesAutomatically(): self
     {
         $this->rule->tax($this->item);
-        
+
         $precision = strlen(substr(strrchr($this->rule->tax_rate1, "."), 1));
 
         $this->item->tax_name1 = $this->rule->tax_name1;
@@ -255,7 +261,7 @@ class InvoiceItemSum
 
         return $this;
     }
-    
+
     /**
      * calcTaxes
      *
@@ -297,7 +303,7 @@ class InvoiceItemSum
         $this->setTotalTaxes($this->formatValue($item_tax, $this->currency->precision));
 
         $this->item->gross_line_total = $this->getLineTotal() + $item_tax;
- 
+
         $this->item->tax_amount = $item_tax;
 
         return $this;
@@ -309,7 +315,7 @@ class InvoiceItemSum
 
         $key = str_replace(' ', '', $tax_name.$tax_rate);
 
-        $group_tax = ['key' => $key, 'total' => $tax_total, 'tax_name' => $tax_name.' '.floatval($tax_rate).'%'];
+        $group_tax = ['key' => $key, 'total' => $tax_total, 'tax_name' => $tax_name.' '.Number::formatValueNoTrailingZeroes(floatval($tax_rate), $this->client).'%'];
 
         $this->tax_collection->push(collect($group_tax));
     }
@@ -328,7 +334,7 @@ class InvoiceItemSum
 
     public function setLineTotal($total)
     {
-        $this->item->line_total = $total;
+        $this->item->line_total = (float) $total;
 
         return $this;
     }
@@ -391,15 +397,20 @@ class InvoiceItemSum
     {
         $this->setGroupedTaxes(collect([]));
 
-        $item_tax = 0;
-
-        foreach ($this->line_items as $this->item) {
+        foreach ($this->line_items as $key => $this->item) {
             if ($this->item->line_total == 0) {
                 continue;
             }
 
-            //$amount = $this->item->line_total - ($this->item->line_total * ($this->invoice->discount / $this->sub_total));
-            $amount = ($this->sub_total > 0) ? $this->item->line_total - ($this->item->line_total * ($this->invoice->discount / $this->sub_total)) : 0;
+            $item_tax = 0;
+
+            try {
+                $amount = $this->item->line_total - ($this->item->line_total * ($this->invoice->discount / $this->sub_total));
+            } catch(\DivisionByZeroError $e) {
+                $amount = $this->item->line_total;
+            }
+
+            //$amount = ($this->sub_total > 0) ? $this->item->line_total - ($this->invoice->discount * ($this->item->line_total / $this->sub_total)) : 0;
 
             $item_tax_rate1_total = $this->calcAmountLineTax($this->item->tax_rate1, $amount);
 
@@ -424,9 +435,19 @@ class InvoiceItemSum
             if ($item_tax_rate3_total != 0) {
                 $this->groupTax($this->item->tax_name3, $this->item->tax_rate3, $item_tax_rate3_total);
             }
+
+            $this->item->gross_line_total = $this->getLineTotal() + $item_tax;
+            $this->item->tax_amount = $item_tax;
+
+            $this->line_items[$key] = $this->item;
+
+            $this->setTotalTaxes($this->getTotalTaxes() + $item_tax);
+
         }
 
-        $this->setTotalTaxes($item_tax);
+
+
+        return $this;
     }
 
     /**

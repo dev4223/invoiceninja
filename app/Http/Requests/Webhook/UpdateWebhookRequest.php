@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -25,7 +25,7 @@ class UpdateWebhookRequest extends Request
      *
      * @return bool
      */
-    public function authorize() : bool
+    public function authorize(): bool
     {
         return auth()->user()->can('edit', $this->webhook);
     }
@@ -47,9 +47,9 @@ class UpdateWebhookRequest extends Request
         if (!isset($input['rest_method'])) {
             $input['rest_method'] = 'post';
         }
-        
+
         // if(isset($input['headers']) && count($input['headers']) == 0)
-            //     $input['headers'] = null;
+        //     $input['headers'] = null;
 
         $this->replace($input);
     }

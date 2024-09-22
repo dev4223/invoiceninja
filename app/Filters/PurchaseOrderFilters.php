@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -63,7 +63,7 @@ class PurchaseOrderFilters extends QueryFilters
                 $po_status[] = PurchaseOrder::STATUS_CANCELLED;
             }
 
-            if (count($po_status) >=1) {
+            if (count($po_status) >= 1) {
                 $query->whereIn('status_id', $po_status);
             }
         });
@@ -123,12 +123,18 @@ class PurchaseOrderFilters extends QueryFilters
             return $this->builder;
         }
 
+        $dir = ($sort_col[1] == 'asc') ? 'asc' : 'desc';
+
         if ($sort_col[0] == 'vendor_id') {
             return $this->builder->orderBy(\App\Models\Vendor::select('name')
-                    ->whereColumn('vendors.id', 'purchase_orders.vendor_id'), $sort_col[1]);
+                    ->whereColumn('vendors.id', 'purchase_orders.vendor_id'), $dir);
         }
 
-        return $this->builder->orderBy($sort_col[0], $sort_col[1]);
+        if($sort_col[0] == 'number') {
+            return $this->builder->orderByRaw("REGEXP_REPLACE(number,'[^0-9]+','')+0 " . $dir);
+        }
+
+        return $this->builder->orderBy($sort_col[0], $dir);
     }
 
     /**
@@ -145,7 +151,7 @@ class PurchaseOrderFilters extends QueryFilters
             return $this->builder->company();
         }
 
-//            return $this->builder->whereCompanyId(auth()->user()->company()->id);
+        //            return $this->builder->whereCompanyId(auth()->user()->company()->id);
     }
 
     /**

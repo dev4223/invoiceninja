@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -66,33 +66,17 @@ class CreditReportController extends BaseController
         /** @var \App\Models\User $user */
         $user = auth()->user();
 
-        if ($request->has('send_email') && $request->get('send_email')) {
+        if ($request->has('send_email') && $request->get('send_email') && $request->missing('output')) {
             SendToAdmin::dispatch($user->company(), $request->all(), CreditExport::class, $this->filename);
 
             return response()->json(['message' => 'working...'], 200);
         }
-        // expect a list of visible fields, or use the default
 
-        if($request->has('output') && $request->input('output') == 'json') {
+        $hash = \Illuminate\Support\Str::uuid();
 
-            $hash = \Illuminate\Support\Str::uuid();
+        PreviewReport::dispatch($user->company(), $request->all(), CreditExport::class, $hash);
 
-            PreviewReport::dispatch($user->company(), $request->all(), CreditExport::class, $hash);
+        return response()->json(['message' => $hash], 200);
 
-            return response()->json(['message' => $hash], 200);
-        }
-        
-        $export = new CreditExport($user->company(), $request->all());
-
-        $csv = $export->run();
-
-        $headers = [
-            'Content-Disposition' => 'attachment',
-            'Content-Type' => 'text/csv',
-        ];
-
-        return response()->streamDownload(function () use ($csv) {
-            echo $csv;
-        }, $this->filename, $headers);
     }
 }

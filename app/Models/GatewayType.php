@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -35,61 +35,63 @@ class GatewayType extends StaticModel
 {
     public $timestamps = false;
 
-    const CREDIT_CARD = 1;
+    public const CREDIT_CARD = 1;
 
-    const BANK_TRANSFER = 2;
+    public const BANK_TRANSFER = 2;
 
-    const PAYPAL = 3;
+    public const PAYPAL = 3;
 
-    const CRYPTO = 4;
+    public const CRYPTO = 4;
 
-    const CUSTOM = 5;
+    public const CUSTOM = 5;
 
-    const ALIPAY = 6;
+    public const ALIPAY = 6;
 
-    const SOFORT = 7;
+    public const SOFORT = 7;
 
-    const APPLE_PAY = 8;
+    public const APPLE_PAY = 8;
 
-    const SEPA = 9;
+    public const SEPA = 9;
 
-    const CREDIT = 10;
+    public const CREDIT = 10;
 
-    const KBC = 11;
+    public const KBC = 11;
 
-    const BANCONTACT = 12;
+    public const BANCONTACT = 12;
 
-    const IDEAL = 13;
+    public const IDEAL = 13;
 
-    const HOSTED_PAGE = 14; // For gateways that contain multiple methods.
+    public const HOSTED_PAGE = 14; // For gateways that contain multiple methods.
 
-    const GIROPAY = 15;
+    public const GIROPAY = 15;
 
-    const PRZELEWY24 = 16;
+    public const PRZELEWY24 = 16;
 
-    const EPS = 17;
+    public const EPS = 17;
 
-    const DIRECT_DEBIT = 18;
+    public const DIRECT_DEBIT = 18;
 
-    const ACSS = 19;
+    public const ACSS = 19;
 
-    const BECS = 20;
+    public const BECS = 20;
 
-    const INSTANT_BANK_PAY = 21;
+    public const INSTANT_BANK_PAY = 21;
 
-    const FPX = 22;
+    public const FPX = 22;
 
-    const KLARNA = 23;
+    public const KLARNA = 23;
 
-    const BACS = 24;
+    public const BACS = 24;
 
-    const VENMO = 25;
+    public const VENMO = 25;
 
-    const MERCADOPAGO = 26;
+    public const MERCADOPAGO = 26;
 
-    const MYBANK = 27;
+    public const MYBANK = 27;
 
-    const PAYLATER = 28;
+    public const PAYLATER = 28;
+
+    public const PAYPAL_ADVANCED_CARDS = 29;
 
     public function gateway()
     {
@@ -158,9 +160,11 @@ class GatewayType extends StaticModel
                 return ctrans('texts.mybank');
             case self::PAYLATER:
                 return ctrans('texts.paypal_paylater');
+            case self::PAYPAL_ADVANCED_CARDS:
+                return ctrans('texts.credit_card');
+
             default:
                 return ' ';
         }
     }
 }
-

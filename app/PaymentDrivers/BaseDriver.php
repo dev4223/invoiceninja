@@ -4,43 +4,43 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\PaymentDrivers;
 
-use App\Events\Invoice\InvoiceWasPaid;
-use App\Events\Payment\PaymentWasCreated;
-use App\Exceptions\PaymentFailed;
-use App\Factory\PaymentFactory;
-use App\Http\Requests\ClientPortal\Payments\PaymentResponseRequest;
-use App\Jobs\Mail\NinjaMailer;
-use App\Jobs\Mail\NinjaMailerJob;
-use App\Jobs\Mail\NinjaMailerObject;
-use App\Jobs\Mail\PaymentFailedMailer;
-use App\Jobs\Util\SystemLogger;
-use App\Mail\Admin\ClientPaymentFailureObject;
-use App\Models\Client;
-use App\Models\ClientContact;
-use App\Models\ClientGatewayToken;
-use App\Models\CompanyGateway;
-use App\Models\GatewayType;
-use App\Models\Invoice;
-use App\Models\Payment;
-use App\Models\PaymentHash;
-use App\Models\SystemLog;
-use App\Services\Subscription\SubscriptionService;
-use App\Utils\Helpers;
 use App\Utils\Ninja;
 use App\Utils\Number;
-use App\Utils\Traits\MakesHash;
-use App\Utils\Traits\SystemLogTrait;
-use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\App;
+use App\Models\Client;
+use App\Utils\Helpers;
+use App\Models\Invoice;
+use App\Models\Payment;
+use App\Models\SystemLog;
+use App\Models\GatewayType;
+use App\Models\PaymentHash;
 use Illuminate\Support\Str;
+use Illuminate\Http\Request;
+use App\Models\ClientContact;
+use App\Jobs\Mail\NinjaMailer;
+use App\Models\CompanyGateway;
+use Illuminate\Support\Carbon;
+use App\DataMapper\InvoiceItem;
+use App\Factory\PaymentFactory;
+use App\Jobs\Util\SystemLogger;
+use App\Utils\Traits\MakesHash;
+use App\Exceptions\PaymentFailed;
+use App\Jobs\Mail\NinjaMailerJob;
+use App\Models\ClientGatewayToken;
+use Illuminate\Support\Facades\App;
+use App\Jobs\Mail\NinjaMailerObject;
+use App\Utils\Traits\SystemLogTrait;
+use App\Events\Invoice\InvoiceWasPaid;
+use App\Jobs\Mail\PaymentFailedMailer;
+use App\Events\Payment\PaymentWasCreated;
+use App\Mail\Admin\ClientPaymentFailureObject;
+use App\Services\Subscription\SubscriptionService;
 
 /**
  * Class BaseDriver.
@@ -59,7 +59,7 @@ class BaseDriver extends AbstractPaymentDriver
     /**
      * The Client
      *
-     * @var \App\Models\Client|null $client 
+     * @var \App\Models\Client|null $client
     */
     public $client;
 
@@ -84,7 +84,7 @@ class BaseDriver extends AbstractPaymentDriver
      * @var Helpers`
      */
     public $helpers;
-    
+
     /* Array of payment methods */
     public static $methods = [];
 
@@ -109,6 +109,11 @@ class BaseDriver extends AbstractPaymentDriver
         return $this;
     }
 
+    public function getAvailableMethods(): array
+    {
+        return self::$methods;
+    }
+
     /**
      * Required fields for client to fill, to proceed with gateway actions.
      *
@@ -122,14 +127,9 @@ class BaseDriver extends AbstractPaymentDriver
             $fields[] = ['name' => 'client_name', 'label' => ctrans('texts.client_name'), 'type' => 'text', 'validation' => 'required'];
         }
 
-        if ($this->company_gateway->require_contact_name) {
-            $fields[] = ['name' => 'contact_first_name', 'label' => ctrans('texts.first_name'), 'type' => 'text', 'validation' => 'required'];
-            $fields[] = ['name' => 'contact_last_name', 'label' => ctrans('texts.last_name'), 'type' => 'text', 'validation' => 'required'];
-        }
-
-        if ($this->company_gateway->require_contact_email) {
-            $fields[] = ['name' => 'contact_email', 'label' => ctrans('texts.email'), 'type' => 'text', 'validation' => 'required,email:rfc'];
-        }
+        $fields[] = ['name' => 'contact_first_name', 'label' => ctrans('texts.first_name'), 'type' => 'text', 'validation' => 'required'];
+        $fields[] = ['name' => 'contact_last_name', 'label' => ctrans('texts.last_name'), 'type' => 'text', 'validation' => 'required'];
+        $fields[] = ['name' => 'contact_email', 'label' => ctrans('texts.email'), 'type' => 'text', 'validation' => 'required,email:rfc'];
 
         if ($this->company_gateway->require_client_phone) {
             $fields[] = ['name' => 'client_phone', 'label' => ctrans('texts.client_phone'), 'type' => 'tel', 'validation' => 'required'];
@@ -157,16 +157,14 @@ class BaseDriver extends AbstractPaymentDriver
         if ($this->company_gateway->require_custom_value1) {
             $fields[] = ['name' => 'client_custom_value1', 'label' => $this->helpers->makeCustomField($this->client->company->custom_fields, 'client1'), 'type' => 'text', 'validation' => 'required'];
         }
-        
+
         if ($this->company_gateway->require_custom_value2) {
             $fields[] = ['name' => 'client_custom_value2', 'label' => $this->helpers->makeCustomField($this->client->company->custom_fields, 'client2'), 'type' => 'text', 'validation' => 'required'];
         }
 
-
         if ($this->company_gateway->require_custom_value3) {
             $fields[] = ['name' => 'client_custom_value3', 'label' => $this->helpers->makeCustomField($this->client->company->custom_fields, 'client3'), 'type' => 'text', 'validation' => 'required'];
         }
-
 
         if ($this->company_gateway->require_custom_value4) {
             $fields[] = ['name' => 'client_custom_value4', 'label' => $this->helpers->makeCustomField($this->client->company->custom_fields, 'client4'), 'type' => 'text', 'validation' => 'required'];
@@ -263,7 +261,7 @@ class BaseDriver extends AbstractPaymentDriver
     public function setClient(Client $client)
     {
         $this->client = $client;
-        
+
         return $this;
     }
     /************************** Helper methods *************************************/
@@ -326,11 +324,11 @@ class BaseDriver extends AbstractPaymentDriver
         $payment->company_gateway_id = $this->company_gateway->id;
         $payment->status_id = $status;
         $payment->currency_id = $this->client->getSetting('currency_id');
-        $payment->date = Carbon::now()->addSeconds($this->client->company->timezone()->utc_offset)->format('Y-m-d');
+        $payment->date = Carbon::now()->addSeconds($this->client->company->utc_offset())->format('Y-m-d');
         $payment->gateway_type_id = $data['gateway_type_id'];
 
         $client_contact = $this->getContact();
-        $client_contact_id = $client_contact ? $client_contact->id : null;
+        $client_contact_id = $client_contact ? $client_contact->id : $this->client->contacts()->first()->id;
 
         $payment->amount = $data['amount'];
         $payment->type_id = $data['payment_type'];
@@ -377,6 +375,7 @@ class BaseDriver extends AbstractPaymentDriver
             // To access campaign data => Cache::get(CAMPAIGN_HASH)
             // To access utm data => session()->get('utm-' . CAMPAIGN_HASH);
 
+            /** @var \App\Models\Subscription $billing_subscription */
             (new SubscriptionService($billing_subscription))->completePurchase($this->payment_hash);
         }
 
@@ -389,7 +388,7 @@ class BaseDriver extends AbstractPaymentDriver
      *
      * @return void                            Success/Failure
      */
-    public function confirmGatewayFee() :void
+    public function confirmGatewayFee(): void
     {
         /*Payment invoices*/
         $payment_invoices = $this->payment_hash->invoices();
@@ -397,14 +396,71 @@ class BaseDriver extends AbstractPaymentDriver
         /*Fee charged at gateway*/
         $fee_total = $this->payment_hash->fee_total;
 
-        /*Hydrate invoices*/
-        $invoices = Invoice::query()->whereIn('id', $this->transformKeys(array_column($payment_invoices, 'invoice_id')))->withTrashed()->get();
+        if(!$fee_total || $fee_total == 0)
+            return;
 
-        $invoices->each(function ($invoice) {
-            if (collect($invoice->line_items)->contains('type_id', '3')) {
-                $invoice->service()->toggleFeesPaid()->save();
+        $invoices = Invoice::query()
+                            ->whereIn('id', $this->transformKeys(array_column($payment_invoices, 'invoice_id')))
+                            ->whereJsonContains('line_items', ['type_id' => '3'])
+                            ->withTrashed();
+
+        if($invoices->count() == 0){
+
+            $invoice = Invoice::query()
+                            ->whereIn('id', $this->transformKeys(array_column($payment_invoices, 'invoice_id')))
+                            ->orderBy('id','desc')
+                            ->withTrashed()
+                            ->first();
+
+            if(!$invoice)
+                return;
+
+            $balance = $invoice->balance;
+
+            App::forgetInstance('translator');
+            $t = app('translator');
+            $t->replace(Ninja::transformTranslations($invoice->company->settings));
+            App::setLocale($invoice->client->locale());
+
+            $invoice_item = new InvoiceItem();
+            $invoice_item->type_id = '4';
+            $invoice_item->product_key = ctrans('texts.surcharge');
+            $invoice_item->notes = ctrans('texts.online_payment_surcharge');
+            $invoice_item->quantity = 1;
+            $invoice_item->cost = (float)$fee_total;
+
+            $invoice_items = (array) $invoice->line_items;
+            $invoice_items[] = $invoice_item;
+
+            $invoice->line_items = $invoice_items;
+
+            /**Refresh Invoice values*/
+            $invoice = $invoice->calc()->getInvoice();
+
+            $new_balance = $invoice->balance;
+
+            if (floatval($new_balance) - floatval($balance) != 0) {
+                $adjustment = $new_balance - $balance;
+
+                $invoice
+                ->ledger()
+                ->updateInvoiceBalance($adjustment, 'Adjustment for adding gateway fee');
+
+                $invoice->client->service()->calculateBalance();
             }
-        });
+
+        }
+        else {
+            
+            $invoices
+            ->cursor()
+            ->each(function ($i){
+                $i->service()->toggleFeesPaid()->save();              
+            });
+
+        }
+            
+
     }
 
     /**
@@ -430,9 +486,9 @@ class BaseDriver extends AbstractPaymentDriver
     public function getContact()
     {
         if ($this->invitation) {
-            return ClientContact::find($this->invitation->client_contact_id);
+            return ClientContact::withTrashed()->find($this->invitation->client_contact_id);
         } elseif (auth()->guard('contact')->user()) {
-            return auth()->user();
+            return auth()->guard('contact')->user();
         } else {
             return false;
         }
@@ -504,7 +560,7 @@ class BaseDriver extends AbstractPaymentDriver
             $error = 'Payment Aborted';
         }
 
-        if (! is_null($this->payment_hash)) {
+        if (! is_null($this->payment_hash)) { //@phpstan-ignore-line
             $this->unWindGatewayFees($this->payment_hash);
         }
 
@@ -523,16 +579,12 @@ class BaseDriver extends AbstractPaymentDriver
     public function clientPaymentFailureMailer($error)
     {
         if ($this->payment_hash && is_array($this->payment_hash->invoices())) {
-            $nmo = new NinjaMailerObject;
+            $nmo = new NinjaMailerObject();
             $nmo->mailable = new NinjaMailer((new ClientPaymentFailureObject($this->client, $error, $this->client->company, $this->payment_hash))->build());
             $nmo->company = $this->client->company;
             $nmo->settings = $this->client->company->settings;
 
             $invoices = Invoice::query()->whereIn('id', $this->transformKeys(array_column($this->payment_hash->invoices(), 'invoice_id')))->withTrashed()->get();
-
-            $invoices->each(function ($invoice) {
-                $invoice->service()->deletePdf();
-            });
 
             $invoices->first()->invitations->each(function ($invitation) use ($nmo) {
                 if ((bool) $invitation->contact->send_email !== false && $invitation->contact->email) {
@@ -564,27 +616,27 @@ class BaseDriver extends AbstractPaymentDriver
         $error = array_key_exists('error', $response) ? $response['error'] : 'Undefined Error';
         $error_code = array_key_exists('error_code', $response) ? $response['error_code'] : 'Undefined Error Code';
 
-        $this->unWindGatewayFees($this->payment_hash);
+        if($this->payment_hash) {
+            $this->unWindGatewayFees($this->payment_hash);
+        }
 
         $this->sendFailureMail($error);
 
-        $nmo = new NinjaMailerObject;
+        $nmo = new NinjaMailerObject();
         $nmo->mailable = new NinjaMailer((new ClientPaymentFailureObject($this->client, $error, $this->client->company, $this->payment_hash))->build());
         $nmo->company = $this->client->company;
         $nmo->settings = $this->client->company->settings;
 
-        $invoices = Invoice::query()->whereIn('id', $this->transformKeys(array_column($this->payment_hash->invoices(), 'invoice_id')))->withTrashed()->get();
+        if($this->payment_hash) {
+            $invoices = Invoice::query()->whereIn('id', $this->transformKeys(array_column($this->payment_hash->invoices(), 'invoice_id')))->withTrashed()->get();
 
-        $invoices->each(function ($invoice) {
-            $invoice->service()->deletePdf();
-        });
-
-        $invoices->first()->invitations->each(function ($invitation) use ($nmo) {
-            if (! $invitation->contact->trashed()) {
-                $nmo->to_user = $invitation->contact;
-                NinjaMailerJob::dispatch($nmo);
-            }
-        });
+            $invoices->first()->invitations->each(function ($invitation) use ($nmo) {
+                if (! $invitation->contact->trashed()) {
+                    $nmo->to_user = $invitation->contact;
+                    NinjaMailerJob::dispatch($nmo);
+                }
+            });
+        }
 
         $message = [
             'server_response' => $response,
@@ -670,7 +722,7 @@ class BaseDriver extends AbstractPaymentDriver
                 $this->required_fields[] = 'phone';
             }
         }
-        
+
 
         if ($this->company_gateway->require_postal_code) {
             // In case "require_postal_code" is true, we don't need billing address.
@@ -732,24 +784,32 @@ class BaseDriver extends AbstractPaymentDriver
         $t = app('translator');
         $t->replace(Ninja::transformTranslations($this->client->getMergedSettings()));
         App::setLocale($this->client->company->locale());
-        
-        if (! $this->payment_hash || !$this->client) 
+
+        if (! $this->payment_hash || !$this->client) {
             return 'Descriptor';
+        }
 
         $invoices_string = \implode(', ', collect($this->payment_hash->invoices())->pluck('invoice_number')->toArray()) ?: null;
 
-        if (!$invoices_string) 
+        if (!$invoices_string) {
             return str_replace(["*","<",">","'",'"'], "", $this->client->company->present()->name());
+        }
 
         $invoices_string = str_replace(["*","<",">","'",'"'], "-", $invoices_string);
-        
-        $invoices_string = "I-".$invoices_string;
 
-        $invoices_string = substr($invoices_string,0,22);
-        
-        $invoices_string = str_pad($invoices_string, 5, ctrans('texts.invoice'), STR_PAD_LEFT);
+        // 2023-11-02 - improve the statement descriptor for string
 
-        return $invoices_string;
+        $company_name = $this->client->company->present()->name();
+        $company_name = str_replace(["*","<",">","'",'"'], "-", $company_name);
+
+        if(ctype_digit(substr($company_name, 0, 1))) {
+            $company_name = "I" . $company_name;
+        }
+
+        $company_name = substr($company_name, 0, 11);
+        $descriptor = "{$company_name} {$invoices_string}";
+        $descriptor = substr($descriptor, 0, 22);
+        return $descriptor;
 
     }
     /**
@@ -767,9 +827,9 @@ class BaseDriver extends AbstractPaymentDriver
         }
 
         $invoices_string = \implode(', ', collect($this->payment_hash->invoices())->pluck('invoice_number')->toArray()) ?: null;
-        $amount = Number::formatMoney($this->payment_hash?->amount_with_fee() ?? 0, $this->client);
+        $amount = Number::formatMoney($this->payment_hash?->amount_with_fee() ?? 0, $this->client); // @phpstan-ignore-line
 
-        if($abbreviated && $invoices_string){
+        if($abbreviated && $invoices_string) {
             return $invoices_string;
         } elseif ($abbreviated || ! $invoices_string) {
             return ctrans('texts.gateway_payment_text_no_invoice', [
@@ -784,16 +844,31 @@ class BaseDriver extends AbstractPaymentDriver
             'client' => $this->client->present()->name(),
         ]);
 
-        return sprintf('%s: %s', ctrans('texts.invoices'), \implode(', ', collect($this->payment_hash->invoices())->pluck('invoice_number')->toArray()));
+        // return sprintf('%s: %s', ctrans('texts.invoices'), \implode(', ', collect($this->payment_hash->invoices())->pluck('invoice_number')->toArray()));
     }
-    
+
     /**
      * Stub for disconnecting from the gateway.
      *
-     * @return void
+     * @return bool
      */
     public function disconnect()
     {
         return true;
+    }
+
+    /**
+     * Stub for checking authentication.
+     *
+     * @return bool
+     */
+    public function auth(): bool
+    {
+        return true;
+    }
+
+    public function importCustomers()
+    {
+
     }
 }

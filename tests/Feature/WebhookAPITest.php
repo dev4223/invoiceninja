@@ -11,7 +11,6 @@
 
 namespace Tests\Feature;
 
-use App\Jobs\Util\WebhookSingle;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -29,6 +28,8 @@ class WebhookAPITest extends TestCase
     use DatabaseTransactions;
     use MockAccountData;
 
+    protected $faker;
+    
     protected function setUp() :void
     {
         parent::setUp();
@@ -49,33 +50,33 @@ class WebhookAPITest extends TestCase
     public function testWebhookRetry()
     {
         
-            $data = [
-                'target_url' => 'http://hook.com',
-                'event_id' => 1, //create client
-                'format' => 'JSON',
-                'headers' => []
-            ];
+        $data = [
+            'target_url' => 'http://hook.com',
+            'event_id' => 1, //create client
+            'format' => 'JSON',
+            'headers' => []
+        ];
 
-            $response = $this->withHeaders([
-                'X-API-SECRET' => config('ninja.api_secret'),
-                'X-API-TOKEN' => $this->token,
-            ])->postJson("/api/v1/webhooks", $data);
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson("/api/v1/webhooks", $data);
 
-            $response->assertStatus(200);
+        $response->assertStatus(200);
 
-            $arr = $response->json();
+        $arr = $response->json();
 
-            $data = [
-                'entity' => 'client',
-                'entity_id' => $this->client->hashed_id,
-            ];
+        $data = [
+            'entity' => 'client',
+            'entity_id' => $this->client->hashed_id,
+        ];
 
-            $response = $this->withHeaders([
-                'X-API-SECRET' => config('ninja.api_secret'),
-                'X-API-TOKEN' => $this->token,
-            ])->postJson("/api/v1/webhooks/".$arr['data']['id']."/retry", $data);
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson("/api/v1/webhooks/".$arr['data']['id']."/retry", $data);
             
-            $response->assertStatus(200);
+        $response->assertStatus(200);
 
     }
 

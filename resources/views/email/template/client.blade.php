@@ -3,7 +3,6 @@
     $email_alignment = isset($settings->email_alignment) ? $settings->email_alignment : 'center';
 @endphp
 
-
 <!DOCTYPE html
     PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en-US">
@@ -23,6 +22,7 @@
             color-scheme: light dark;
             supported-color-schemes: light dark;
         }
+        
         @if(isset($settings) && $settings->email_style === 'dark')
         body {
             background-color: #1a1a1a !important;
@@ -48,6 +48,13 @@
         }
         hr {
             border-color: #474849 !important;
+        }
+        .file_icon {
+            filter: invert(1);
+        }
+        @else
+        .file_icon {
+            filter: invert(1);
         }
         @endif
          /** Content-specific styles. **/
@@ -163,7 +170,7 @@
 
                                 {{ $slot ?? '' }}
                                 {!! $body ?? '' !!}
-
+                                
                                 <div>
                                     <a href="#"
                                         style="display: inline-block;background-color: {{ $primary_color }}; color: #ffffff; text-transform: uppercase;letter-spacing: 2px; text-decoration: none; font-size: 13px; font-weight: 600;">
@@ -172,9 +179,12 @@
 
                                 @isset($links)
                                 <div>
-                                    <ul style="list-style-type: none;">
+                                    <ul style="list-style-type: none;">  
+                                    @if(count($links) > 0)
+                                        <li>{{ ctrans('texts.download_files')}}</li>
+                                    @endif
                                     @foreach($links as $link)
-                                            <li>{!! $link ?? '' !!} <img height="15px" src="{{ asset('images/svg/dark/file.svg') }}"></li>
+                                        <li>{!! $link ?? '' !!} <img height="15px" src="{{ asset('images/svg/dark/file.svg') }}" class="file_icon"></li>
                                     @endforeach
                                     </ul>
                                 </div>
@@ -232,6 +242,21 @@
                         </div>
                     </td>
                 </tr>
+
+                @if(isset($email_preferences) && $email_preferences)
+                <tr>
+                    <td bgcolor="#242424"  cellpadding="20">
+                        <div class="dark-bg-base"
+                             style="padding-top: 10px;padding-bottom: 10px; background-color: #242424; border: 1px solid #c2c2c2; border-top-color: #242424; border-bottom-color: #242424;">
+                                <a href="{{ $email_preferences }}">
+                                    <p style="text-align: center; color: #ffffff; font-size: 10px; font-family: Verdana, Geneva, Tahoma, sans-serif;">
+                                        {{ ctrans('texts.email_preferences') }}
+                                    </p>
+                                </a>
+                        </div>
+                    </td>
+                </tr>
+                @endif
             </table>
         </td>
     </tr>

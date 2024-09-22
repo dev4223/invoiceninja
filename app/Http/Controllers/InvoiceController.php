@@ -5,46 +5,47 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers;
 
-use App\Utils\Ninja;
-use App\Models\Quote;
-use App\Models\Account;
-use App\Models\Invoice;
-use App\Jobs\Cron\AutoBill;
-use Illuminate\Http\Response;
-use App\Factory\InvoiceFactory;
-use App\Filters\InvoiceFilters;
-use App\Utils\Traits\MakesHash;
-use App\Jobs\Invoice\ZipInvoices;
-use App\Services\PdfMaker\PdfMerge;
-use Illuminate\Support\Facades\App;
-use App\Factory\CloneInvoiceFactory;
-use App\Jobs\Invoice\BulkInvoiceJob;
-use App\Utils\Traits\SavesDocuments;
-use App\Jobs\Invoice\UpdateReminders;
-use App\Transformers\QuoteTransformer;
-use App\Repositories\InvoiceRepository;
-use Illuminate\Support\Facades\Storage;
-use App\Transformers\InvoiceTransformer;
 use App\Events\Invoice\InvoiceWasCreated;
 use App\Events\Invoice\InvoiceWasUpdated;
+use App\Factory\CloneInvoiceFactory;
 use App\Factory\CloneInvoiceToQuoteFactory;
+use App\Factory\InvoiceFactory;
+use App\Filters\InvoiceFilters;
+use App\Http\Requests\Invoice\ActionInvoiceRequest;
 use App\Http\Requests\Invoice\BulkInvoiceRequest;
+use App\Http\Requests\Invoice\CreateInvoiceRequest;
+use App\Http\Requests\Invoice\DestroyInvoiceRequest;
 use App\Http\Requests\Invoice\EditInvoiceRequest;
 use App\Http\Requests\Invoice\ShowInvoiceRequest;
 use App\Http\Requests\Invoice\StoreInvoiceRequest;
-use App\Http\Requests\Invoice\ActionInvoiceRequest;
-use App\Http\Requests\Invoice\CreateInvoiceRequest;
 use App\Http\Requests\Invoice\UpdateInvoiceRequest;
-use App\Http\Requests\Invoice\UploadInvoiceRequest;
-use App\Http\Requests\Invoice\DestroyInvoiceRequest;
 use App\Http\Requests\Invoice\UpdateReminderRequest;
+use App\Http\Requests\Invoice\UploadInvoiceRequest;
+use App\Jobs\Cron\AutoBill;
+use App\Jobs\Invoice\BulkInvoiceJob;
+use App\Jobs\Invoice\UpdateReminders;
+use App\Jobs\Invoice\ZipInvoices;
+use App\Models\Account;
+use App\Models\Invoice;
+use App\Models\Quote;
+use App\Repositories\InvoiceRepository;
+use App\Services\PdfMaker\PdfMerge;
+use App\Services\Template\TemplateAction;
+use App\Transformers\InvoiceTransformer;
+use App\Transformers\QuoteTransformer;
+use App\Utils\Ninja;
+use App\Utils\Traits\MakesHash;
+use App\Utils\Traits\SavesDocuments;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Class InvoiceController.
@@ -80,7 +81,7 @@ class InvoiceController extends BaseController
      *
      * @param InvoiceFilters $filters  The filters
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      * @OA\Get(
      *      path="/api/v1/invoices",
@@ -127,7 +128,7 @@ class InvoiceController extends BaseController
      *
      * @param CreateInvoiceRequest $request  The request
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -165,6 +166,7 @@ class InvoiceController extends BaseController
         /** @var \App\Models\User $user */
         $user = auth()->user();
         $invoice = InvoiceFactory::create($user->company()->id, $user->id);
+        $invoice->date = now()->addSeconds($user->company()->utc_offset())->format('Y-m-d');
 
         return $this->itemResponse($invoice);
     }
@@ -174,7 +176,7 @@ class InvoiceController extends BaseController
      *
      * @param StoreInvoiceRequest $request  The request
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Post(
@@ -213,7 +215,7 @@ class InvoiceController extends BaseController
      */
     public function store(StoreInvoiceRequest $request)
     {
-        
+
         /** @var \App\Models\User $user */
         $user = auth()->user();
 
@@ -246,7 +248,7 @@ class InvoiceController extends BaseController
      * @param ShowInvoiceRequest $request  The request
      * @param Invoice $invoice  The invoice
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -301,7 +303,7 @@ class InvoiceController extends BaseController
      * @param EditInvoiceRequest $request  The request
      * @param Invoice $invoice  The invoice
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      * @OA\Get(
      *      path="/api/v1/invoices/{id}/edit",
@@ -355,7 +357,7 @@ class InvoiceController extends BaseController
      * @param UpdateInvoiceRequest $request  The request
      * @param Invoice $invoice  The invoice
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Put(
@@ -406,7 +408,7 @@ class InvoiceController extends BaseController
         }
 
         if ($invoice->isLocked()) {
-            return response()->json(['message' => ctrans('texts.locked_invoice')], 403);
+            return response()->json(['message' => '', 'errors' => ['number' => ctrans('texts.locked_invoice')]], 422);
         }
 
         $old_invoice = $invoice->line_items;
@@ -415,7 +417,6 @@ class InvoiceController extends BaseController
 
         $invoice->service()
                 ->triggeredActions($request)
-                ->deletePdf()
                 ->adjustInventory($old_invoice);
 
         event(new InvoiceWasUpdated($invoice, $invoice->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
@@ -481,21 +482,28 @@ class InvoiceController extends BaseController
 
     public function bulk(BulkInvoiceRequest $request)
     {
-        
+
         /** @var \App\Models\User $user */
         $user = auth()->user();
 
         $action = $request->input('action');
-
         $ids = $request->input('ids');
 
         if (Ninja::isHosted() && (stripos($action, 'email') !== false) && !$user->company()->account->account_sms_verified) {
             return response(['message' => 'Please verify your account to send emails.'], 400);
         }
 
+        if (Ninja::isHosted() && (stripos($action, 'email') !== false) && $user->account->emailQuotaExceeded()) {
+            return response(['message' => ctrans('texts.email_quota_exceeded_subject')], 400);
+        }
+
+        if(in_array($request->action, ['auto_bill', 'mark_paid']) && $user->cannot('create', \App\Models\Payment::class)) {
+            return response(['message' => ctrans('texts.not_authorized'), 'errors' => ['ids' => [ctrans('texts.not_authorized')]]], 422);
+        }
+
         $invoices = Invoice::withTrashed()->whereIn('id', $this->transformKeys($ids))->company()->get();
 
-        if (! $invoices) {
+        if ($invoices->count() == 0 ) {
             return response()->json(['message' => 'No Invoices Found']);
         }
 
@@ -504,10 +512,8 @@ class InvoiceController extends BaseController
          */
 
         if ($action == 'bulk_download' && $invoices->count() > 1) {
-            $invoices->each(function ($invoice) use($user) {
+            $invoices->each(function ($invoice) use ($user) {
                 if ($user->cannot('view', $invoice)) {
-                    nlog('access denied');
-
                     return response()->json(['message' => ctrans('text.access_denied')]);
                 }
             });
@@ -517,24 +523,52 @@ class InvoiceController extends BaseController
             return response()->json(['message' => ctrans('texts.sent_message')], 200);
         }
 
-        if ($action == 'download' && $invoices->count() >=1 && $user->can('view', $invoices->first())) {
-            $file = $invoices->first()->service()->getInvoicePdf();
+        if ($action == 'download' && $invoices->count() >= 1 && $user->can('view', $invoices->first())) {
 
-            return response()->streamDownload(function () use ($file) {
-                echo Storage::get($file);
-            }, basename($file), ['Content-Type' => 'application/pdf']);
+            $filename = $invoices->first()->getFileName();
+
+            return response()->streamDownload(function () use ($invoices) {
+                echo $invoices->first()->service()->getInvoicePdf();
+            }, $filename, ['Content-Type' => 'application/pdf']);
         }
 
         if ($action == 'bulk_print' && $user->can('view', $invoices->first())) {
             $paths = $invoices->map(function ($invoice) {
-                return $invoice->service()->getInvoicePdf();
+                return (new \App\Jobs\Entity\CreateRawPdf($invoice->invitations->first()))->handle();
             });
 
-            $merge = (new PdfMerge($paths->toArray()))->run();
-
-            return response()->streamDownload(function () use ($merge) {
-                echo($merge);
+            return response()->streamDownload(function () use ($paths) {
+                echo $merge = (new PdfMerge($paths->toArray()))->run();
             }, 'print.pdf', ['Content-Type' => 'application/pdf']);
+        }
+
+        if($action == 'template' && $user->can('view', $invoices->first())) {
+
+            $hash_or_response = $request->boolean('send_email') ? 'email sent' : \Illuminate\Support\Str::uuid();
+
+            TemplateAction::dispatch(
+                $ids,
+                $request->template_id,
+                Invoice::class,
+                $user->id,
+                $user->company(),
+                $user->company()->db,
+                $hash_or_response,
+                $request->boolean('send_email')
+            );
+
+            return response()->json(['message' => $hash_or_response], 200);
+        }
+
+        if($action == 'set_payment_link' && $request->has('subscription_id')) {
+
+            $invoices->each(function ($invoice) use ($user, $request) {
+                if($user->can('edit', $invoice)) {
+                    $invoice->service()->setPaymentLink($request->subscription_id)->save();
+                }
+            });
+
+            return $this->listResponse(Invoice::withTrashed()->whereIn('id', $this->transformKeys($ids))->company());
         }
 
         /*
@@ -548,7 +582,7 @@ class InvoiceController extends BaseController
 
         /* Need to understand which permission are required for the given bulk action ie. view / edit */
 
-        return $this->listResponse(Invoice::query()->withTrashed()->whereIn('id', $this->transformKeys($ids))->company());
+        return $this->listResponse(Invoice::withTrashed()->whereIn('id', $this->transformKeys($ids))->company());
     }
 
     /**
@@ -626,9 +660,13 @@ class InvoiceController extends BaseController
 
     private function performAction(Invoice $invoice, $action, $bulk = false)
     {
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
         /*If we are using bulk actions, we don't want to return anything */
         switch ($action) {
             case 'auto_bill':
+
                 AutoBill::dispatch($invoice->id, $invoice->company->db);
                 return $this->itemResponse($invoice);
 
@@ -652,7 +690,6 @@ class InvoiceController extends BaseController
                 break;
             case 'mark_paid':
                 if ($invoice->status_id == Invoice::STATUS_PAID || $invoice->is_deleted === true) {
-                    // if ($invoice->balance < 0 || $invoice->status_id == Invoice::STATUS_PAID || $invoice->is_deleted === true) {
                     return $this->errorResponse(['message' => ctrans('texts.invoice_cannot_be_marked_paid')], 400);
                 }
 
@@ -671,11 +708,9 @@ class InvoiceController extends BaseController
                 break;
             case 'download':
 
-                $file = $invoice->service()->getInvoicePdf();
-
-                return response()->streamDownload(function () use ($file) {
-                    echo Storage::get($file);
-                }, basename($file), ['Content-Type' => 'application/pdf']);
+                return response()->streamDownload(function () use ($invoice) {
+                    echo $invoice->service()->getInvoicePdf();
+                }, $invoice->getFileName(), ['Content-Type' => 'application/pdf']);
 
             case 'restore':
                 $this->invoice_repo->restore($invoice);
@@ -700,7 +735,7 @@ class InvoiceController extends BaseController
                 }
                 break;
             case 'cancel':
-                $invoice = $invoice->service()->handleCancellation()->deletePdf()->save();
+                $invoice = $invoice->service()->handleCancellation()->save();
                 if (! $bulk) {
                     $this->itemResponse($invoice);
                 }
@@ -718,7 +753,6 @@ class InvoiceController extends BaseController
                     return response()->json(['message' => 'email sent'], 200);
                 }
                 break;
-
 
             default:
                 return response()->json(['message' => ctrans('texts.action_unavailable', ['action' => $action])], 400);
@@ -766,7 +800,7 @@ class InvoiceController extends BaseController
      *       ),
      *     )
      * @param $invitation_key
-     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse | \Illuminate\Http\JsonResponse | \Illuminate\Http\Response
      */
     public function downloadPdf($invitation_key)
     {
@@ -782,7 +816,7 @@ class InvoiceController extends BaseController
 
         $file_name = $invoice->numberFormatter().'.pdf';
 
-        $file = (new \App\Jobs\Entity\CreateRawPdf($invitation, $invitation->company->db))->handle();
+        $file = (new \App\Jobs\Entity\CreateRawPdf($invitation))->handle();
 
         $headers = ['Content-Type' => 'application/pdf'];
 
@@ -836,7 +870,7 @@ class InvoiceController extends BaseController
      *       ),
      *     )
      * @param $invitation_key
-     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse | \Illuminate\Http\JsonResponse | \Illuminate\Http\Response
      */
     public function downloadEInvoice($invitation_key)
     {
@@ -904,15 +938,15 @@ class InvoiceController extends BaseController
      *       ),
      *     )
      * @param $invoice
-     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse | \Illuminate\Http\JsonResponse | \Illuminate\Http\Response
      */
     public function deliveryNote(ShowInvoiceRequest $request, Invoice $invoice)
     {
-        $file = $invoice->service()->getInvoiceDeliveryNote($invoice, $invoice->invitations->first()->contact);
 
-        return response()->streamDownload(function () use ($file) {
-            echo Storage::get($file);
-        }, basename($file), ['Content-Type' => 'application/pdf']);
+        return response()->streamDownload(function () use ($invoice) {
+            echo $invoice->service()->getInvoiceDeliveryNote($invoice, $invoice->invitations->first()->contact);
+        }, $invoice->getDeliveryNoteName(), ['Content-Type' => 'application/pdf']);
+
     }
 
     /**
@@ -920,7 +954,7 @@ class InvoiceController extends BaseController
      *
      * @param UploadInvoiceRequest $request
      * @param Invoice $invoice
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *

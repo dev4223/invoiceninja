@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -18,7 +18,6 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class ClientFilters extends QueryFilters
 {
-
     /**
      * Filter by name.
      *
@@ -42,7 +41,7 @@ class ClientFilters extends QueryFilters
      */
     public function balance(string $balance = ''): Builder
     {
-        if (strlen($balance) == 0) {
+        if (strlen($balance) == 0 || count(explode(":", $balance)) < 2) {
             return $this->builder;
         }
 
@@ -132,10 +131,13 @@ class ClientFilters extends QueryFilters
         return  $this->builder->where(function ($query) use ($filter) {
             $query->where('name', 'like', '%'.$filter.'%')
                           ->orWhere('id_number', 'like', '%'.$filter.'%')
+                          ->orWhere('number', 'like', '%'.$filter.'%')
+
                           ->orWhereHas('contacts', function ($query) use ($filter) {
                               $query->where('first_name', 'like', '%'.$filter.'%');
                               $query->orWhere('last_name', 'like', '%'.$filter.'%');
                               $query->orWhere('email', 'like', '%'.$filter.'%');
+                              $query->orWhere('phone', 'like', '%'.$filter.'%');
                           })
                           ->orWhere('custom_value1', 'like', '%'.$filter.'%')
                           ->orWhere('custom_value2', 'like', '%'.$filter.'%')
@@ -158,13 +160,23 @@ class ClientFilters extends QueryFilters
             return $this->builder;
         }
 
+        if($sort_col[0] == 'documents') {
+            return $this->builder;
+        }
+
         if ($sort_col[0] == 'display_name') {
             $sort_col[0] = 'name';
         }
-        
-        return $this->builder->orderBy($sort_col[0], $sort_col[1]);
+
+        $dir = ($sort_col[1] == 'asc') ? 'asc' : 'desc';
+
+        if($sort_col[0] == 'number') {
+            return $this->builder->orderByRaw("REGEXP_REPLACE(number,'[^0-9]+','')+0 " . $dir);
+        }
+
+        return $this->builder->orderBy($sort_col[0], $dir);
     }
-    
+
     /**
      * Filters the query by the users company ID.
      *

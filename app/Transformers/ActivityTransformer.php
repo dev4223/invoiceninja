@@ -4,42 +4,40 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Transformers;
 
-use App\Models\Task;
-use App\Models\User;
-use App\Models\Quote;
+use App\Models\Activity;
 use App\Models\Backup;
 use App\Models\Client;
+use App\Models\ClientContact;
 use App\Models\Credit;
-use App\Models\Vendor;
 use App\Models\Expense;
 use App\Models\Invoice;
 use App\Models\Payment;
-use App\Models\Activity;
-use App\Models\ClientContact;
 use App\Models\PurchaseOrder;
+use App\Models\Quote;
+use App\Models\RecurringInvoice;
+use App\Models\Task;
+use App\Models\User;
+use App\Models\Vendor;
 use App\Models\VendorContact;
 use App\Utils\Traits\MakesHash;
-use App\Models\RecurringInvoice;
-use App\Transformers\EntityTransformer;
-use App\Transformers\InvoiceHistoryTransformer;
 
 class ActivityTransformer extends EntityTransformer
 {
     use MakesHash;
 
-    protected $defaultIncludes = [];
+    protected array $defaultIncludes = [];
 
     /**
      * @var array
      */
-    protected $availableIncludes = [
+    protected array $availableIncludes = [
         'history',
         'user',
         'client',
@@ -100,6 +98,11 @@ class ActivityTransformer extends EntityTransformer
 
     public function includeClient(Activity $activity)
     {
+
+        if (!$activity->client) {
+            return null;
+        }
+
         $transformer = new ClientTransformer($this->serializer);
 
         return $this->includeItem($activity->client, $transformer, Client::class);
@@ -107,6 +110,10 @@ class ActivityTransformer extends EntityTransformer
 
     public function includeVendor(Activity $activity)
     {
+        if (!$activity->vendor) {
+            return null;
+        }
+
         $transformer = new VendorTransformer($this->serializer);
 
         return $this->includeItem($activity->vendor, $transformer, Vendor::class);
@@ -114,6 +121,11 @@ class ActivityTransformer extends EntityTransformer
 
     public function includeContact(Activity $activity)
     {
+
+        if (!$activity->contact) {
+            return null;
+        }
+
         $transformer = new ClientContactTransformer($this->serializer);
 
         return $this->includeItem($activity->contact, $transformer, ClientContact::class);
@@ -121,6 +133,11 @@ class ActivityTransformer extends EntityTransformer
 
     public function includeVendorContact(Activity $activity)
     {
+
+        if (!$activity->vendor_contact) {
+            return null;
+        }
+
         $transformer = new VendorContactTransformer($this->serializer);
 
         return $this->includeItem($activity->vendor_contact, $transformer, VendorContact::class);
@@ -128,6 +145,11 @@ class ActivityTransformer extends EntityTransformer
 
     public function includeRecurringInvoice(Activity $activity)
     {
+
+        if (!$activity->recurring_invoice) {
+            return null;
+        }
+
         $transformer = new RecurringInvoiceTransformer($this->serializer);
 
         return $this->includeItem($activity->recurring_invoice, $transformer, RecurringInvoice::class);
@@ -135,14 +157,24 @@ class ActivityTransformer extends EntityTransformer
 
     public function includePurchaseOrder(Activity $activity)
     {
+
+        if (!$activity->purchase_order) {
+            return null;
+        }
+
         $transformer = new PurchaseOrderTransformer($this->serializer);
 
-        return $this->includeItem($activity->purchase_order(), $transformer, PurchaseOrder::class);
+        return $this->includeItem($activity->purchase_order, $transformer, PurchaseOrder::class);
     }
 
 
     public function includeQuote(Activity $activity)
     {
+
+        if (!$activity->quote) {
+            return null;
+        }
+
         $transformer = new RecurringInvoiceTransformer($this->serializer);
 
         return $this->includeItem($activity->quote, $transformer, Quote::class);
@@ -150,6 +182,10 @@ class ActivityTransformer extends EntityTransformer
 
     public function includeInvoice(Activity $activity)
     {
+        if (!$activity->invoice) {
+            return null;
+        }
+
         $transformer = new InvoiceTransformer($this->serializer);
 
         return $this->includeItem($activity->invoice, $transformer, Invoice::class);
@@ -157,6 +193,10 @@ class ActivityTransformer extends EntityTransformer
 
     public function includeCredit(Activity $activity)
     {
+        if (!$activity->credit) {
+            return null;
+        }
+
         $transformer = new CreditTransformer($this->serializer);
 
         return $this->includeItem($activity->credit, $transformer, Credit::class);
@@ -164,6 +204,10 @@ class ActivityTransformer extends EntityTransformer
 
     public function includePayment(Activity $activity)
     {
+        if (!$activity->payment) {
+            return null;
+        }
+
         $transformer = new PaymentTransformer($this->serializer);
 
         return $this->includeItem($activity->payment, $transformer, Payment::class);
@@ -171,6 +215,10 @@ class ActivityTransformer extends EntityTransformer
 
     public function includeUser(Activity $activity)
     {
+        if (!$activity->user) {
+            return null;
+        }
+
         $transformer = new UserTransformer($this->serializer);
 
         return $this->includeItem($activity->user, $transformer, User::class);
@@ -178,6 +226,10 @@ class ActivityTransformer extends EntityTransformer
 
     public function includeExpense(Activity $activity)
     {
+        if (!$activity->expense) {
+            return null;
+        }
+
         $transformer = new ExpenseTransformer($this->serializer);
 
         return $this->includeItem($activity->expense, $transformer, Expense::class);
@@ -185,6 +237,10 @@ class ActivityTransformer extends EntityTransformer
 
     public function includeTask(Activity $activity)
     {
+        if (!$activity->task) {
+            return null;
+        }
+
         $transformer = new TaskTransformer($this->serializer);
 
         return $this->includeItem($activity->task, $transformer, Task::class);

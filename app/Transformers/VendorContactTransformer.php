@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -45,6 +45,7 @@ class VendorContactTransformer extends EntityTransformer
             'custom_value4' => $vendor->custom_value4 ?: '',
             'link' => $vendor->getLoginLink(),
             'last_login' => (int)$vendor->last_login,
+            'password' => empty($vendor->password) ? '' : '**********',
         ];
     }
 }

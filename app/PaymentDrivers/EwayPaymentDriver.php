@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -39,7 +39,7 @@ class EwayPaymentDriver extends BaseDriver
         GatewayType::CREDIT_CARD => CreditCard::class, //maps GatewayType => Implementation class
     ];
 
-    const SYSTEM_LOG_TYPE = SystemLog::TYPE_EWAY; //define a constant for your gateway ie TYPE_YOUR_CUSTOM_GATEWAY - set the const in the SystemLog model
+    public const SYSTEM_LOG_TYPE = SystemLog::TYPE_EWAY; //define a constant for your gateway ie TYPE_YOUR_CUSTOM_GATEWAY - set the const in the SystemLog model
 
     public function init()
     {
@@ -194,7 +194,7 @@ class EwayPaymentDriver extends BaseDriver
         if ($this->company_gateway->require_custom_value1) {
             $fields[] = ['name' => 'client_custom_value1', 'label' => $this->helpers->makeCustomField($this->client->company->custom_fields, 'client1'), 'type' => 'text', 'validation' => 'required'];
         }
-        
+
         if ($this->company_gateway->require_custom_value2) {
             $fields[] = ['name' => 'client_custom_value2', 'label' => $this->helpers->makeCustomField($this->client->company->custom_fields, 'client2'), 'type' => 'text', 'validation' => 'required'];
         }
@@ -210,5 +210,25 @@ class EwayPaymentDriver extends BaseDriver
 
 
         return $fields;
+    }
+
+    public function auth(): bool
+    {
+
+        $response = $this->init()->eway->queryTransaction('xx');
+
+        return (bool) count($response->getErrors()) == 0;
+
+    }
+
+    /**
+     * importCustomers
+     *
+     * No support
+     * @return void
+     */
+    public function importCustomers()
+    {
+        return true;
     }
 }

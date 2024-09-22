@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * App\Models\License
  *
  * @property int $id
- * @property int|null $created_at
+ * @property \Carbon\Carbon $created_at
  * @property int|null $updated_at
  * @property int|null $deleted_at
  * @property string|null $first_name
@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string|null $transaction_reference
  * @property int|null $product_id
  * @property int|null $recurring_invoice_id
+ * @property-read \App\Models\RecurringInvoice $recurring_invoice
  * @method static \Illuminate\Database\Eloquent\Builder|StaticModel company()
  * @method static \Illuminate\Database\Eloquent\Builder|StaticModel exclude($columns)
  * @method static \Illuminate\Database\Eloquent\Builder|License newModelQuery()
@@ -53,4 +54,24 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class License extends StaticModel
 {
     use SoftDeletes;
+
+    protected $casts = [
+        'created_at' => 'date',
+    ];
+
+    public function expiry(): string
+    {
+        return $this->created_at->addYear()->format('Y-m-d');
+    }
+
+    public function recurring_invoice()
+    {
+        return $this->belongsTo(RecurringInvoice::class);
+    }
+
+    public function url()
+    {
+        $contact = $this->recurring_invoice->client->contacts()->where('email', $this->email)->first();
+
+    }
 }

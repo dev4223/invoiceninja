@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -21,8 +21,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property int|null $client_id
  * @property int|null $user_id
  * @property int|null $activity_id
- * @property string|null $adjustment
- * @property string|null $balance
+ * @property float|null $adjustment
+ * @property float|null $balance
  * @property string|null $notes
  * @property string|null $hash
  * @property int $company_ledgerable_id

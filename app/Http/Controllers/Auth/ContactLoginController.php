@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -41,9 +41,12 @@ class ContactLoginController extends Controller
         $company = false;
         $account = false;
 
+        if($request->query('intended'))
+            $request->session()->put('url.intended', $request->query('intended'));
+        
         if ($request->session()->has('company_key')) {
             MultiDB::findAndSetDbByCompanyKey($request->session()->get('company_key'));
-            $company = Company::where('company_key', $request->input('company_key'))->first();
+            $company = Company::where('company_key', $request->session()->get('company_key'))->first();
         } elseif ($request->has('company_key')) {
             MultiDB::findAndSetDbByCompanyKey($request->input('company_key'));
             $company = Company::where('company_key', $request->input('company_key'))->first();
@@ -52,10 +55,10 @@ class ContactLoginController extends Controller
             $company = Company::where('company_key', $company_key)->first();
         }
 
-        /** @var \App\Models\Company $company **/
+        /** @var ?\App\Models\Company $company **/
         if ($company) {
             $account = $company->account;
-        } elseif (! $company && strpos($request->getHost(), 'invoicing.co') !== false) {
+        } elseif (! $company && strpos($request->getHost(), config('ninja.app_domain')) !== false) {
             $subdomain = explode('.', $request->getHost())[0];
             MultiDB::findAndSetDbByDomain(['subdomain' => $subdomain]);
             $company = Company::where('subdomain', $subdomain)->first();
@@ -81,6 +84,7 @@ class ContactLoginController extends Controller
 
     public function login(Request $request)
     {
+
         Auth::shouldUse('contact');
 
         if (Ninja::isHosted() && $request->has('company_key')) {
@@ -125,6 +129,9 @@ class ContactLoginController extends Controller
 
     protected function sendLoginResponse(Request $request)
     {
+
+        $intended = $request->session()->has('url.intended') ? $request->session()->get('url.intended') : false;
+
         $request->session()->regenerate();
 
         $this->clearLoginAttempts($request);
@@ -134,6 +141,9 @@ class ContactLoginController extends Controller
         }
 
         $this->setRedirectPath();
+        
+        if($intended)
+            $this->redirectTo = $intended;
 
         return $request->wantsJson()
                     ? new JsonResponse([], 204)
@@ -146,8 +156,8 @@ class ContactLoginController extends Controller
 
         event(new ContactLoggedIn($client, $client->company, Ninja::eventVars()));
 
-        if (session()->get('url.intended')) {
-            return redirect(session()->get('url.intended'));
+        if ($request->session()->has('url.intended')) {
+            return redirect($request->session()->get('url.intended'));
         }
 
         $this->setRedirectPath();
@@ -165,17 +175,20 @@ class ContactLoginController extends Controller
 
     private function setRedirectPath()
     {
-        if (auth()->guard('contact')->user()->company->enabled_modules & PortalComposer::MODULE_INVOICES) {
+
+        if (auth()->guard('contact')->user()->client->getSetting('enable_client_portal_dashboard') === true) {
+            $this->redirectTo = '/client/dashboard';
+        } elseif ((bool)(auth()->guard('contact')->user()->company->enabled_modules & PortalComposer::MODULE_INVOICES)) {
             $this->redirectTo = '/client/invoices';
-        } elseif (auth()->guard('contact')->user()->company->enabled_modules & PortalComposer::MODULE_RECURRING_INVOICES) {
+        } elseif ((bool)(auth()->guard('contact')->user()->company->enabled_modules & PortalComposer::MODULE_RECURRING_INVOICES)) {
             $this->redirectTo = '/client/recurring_invoices';
-        } elseif (auth()->guard('contact')->user()->company->enabled_modules & PortalComposer::MODULE_QUOTES) {
+        } elseif ((bool)(auth()->guard('contact')->user()->company->enabled_modules & PortalComposer::MODULE_QUOTES)) {
             $this->redirectTo = '/client/quotes';
-        } elseif (auth()->guard('contact')->user()->company->enabled_modules & PortalComposer::MODULE_CREDITS) {
+        } elseif ((bool)(auth()->guard('contact')->user()->company->enabled_modules & PortalComposer::MODULE_CREDITS)) {
             $this->redirectTo = '/client/credits';
-        } elseif (auth()->guard('contact')->user()->company->enabled_modules & PortalComposer::MODULE_TASKS) {
+        } elseif ((bool)(auth()->guard('contact')->user()->company->enabled_modules & PortalComposer::MODULE_TASKS)) {
             $this->redirectTo = '/client/tasks';
-        } elseif (auth()->guard('contact')->user()->company->enabled_modules & PortalComposer::MODULE_EXPENSES) {
+        } elseif ((bool)(auth()->guard('contact')->user()->company->enabled_modules & PortalComposer::MODULE_EXPENSES)) {
             $this->redirectTo = '/client/expenses';
         }
     }

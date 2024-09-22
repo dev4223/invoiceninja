@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -64,7 +64,7 @@ class ClientSettings extends BaseSettings
      *
      * @return stdClass
      */
-    public static function defaults() : stdClass
+    public static function defaults(): stdClass
     {
         $data = (object) [
             'entity' => (string) Client::class,

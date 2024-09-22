@@ -82,7 +82,7 @@
 
     @component('portal.ninja2020.components.general.card-element-single')
         <input type="checkbox" class="form-checkbox mr-1" id="accept-terms" required>
-        <label for="accept-terms" class="cursor-pointer">{{ ctrans('texts.ach_authorization', ['company' => auth()->user()->company->present()->name, 'email' => auth()->guard('contact')->user()->client->company->settings->email]) }}</label>
+        <label for="accept-terms" class="cursor-pointer">{{ ctrans('texts.ach_authorization', ['company' => auth()->guard('contact')->user()->company->present()->name, 'email' => auth()->guard('contact')->user()->client->company->settings->email]) }}</label>
     @endcomponent
 
     @component('portal.ninja2020.gateways.includes.pay_now', ['id' => 'save-button'])
@@ -92,5 +92,5 @@
 
 @section('gateway_footer')
     <script src="https://js.stripe.com/v3/"></script>
-    <script src="{{ asset('js/clients/payments/stripe-ach.js') }}"></script>
+    @vite('resources/js/clients/payments/stripe-ach.js')
 @endsection

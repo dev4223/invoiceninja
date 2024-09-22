@@ -2,8 +2,8 @@ paths:
   /api/v1/activities:
     get:
       tags:
-        - actvities
-      summary: "Returns a list of actvities"
+        - activities
+      summary: "Returns a list of activities"
       description: "Lists all activities related to this company"
       operationId: getActivities
       parameters:
@@ -44,10 +44,10 @@ paths:
           $ref: "#/components/responses/422"
         default:
           $ref: "#/components/responses/default"
-  "/api/v1/actvities/download_entity/{activity_id}":
+  "/api/v1/activities/download_entity/{activity_id}":
     get:
       tags:
-        - actvities
+        - activities
       summary: "Returns a PDF for the given activity"
       description: "Returns a PDF for the given activity"
       operationId: getActivityHistoricalEntityPdf
@@ -89,10 +89,15 @@ paths:
       tags:
         - login
       summary: "Attempts authentication"
-      description: "Returns a CompanyUser object on success"
+      description: |
+        After authenticating with the API, the returned object is a CompanyUser object which is a bridge linking the user to the company. 
+
+        The company user object itself contains the users permissions (admin/owner or fine grained permissions) You will most likely want to 
+        also include in the response of this object both the company and the user object, this can be done by using the include parameter.
+
+        /api/v1/login?include=company,user
+
       operationId: postLogin
-      security:
-        - []
       parameters:
         - $ref: "#/components/parameters/X-API-SECRET"
         - $ref: "#/components/parameters/X-API-TOKEN"
@@ -115,6 +120,13 @@ paths:
                   description: "The user password. Must meet minimum criteria ~ > 6 characters"
                   type: string
                   example: "Password0"
+                one_time_password:
+                  description: "The one time password if 2FA is enabled"
+                  type: string
+                  example: "123456"
+              required:
+                - email
+                - password
               type: object
       responses:
         200:
@@ -129,15 +141,17 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Client"
+                $ref: "#/components/schemas/CompanyUser"
         401:
           $ref: "#/components/responses/401"
         403:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
         5XX:
-          $ref: "#/components/responses/5XX"
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/refresh:
@@ -148,8 +162,9 @@ paths:
       description: |
         Refreshes the dataset.  
 
-        This endpoint can be used if you only need to access the most recent data from a certain point in time.
-        operationId: refresh
+        This endpoint can be used if you only need to access the most recent data from a certain point in time. For example, if you only want to retrieve The
+        most recent data from the last time you accessed the system, you would pass the query parameter ?updated_at=1676173763. (unix timestamp)
+      operationId: refresh
       parameters:
         - name: updated_at
           in: query
@@ -184,6 +199,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/yodlee/refresh:
@@ -216,6 +235,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/bank_integrations:
@@ -266,6 +289,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
     post:
@@ -298,6 +325,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   "/api/v1/bank_integrations/{id}":
@@ -339,6 +370,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
     put:
@@ -379,6 +414,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
     delete:
@@ -415,6 +454,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   "/api/v1/bank_integrations/{id}/edit":
@@ -456,6 +499,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/bank_integrations/create:
@@ -489,6 +536,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/bank_integrations/bulk:
@@ -529,6 +580,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/bank_integrations/refresh_accounts:
@@ -562,6 +617,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/bank_integrations/remove_account/account_id:
@@ -595,6 +654,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/bank_integrations/get_transactions/account_id:
@@ -628,6 +691,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/bank_transactions:
@@ -678,6 +745,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
     post:
@@ -710,6 +781,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   "/api/v1/bank_transactions/{id}":
@@ -751,6 +826,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
     put:
@@ -791,6 +870,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
     delete:
@@ -868,6 +951,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/bank_transactions/create:
@@ -901,13 +988,17 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/bank_transations/bulk:
     post:
       tags:
         - bank_transactions
-      summary: "Performs bulk actions on an array of bank_transations"
+      summary: "Bulk actions"
       description: ""
       operationId: bulkBankTransactions
       parameters:
@@ -941,14 +1032,40 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/bank_transations/match:
     post:
       tags:
         - bank_transactions
-      summary: "Performs match actions on an array of bank_transactions"
-      description: ""
+      summary: "Match transactions"
+      description: |
+        Matching invoices or a payment to a bank transactions.
+        
+        The API expects the id of the transaction along with either a comma separated list of invoice ids OR the payment id to associate the transaction to.
+
+        Example for matching a transaction to two invoices:
+
+        {"transactions":[{"id":"olejRl5ejN","invoice_ids":"JxboYBLegw,JxboYBLeXX"}]}
+
+        Example for matching a transaction and a paymente:
+
+        {"transactions":[{"id":"olejRl5ejN","payment_id":"JxboYBLeXf"}]}
+
+        Matching expenses.
+
+        You can match an existing expense within Invoice Ninja - or - create a new expense using the following:
+
+        {"transactions":[{"id":"open5pld7A","vendor_id":"gl9avJnaG1","ninja_category_id":""}]}
+
+        To match to an existing expense:
+
+        {"transactions":[{"id":"Jxbo2qKagw","expense_id":"7N1aMM1aWm"}]}
+
       operationId: matchBankTransactions
       parameters:
         - $ref: "#/components/parameters/X-API-TOKEN"
@@ -981,6 +1098,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/bank_transaction_rules:
@@ -1031,6 +1152,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
     post:
@@ -1063,6 +1188,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   "/api/v1/bank_transaction_rules/{id}":
@@ -1104,6 +1233,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
     put:
@@ -1144,6 +1277,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
     delete:
@@ -1180,6 +1317,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   "/api/v1/bank_transaction_rules/{id}/edit":
@@ -1221,6 +1362,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/bank_transaction_rules/create:
@@ -1254,6 +1399,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/bank_transation_rules/bulk:
@@ -1294,6 +1443,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/charts/totals:
@@ -1328,6 +1481,10 @@ paths:
               $ref: "#/components/headers/X-RateLimit-Limit"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
 
@@ -1335,7 +1492,7 @@ paths:
     get:
       tags:
         - client_gateway_tokens
-      summary: "List of client tokens"
+      summary: "List of client payment tokens"
       description: "Lists client_gateway_tokens, search and filters allow fine grained lists to be generated.\n\n    Query parameters can be added to performed more fine grained filtering of the client_gateway_tokens, these are handled by the ClientGatewayTokenFilters class which defines the methods available"
       operationId: getClientGatewayTokens
       parameters:
@@ -1371,13 +1528,17 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
     post:
       tags:
         - client_gateway_tokens
-      summary: "Adds a client"
-      description: "Adds an client to a company"
+      summary: "Adds a client payment token"
+      description: "Adds a client payment token to a company"
       operationId: storeClientGatewayToken
       parameters:
         - $ref: "#/components/parameters/X-API-TOKEN"
@@ -1385,7 +1546,7 @@ paths:
         - $ref: "#/components/parameters/include"
       responses:
         200:
-          description: "Returns the saved client object"
+          description: "Returns the saved client payment token object"
           headers:
             X-MINIMUM-CLIENT-VERSION:
               $ref: "#/components/headers/X-MINIMUM-CLIENT-VERSION"
@@ -1403,14 +1564,18 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   "/api/v1/client_gateway_tokens/{id}":
     get:
       tags:
         - client_gateway_tokens
-      summary: "Shows a client"
-      description: "Displays a client by id"
+      summary: "Shows a client payment token"
+      description: "Displays a client payment token by id"
       operationId: showClientGatewayToken
       parameters:
         - $ref: "#/components/parameters/X-API-TOKEN"
@@ -1426,7 +1591,7 @@ paths:
           example: D2J234DFA
       responses:
         200:
-          description: "Returns the cl.ient object"
+          description: "Returns the client payment token object"
           headers:
             X-MINIMUM-CLIENT-VERSION:
               $ref: "#/components/headers/X-MINIMUM-CLIENT-VERSION"
@@ -1444,13 +1609,17 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
     put:
       tags:
         - client_gateway_tokens
-      summary: "Updates a client"
-      description: "Handles the updating of a client by id"
+      summary: "Updates a client payment token"
+      description: "Handles the updating of a client payment token by id"
       operationId: updateClientGatewayToken
       parameters:
         - $ref: "#/components/parameters/X-API-TOKEN"
@@ -1466,7 +1635,7 @@ paths:
           example: D2J234DFA
       responses:
         200:
-          description: "Returns the client object"
+          description: "Returns the client payment token object"
           headers:
             X-MINIMUM-CLIENT-VERSION:
               $ref: "#/components/headers/X-MINIMUM-CLIENT-VERSION"
@@ -1484,13 +1653,17 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
     delete:
       tags:
         - client_gateway_tokens
       summary: "Deletes a client"
-      description: "Handles the deletion of a client by id"
+      description: "Handles the deletion of a client payment token by id"
       operationId: deleteClientGatewayToken
       parameters:
         - $ref: "#/components/parameters/X-API-TOKEN"
@@ -1520,13 +1693,17 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   "/api/v1/client_gateway_tokens/{id}/edit":
     get:
       tags:
         - client_gateway_tokens
-      summary: "Shows a client for editting"
+      summary: "Shows a client payment token for editting"
       description: "Displays a client by id"
       operationId: editClientGatewayToken
       parameters:
@@ -1543,7 +1720,7 @@ paths:
           example: D2J234DFA
       responses:
         200:
-          description: "Returns the client object"
+          description: "Returns the client payment token object"
           headers:
             X-MINIMUM-CLIENT-VERSION:
               $ref: "#/components/headers/X-MINIMUM-CLIENT-VERSION"
@@ -1561,13 +1738,17 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/client_gateway_tokens/create:
     get:
       tags:
         - client_gateway_tokens
-      summary: "Gets a new blank client object"
+      summary: "Gets a new blank client payment token object"
       description: "Returns a blank object with default values"
       operationId: getClientGatewayTokensCreate
       parameters:
@@ -1576,7 +1757,7 @@ paths:
         - $ref: "#/components/parameters/include"
       responses:
         200:
-          description: "A blank client object"
+          description: "A blank client payment token object"
           headers:
             X-MINIMUM-CLIENT-VERSION:
               $ref: "#/components/headers/X-MINIMUM-CLIENT-VERSION"
@@ -1594,6 +1775,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
 
@@ -1636,6 +1821,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
     post:
@@ -1668,6 +1857,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/companies/create:
@@ -1701,6 +1894,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   "/api/v1/companies/{id}":
@@ -1742,6 +1939,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
     put:
@@ -1780,9 +1981,12 @@ paths:
           $ref: "#/components/responses/401"
         403:
           $ref: "#/components/responses/403"
-
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
     delete:
@@ -1817,9 +2021,12 @@ paths:
           $ref: "#/components/responses/401"
         403:
           $ref: "#/components/responses/403"
-
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   "/api/v1/companies/{id}/edit":
@@ -1859,13 +2066,16 @@ paths:
           $ref: "#/components/responses/401"
         403:
           $ref: "#/components/responses/403"
-
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   "/api/v1/companies/{id}/upload":
-    put:
+    post:
       tags:
         - companies
       summary: "Uploads a document to a company"
@@ -1883,6 +2093,23 @@ paths:
             type: string
             format: string
           example: D2J234DFA
+      requestBody:
+        description: "File Upload Body"
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                _method:
+                  type: string
+                  example: PUT
+                documents:
+                  type: array
+                  items:
+                    description: "Array of binary documents for upload"
+                    type: string
+                    format: binary
       responses:
         200:
           description: "Returns the client object"
@@ -1901,9 +2128,12 @@ paths:
           $ref: "#/components/responses/401"
         403:
           $ref: "#/components/responses/403"
-
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   "/api/v1/companies/{company}/default":
@@ -1943,9 +2173,49 @@ paths:
           $ref: "#/components/responses/401"
         403:
           $ref: "#/components/responses/403"
-
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
+        default:
+          $ref: "#/components/responses/default"
+  "/api/v1/companies/current":
+    post:
+      tags:
+        - companies
+      summary: "Returns the current comapny"
+      description: "Returns the current company based on the API token passed in"
+      operationId: showCurrentCompany
+      parameters:
+        - $ref: "#/components/parameters/X-API-TOKEN"
+        - $ref: "#/components/parameters/X-Requested-With"
+        - $ref: "#/components/parameters/include"
+      responses:
+        200:
+          description: "Returns the company object"
+          headers:
+            X-MINIMUM-CLIENT-VERSION:
+              $ref: "#/components/headers/X-MINIMUM-CLIENT-VERSION"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+        401:
+          $ref: "#/components/responses/401"
+        403:
+          $ref: "#/components/responses/403"
+        422:
+          $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/company_gateways:
@@ -1985,9 +2255,12 @@ paths:
           $ref: "#/components/responses/401"
         403:
           $ref: "#/components/responses/403"
-
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
     post:
@@ -2020,6 +2293,10 @@ paths:
           $ref: "#/components/responses/403"
         422:
           $ref: "#/components/responses/422"
+        429:
+          $ref: "#/components/responses/429"
+        5XX:
+          description: 'Server error'
         default:
           $ref: "#/components/responses/default"
   /api/v1/company_gateways/create:
@@ -2742,11 +3019,15 @@ paths:
       parameters:
         - $ref: "#/components/parameters/X-Requested-With"
       requestBody:
-        description: "The template subject and body"
+        description: "Required fields to send an email"
         required: true
         content:
           application/json:
             schema:
+              required:
+                - entity
+                - entity_id
+                - template
               properties:
                 subject:
                   description: "The email subject"
@@ -2760,9 +3041,13 @@ paths:
                 entity_id:
                   description: "The entity_id"
                   type: string
+                cc_email:
+                  description: "The email address of a user to be CC'd on the email"
+                  type: string
                 template:
                   description: "The template required"
                   type: string
+                  example: invoice,quote,credit,purchase_order,payment,payment_partial,reminder1,reminder2,reminder3,reminder_endless
               type: object
       responses:
         200:
@@ -3132,8 +3417,8 @@ paths:
     post:
       tags:
         - expenses
-      summary: "Adds a client"
-      description: "Adds an client to a company"
+      summary: "Adds an expense"
+      description: "Adds a expense to a company"
       operationId: storeExpense
       parameters:
         - $ref: "#/components/parameters/X-API-TOKEN"
@@ -3141,7 +3426,7 @@ paths:
         - $ref: "#/components/parameters/include"
       responses:
         200:
-          description: "Returns the saved client object"
+          description: "Returns the saved expense object"
           headers:
             X-MINIMUM-CLIENT-VERSION:
               $ref: "#/components/headers/X-MINIMUM-CLIENT-VERSION"
@@ -3165,8 +3450,8 @@ paths:
     get:
       tags:
         - expenses
-      summary: "Shows a client"
-      description: "Displays a client by id"
+      summary: "Shows a expense"
+      description: "Displays a expense by id"
       operationId: showExpense
       parameters:
         - $ref: "#/components/parameters/X-API-TOKEN"
@@ -3205,8 +3490,8 @@ paths:
     put:
       tags:
         - expenses
-      summary: "Updates a client"
-      description: "Handles the updating of a client by id"
+      summary: "Updates a expense"
+      description: "Handles the updating of a expense by id"
       operationId: updateExpense
       parameters:
         - $ref: "#/components/parameters/X-API-TOKEN"
@@ -3222,7 +3507,7 @@ paths:
           example: D2J234DFA
       responses:
         200:
-          description: "Returns the client object"
+          description: "Returns the expense object"
           headers:
             X-MINIMUM-CLIENT-VERSION:
               $ref: "#/components/headers/X-MINIMUM-CLIENT-VERSION"
@@ -3245,8 +3530,8 @@ paths:
     delete:
       tags:
         - expenses
-      summary: "Deletes a client"
-      description: "Handles the deletion of a client by id"
+      summary: "Deletes a expense"
+      description: "Handles the deletion of a expense by id"
       operationId: deleteExpense
       parameters:
         - $ref: "#/components/parameters/X-API-TOKEN"
@@ -3282,7 +3567,7 @@ paths:
     get:
       tags:
         - expenses
-      summary: "Shows a client for editting"
+      summary: "Shows a expense for editing"
       description: "Displays a client by id"
       operationId: editExpense
       parameters:
@@ -3299,7 +3584,7 @@ paths:
           example: D2J234DFA
       responses:
         200:
-          description: "Returns the client object"
+          description: "Returns the expense object"
           headers:
             X-MINIMUM-CLIENT-VERSION:
               $ref: "#/components/headers/X-MINIMUM-CLIENT-VERSION"
@@ -3323,7 +3608,7 @@ paths:
     get:
       tags:
         - expenses
-      summary: "Gets a new blank client object"
+      summary: "Gets a new blank expense object"
       description: "Returns a blank object with default values"
       operationId: getExpensesCreate
       parameters:
@@ -3332,7 +3617,7 @@ paths:
         - $ref: "#/components/parameters/include"
       responses:
         200:
-          description: "A blank client object"
+          description: "A blank expense object"
           headers:
             X-MINIMUM-CLIENT-VERSION:
               $ref: "#/components/headers/X-MINIMUM-CLIENT-VERSION"
@@ -3397,7 +3682,7 @@ paths:
         default:
           $ref: "#/components/responses/default"
   "/api/v1/expenses/{id}/upload":
-    put:
+    post:
       tags:
         - expense
       summary: "Uploads a document to a expense"
@@ -3415,6 +3700,23 @@ paths:
             type: string
             format: string
           example: D2J234DFA
+      requestBody:
+        description: "File Upload Body"
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                _method:
+                  type: string
+                  example: PUT
+                documents:
+                  type: array
+                  items:
+                    description: "Array of binary documents for upload"
+                    type: string
+                    format: binary
       responses:
         200:
           description: "Returns the Expense object"
@@ -3769,7 +4071,7 @@ paths:
         default:
           $ref: "#/components/responses/default"
   "/api/v1/group_settings/{id}/upload":
-    put:
+    post:
       tags:
         - group_settings
       summary: "Uploads a document to a group setting"
@@ -3787,6 +4089,23 @@ paths:
             type: string
             format: string
           example: D2J234DFA
+      requestBody:
+        description: "File Upload Body"
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                _method:
+                  type: string
+                  example: PUT
+                documents:
+                  type: array
+                  items:
+                    description: "Array of binary documents for upload"
+                    type: string
+                    format: binary
       responses:
         200:
           description: "Returns the Group Setting object"
@@ -4629,8 +4948,8 @@ paths:
     post:
       tags:
         - recurring_expenses
-      summary: "Adds a client"
-      description: "Adds an client to a company"
+      summary: "Adds a recurring expense"
+      description: "Adds a recurring expense to a company"
       operationId: storeRecurringExpense
       parameters:
         - $ref: "#/components/parameters/X-API-TOKEN"
@@ -4638,7 +4957,7 @@ paths:
         - $ref: "#/components/parameters/include"
       responses:
         200:
-          description: "Returns the saved client object"
+          description: "Returns the saved recurring expense object"
           headers:
             X-MINIMUM-CLIENT-VERSION:
               $ref: "#/components/headers/X-MINIMUM-CLIENT-VERSION"
@@ -4662,8 +4981,8 @@ paths:
     get:
       tags:
         - recurring_expenses
-      summary: "Shows a client"
-      description: "Displays a client by id"
+      summary: "Shows a recurring expense"
+      description: "Displays a recurring expense by id"
       operationId: showRecurringExpense
       parameters:
         - $ref: "#/components/parameters/X-API-TOKEN"
@@ -4702,8 +5021,8 @@ paths:
     put:
       tags:
         - recurring_expenses
-      summary: "Updates a client"
-      description: "Handles the updating of a client by id"
+      summary: "Updates a recurring expense"
+      description: "Handles the updating of a recurring expense by id"
       operationId: updateRecurringExpense
       parameters:
         - $ref: "#/components/parameters/X-API-TOKEN"
@@ -4719,7 +5038,7 @@ paths:
           example: D2J234DFA
       responses:
         200:
-          description: "Returns the client object"
+          description: "Returns the recurring expense object"
           headers:
             X-MINIMUM-CLIENT-VERSION:
               $ref: "#/components/headers/X-MINIMUM-CLIENT-VERSION"
@@ -4742,8 +5061,8 @@ paths:
     delete:
       tags:
         - recurring_expenses
-      summary: "Deletes a client"
-      description: "Handles the deletion of a client by id"
+      summary: "Deletes a recurring expense"
+      description: "Handles the deletion of a recurring expense by id"
       operationId: deleteRecurringExpense
       parameters:
         - $ref: "#/components/parameters/X-API-TOKEN"
@@ -4779,8 +5098,8 @@ paths:
     get:
       tags:
         - recurring_expenses
-      summary: "Shows a client for editting"
-      description: "Displays a client by id"
+      summary: "Shows a recurring expense for editting"
+      description: "Displays a recurring expense by id"
       operationId: editRecurringExpense
       parameters:
         - $ref: "#/components/parameters/X-API-TOKEN"
@@ -4796,7 +5115,7 @@ paths:
           example: D2J234DFA
       responses:
         200:
-          description: "Returns the client object"
+          description: "Returns the recurring expense object"
           headers:
             X-MINIMUM-CLIENT-VERSION:
               $ref: "#/components/headers/X-MINIMUM-CLIENT-VERSION"
@@ -4820,7 +5139,7 @@ paths:
     get:
       tags:
         - recurring_expenses
-      summary: "Gets a new blank client object"
+      summary: "Gets a new blank recurring expense object"
       description: "Returns a blank object with default values"
       operationId: getRecurringExpensesCreate
       parameters:
@@ -4829,7 +5148,7 @@ paths:
         - $ref: "#/components/parameters/include"
       responses:
         200:
-          description: "A blank client object"
+          description: "A blank recurring expense object"
           headers:
             X-MINIMUM-CLIENT-VERSION:
               $ref: "#/components/headers/X-MINIMUM-CLIENT-VERSION"
@@ -4894,7 +5213,7 @@ paths:
         default:
           $ref: "#/components/responses/default"
   "/api/v1/recurring_expenses/{id}/upload":
-    put:
+    post:
       tags:
         - recurring_expense
       summary: "Uploads a document to a recurring_expense"
@@ -4912,6 +5231,23 @@ paths:
             type: string
             format: string
           example: D2J234DFA
+      requestBody:
+        description: "File Upload Body"
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                _method:
+                  type: string
+                  example: PUT
+                documents:
+                  type: array
+                  items:
+                    description: "Array of binary documents for upload"
+                    type: string
+                    format: binary
       responses:
         200:
           description: "Returns the RecurringExpense object"

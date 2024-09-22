@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -31,7 +31,7 @@ class CompanyLedgerController extends BaseController
      * Store a newly created resource in storage.
      *
      * @param ShowCompanyLedgerRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      * @OA\Get(
      *      path="/api/v1/company_ledger",
@@ -64,7 +64,11 @@ class CompanyLedgerController extends BaseController
      */
     public function index(ShowCompanyLedgerRequest $request)
     {
-        $company_ledger = CompanyLedger::where('company_id', auth()->user()->company()->id)->orderBy('id', 'ASC');
+
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        $company_ledger = CompanyLedger::where('company_id', $user->company()->id)->orderBy('id', 'ASC');
 
         return $this->listResponse($company_ledger);
     }

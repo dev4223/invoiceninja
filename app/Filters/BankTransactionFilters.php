@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -30,7 +30,7 @@ class BankTransactionFilters extends QueryFilters
         if (strlen($name) == 0) {
             return $this->builder;
         }
-        
+
         return $this->builder->where('bank_account_name', 'like', '%'.$name.'%');
     }
 
@@ -53,19 +53,19 @@ class BankTransactionFilters extends QueryFilters
     }
 
 
-/**
-     * Filter based on client status.
-     *
-     * Statuses we need to handle
-     * - all
-     * - unmatched
-     * - matched
-     * - converted
-     * - deposits
-     * - withdrawals
-     *
-     * @return Builder
-     */
+    /**
+         * Filter based on client status.
+         *
+         * Statuses we need to handle
+         * - all
+         * - unmatched
+         * - matched
+         * - converted
+         * - deposits
+         * - withdrawals
+         *
+         * @return Builder
+         */
     public function client_status(string $value = ''): Builder
     {
         if (strlen($value) == 0) {
@@ -80,7 +80,7 @@ class BankTransactionFilters extends QueryFilters
 
         $this->builder->where(function ($query) use ($status_parameters) {
             $status_array = [];
-            
+
             $debit_or_withdrawal_array = [];
 
             if (in_array('unmatched', $status_parameters)) {
@@ -103,16 +103,39 @@ class BankTransactionFilters extends QueryFilters
                 $debit_or_withdrawal_array[] = 'DEBIT';
             }
 
-            if (count($status_array) >=1) {
+            if (count($status_array) >= 1) {
                 $query->whereIn('status_id', $status_array);
             }
 
-            if (count($debit_or_withdrawal_array) >=1) {
+            if (count($debit_or_withdrawal_array) >= 1) {
                 $query->orWhereIn('base_type', $debit_or_withdrawal_array);
             }
         });
 
         return $this->builder;
+    }
+
+
+    /**
+     * Filters the list based on Bank Accounts.
+     *
+     * @param string $ids Comma Separated List of bank account ids
+     * @return Builder
+     */
+    public function bank_integration_ids(string $ids = ''): Builder
+    {
+        if(strlen($ids) == 0) {
+            return $this->builder;
+        }
+
+        $ids = $this->transformKeys(explode(",", $ids));
+
+        $this->builder->where(function ($query) use ($ids) {
+            $query->whereIn('bank_integration_id', $ids);
+        });
+
+        return $this->builder;
+
     }
 
     /**
@@ -128,13 +151,17 @@ class BankTransactionFilters extends QueryFilters
         if (!is_array($sort_col) || count($sort_col) != 2) {
             return $this->builder;
         }
-        
+
+        $dir = ($sort_col[1] == 'asc') ? 'asc' : 'desc';
+
         if ($sort_col[0] == 'deposit') {
-            return $this->builder->where('base_type', 'CREDIT')->orderBy('amount', $sort_col[1]);
+            return $this->builder->orderByRaw("(CASE WHEN base_type = 'CREDIT' THEN amount END) $dir")->orderBy('amount', $dir);
+            // return $this->builder->where('base_type', 'CREDIT')->orderBy('amount', $dir);
         }
 
         if ($sort_col[0] == 'withdrawal') {
-            return $this->builder->where('base_type', 'DEBIT')->orderBy('amount', $sort_col[1]);
+            return $this->builder->orderByRaw("(CASE WHEN base_type = 'DEBIT' THEN amount END) $dir")->orderBy('amount', $dir);
+            // return $this->builder->where('base_type', 'DEBIT')->orderBy('amount', $dir);
         }
 
         if ($sort_col[0] == 'status') {
@@ -145,7 +172,7 @@ class BankTransactionFilters extends QueryFilters
             return $this->builder;
         }
 
-        return $this->builder->orderBy($sort_col[0], $sort_col[1]);
+        return $this->builder->orderBy($sort_col[0], $dir);
     }
 
     /**

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -100,7 +100,7 @@ class TypeCheck extends Command
         $entity_settings = $this->checkSettingType($client->settings);
         $entity_settings->md5 = md5(time());
         $client->settings = $entity_settings;
-        $client->save();
+        $client->saveQuietly();
     }
 
     private function checkCompany($company)
@@ -119,7 +119,7 @@ class TypeCheck extends Command
             $entity_settings = $this->checkSettingType($client->settings);
             $entity_settings->md5 = md5(time());
             $client->settings = $entity_settings;
-            $client->save();
+            $client->saveQuietly();
         });
 
         Company::query()->cursor()->each(function ($company) {

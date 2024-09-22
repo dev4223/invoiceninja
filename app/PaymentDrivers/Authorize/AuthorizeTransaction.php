@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -14,16 +14,15 @@ namespace App\PaymentDrivers\Authorize;
 
 use App\Models\Invoice;
 use App\Utils\Traits\MakesHash;
+use App\PaymentDrivers\Authorize\FDSReview;
 use net\authorize\api\contract\v1\OrderType;
 use App\PaymentDrivers\AuthorizePaymentDriver;
 use net\authorize\api\contract\v1\PaymentType;
 use net\authorize\api\contract\v1\SettingType;
 use net\authorize\api\contract\v1\OpaqueDataType;
 use net\authorize\api\contract\v1\ExtendedAmountType;
-use net\authorize\api\contract\v1\PaymentProfileType;
 use net\authorize\api\contract\v1\TransactionRequestType;
 use net\authorize\api\contract\v1\CreateTransactionRequest;
-use net\authorize\api\contract\v1\CustomerProfilePaymentType;
 use net\authorize\api\controller\CreateTransactionController;
 
 /**
@@ -110,7 +109,7 @@ class AuthorizeTransaction
             $billto->setPhoneNumber(substr($this->authorize->client->phone, 0, 20));
         }
 
-//Assign to the transactionRequest field
+        //Assign to the transactionRequest field
 
         $transactionRequestType = new TransactionRequestType();
         $transactionRequestType->setTransactionType('authCaptureTransaction');
@@ -123,8 +122,9 @@ class AuthorizeTransaction
         $transactionRequestType->setPayment($paymentOne);
         $transactionRequestType->setCurrencyCode($this->authorize->client->currency()->code);
 
-        if($billto)
+        if($billto) {
             $transactionRequestType->setBillTo($billto);
+        }
 
         $request = new CreateTransactionRequest();
         $request->setMerchantAuthentication($this->authorize->merchant_authentication);
@@ -144,6 +144,12 @@ class AuthorizeTransaction
                 nlog(' Code : '.$tresponse->getMessages()[0]->getCode());
                 nlog(' Description : '.$tresponse->getMessages()[0]->getDescription());
                 nlog(print_r($tresponse->getMessages()[0], 1));
+
+                if($tresponse->getResponseCode() == "4") {
+                    //notify user that this transaction is being held under FDS review:
+                    FDSReview::dispatch((string)$tresponse->getTransId(), $this->authorize->payment_hash, $this->authorize->company_gateway->company->db);
+                }
+
             } else {
                 nlog('Transaction Failed ');
                 if ($tresponse->getErrors() != null) {

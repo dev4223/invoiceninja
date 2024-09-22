@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -54,14 +54,14 @@ class Backup extends BaseModel
         return $this->belongsTo(Activity::class);
     }
 
-    public function storeRemotely(?string $html, Client $client)
+    public function storeRemotely(?string $html, Client | Vendor $client_or_vendor)
     {
         if (! $html || strlen($html) == 0) {
             return;
         }
 
-        $path = $client->backup_path().'/';
-        $filename = now()->format('Y_m_d').'_'.md5(time()).'.html';
+        $path = $client_or_vendor->backup_path().'/';
+        $filename = now()->format('Y_m_d').'_'.md5(time()).'.html'; //@phpstan-ignore-line
         $file_path = $path.$filename;
 
         Storage::disk(config('filesystems.default'))->put($file_path, $html);

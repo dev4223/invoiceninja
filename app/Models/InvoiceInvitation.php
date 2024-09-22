@@ -4,22 +4,17 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
 
-use App\Events\Invoice\InvoiceWasUpdated;
-use App\Jobs\Entity\CreateEntityPdf;
-use App\Utils\Ninja;
 use App\Utils\Traits\Inviteable;
 use App\Utils\Traits\MakesDates;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * App\Models\InvoiceInvitation
@@ -27,8 +22,8 @@ use Illuminate\Support\Facades\Storage;
  * @property int $id
  * @property int $company_id
  * @property int $user_id
- * @property int $client_contact_id
- * @property int $invoice_id
+ * @property int|null $client_contact_id
+ * @property int|null $invoice_id
  * @property string $key
  * @property string|null $transaction_reference
  * @property string|null $message_id
@@ -102,6 +97,11 @@ class InvoiceInvitation extends BaseModel
         return self::class;
     }
 
+    public function getEntityString(): string
+    {
+        return 'invoice';
+    }
+
     public function entityType()
     {
         return Invoice::class;
@@ -158,15 +158,4 @@ class InvoiceInvitation extends BaseModel
         $this->save();
     }
 
-    public function pdf_file_path(): string
-    {
-        $storage_path = Storage::url($this->invoice->client->invoice_filepath($this).$this->invoice->numberFormatter().'.pdf');
-
-        if (! Storage::exists($this->invoice->client->invoice_filepath($this).$this->invoice->numberFormatter().'.pdf')) {
-            event(new InvoiceWasUpdated($this->invoice, $this->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
-            (new CreateEntityPdf($this))->handle();
-        }
-
-        return $storage_path;
-    }
 }

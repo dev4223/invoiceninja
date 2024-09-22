@@ -4,26 +4,26 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers;
 
-use App\Models\PaymentTerm;
-use Illuminate\Http\Response;
-use App\Utils\Traits\MakesHash;
 use App\Factory\PaymentTermFactory;
 use App\Filters\PaymentTermFilters;
-use App\Repositories\PaymentTermRepository;
-use App\Transformers\PaymentTermTransformer;
+use App\Http\Requests\PaymentTerm\CreatePaymentTermRequest;
+use App\Http\Requests\PaymentTerm\DestroyPaymentTermRequest;
 use App\Http\Requests\PaymentTerm\EditPaymentTermRequest;
 use App\Http\Requests\PaymentTerm\ShowPaymentTermRequest;
 use App\Http\Requests\PaymentTerm\StorePaymentTermRequest;
-use App\Http\Requests\PaymentTerm\CreatePaymentTermRequest;
 use App\Http\Requests\PaymentTerm\UpdatePaymentTermRequest;
-use App\Http\Requests\PaymentTerm\DestroyPaymentTermRequest;
+use App\Models\PaymentTerm;
+use App\Repositories\PaymentTermRepository;
+use App\Transformers\PaymentTermTransformer;
+use App\Utils\Traits\MakesHash;
+use Illuminate\Http\Response;
 
 class PaymentTermController extends BaseController
 {
@@ -94,7 +94,7 @@ class PaymentTermController extends BaseController
      *
      * @param CreatePaymentTermRequest $request The request
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -142,7 +142,7 @@ class PaymentTermController extends BaseController
      *
      * @param StorePaymentTermRequest $request The request
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -236,7 +236,7 @@ class PaymentTermController extends BaseController
      *     )
      * @param ShowPaymentTermRequest $request
      * @param PaymentTerm $payment_term
-     * @return Response|mixed
+     * @return Response| \Illuminate\Http\JsonResponse|mixed
      */
     public function show(ShowPaymentTermRequest $request, PaymentTerm $payment_term)
     {
@@ -286,7 +286,7 @@ class PaymentTermController extends BaseController
      *     )
      * @param EditPaymentTermRequest $request
      * @param PaymentTerm $payment_term
-     * @return Response|mixed
+     * @return Response| \Illuminate\Http\JsonResponse|mixed
      */
     public function edit(EditPaymentTermRequest $request, PaymentTerm $payment_term)
     {
@@ -299,7 +299,7 @@ class PaymentTermController extends BaseController
      * @param UpdatePaymentTermRequest $request  The request
      * @param PaymentTerm $payment_term   The payment term
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Put(
@@ -411,7 +411,7 @@ class PaymentTermController extends BaseController
     /**
      * Perform bulk actions on the list view.
      *
-     * @return \Illuminate\Support\Collection
+     * @return \Illuminate\Http\Response|\Illuminate\Http\JsonResponse
      *
      *
      * @OA\Post(

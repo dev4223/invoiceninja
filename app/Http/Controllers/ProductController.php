@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -83,7 +83,7 @@ class ProductController extends BaseController
      *       ),
      *     )
      * @param ProductFilters $filters
-     * @return Response|mixed
+     * @return Response| \Illuminate\Http\JsonResponse|mixed
      */
     public function index(ProductFilters $filters)
     {
@@ -96,7 +96,7 @@ class ProductController extends BaseController
      * Show the form for creating a new resource.
      *
      * @param CreateProductRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -132,7 +132,11 @@ class ProductController extends BaseController
      */
     public function create(CreateProductRequest $request)
     {
-        $product = ProductFactory::create(auth()->user()->company()->id, auth()->user()->id);
+
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        $product = ProductFactory::create($user->company()->id, auth()->user()->id);
 
         return $this->itemResponse($product);
     }
@@ -141,7 +145,7 @@ class ProductController extends BaseController
      * Store a newly created resource in storage.
      *
      * @param StoreProductRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -177,7 +181,11 @@ class ProductController extends BaseController
      */
     public function store(StoreProductRequest $request)
     {
-        $product = $this->product_repo->save($request->all(), ProductFactory::create(auth()->user()->company()->id, auth()->user()->id));
+
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        $product = $this->product_repo->save($request->all(), ProductFactory::create($user->company()->id, auth()->user()->id));
 
         return $this->itemResponse($product);
     }
@@ -187,7 +195,7 @@ class ProductController extends BaseController
      *
      * @param ShowProductRequest $request
      * @param Product $product
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -241,7 +249,7 @@ class ProductController extends BaseController
      *
      * @param EditProductRequest $request
      * @param Product $product
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      * @OA\Get(
      *      path="/api/v1/products/{id}/edit",
@@ -294,7 +302,7 @@ class ProductController extends BaseController
      *
      * @param UpdateProductRequest $request
      * @param Product $product
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Put(
@@ -354,7 +362,7 @@ class ProductController extends BaseController
      *
      * @param DestroyProductRequest $request
      * @param Product $product
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @throws \Exception
@@ -408,7 +416,7 @@ class ProductController extends BaseController
     /**
      * Perform bulk actions on the list view.
      *
-     * @return \Illuminate\Support\Collection
+     * @return \Illuminate\Http\Response|\Illuminate\Http\JsonResponse
      *
      *
      * @OA\Post(
@@ -458,16 +466,17 @@ class ProductController extends BaseController
      */
     public function bulk(BulkProductRequest $request)
     {
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
         $action = $request->input('action');
 
         $ids = $request->input('ids');
 
         $products = Product::withTrashed()->whereIn('id', $ids);
 
-        nlog($products->count());
+        if($action == 'set_tax_id') {
 
-        if($action == 'set_tax_id'){
-            
             $tax_id = $request->input('tax_id');
 
             $products->update(['tax_id' => $tax_id]);
@@ -475,8 +484,8 @@ class ProductController extends BaseController
             return $this->listResponse(Product::withTrashed()->whereIn('id', $ids));
         }
 
-        $products->cursor()->each(function ($product, $key) use ($action) {
-            if (auth()->user()->can('edit', $product)) {
+        $products->cursor()->each(function ($product, $key) use ($action, $user) {
+            if ($user->can('edit', $product)) {
                 $this->product_repo->{$action}($product);
             }
         });
@@ -489,7 +498,7 @@ class ProductController extends BaseController
      *
      * @param UploadProductRequest $request
      * @param Product $product
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int $account_id
  * @property int $company_id
  * @property int $user_id
+ * @property string $integration_type
  * @property string $provider_name
  * @property int $provider_id
  * @property int $bank_account_id
@@ -28,8 +29,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string|null $bank_account_status
  * @property string|null $bank_account_type
  * @property float $balance
- * @property int|null $currency
+ * @property string|null $currency
  * @property string $nickname
+ * @property string $nordigen_account_id
+ * @property string $nordigen_institution_id
  * @property string|null $from_date
  * @property bool $is_deleted
  * @property int|null $created_at
@@ -60,7 +63,7 @@ class BankIntegration extends BaseModel
 {
     use SoftDeletes;
     use Filterable;
-    
+
     protected $fillable = [
         'bank_account_name',
         'provider_name',
@@ -73,8 +76,9 @@ class BankIntegration extends BaseModel
         'auto_sync',
     ];
 
-    protected $dates = [
-    ];
+    public const INTEGRATION_TYPE_YODLEE = 'YODLEE';
+
+    public const INTEGRATION_TYPE_NORDIGEN = 'NORDIGEN';
 
     public function getEntityType()
     {

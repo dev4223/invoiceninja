@@ -4,22 +4,22 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\PaymentDrivers\Stripe;
 
-use App\Models\Payment;
-use App\Models\SystemLog;
-use App\Models\GatewayType;
-use App\Models\PaymentType;
-use App\Jobs\Util\SystemLogger;
 use App\Exceptions\PaymentFailed;
-use App\Models\ClientGatewayToken;
-use App\PaymentDrivers\StripePaymentDriver;
 use App\Http\Requests\ClientPortal\Payments\PaymentResponseRequest;
+use App\Jobs\Util\SystemLogger;
+use App\Models\ClientGatewayToken;
+use App\Models\GatewayType;
+use App\Models\Payment;
+use App\Models\PaymentType;
+use App\Models\SystemLog;
+use App\PaymentDrivers\StripePaymentDriver;
 
 class SEPA
 {
@@ -148,7 +148,7 @@ class SEPA
         try {
             $method = $this->stripe->getStripePaymentMethod($intent->payment_method);
 
-            $payment_meta = new \stdClass;
+            $payment_meta = new \stdClass();
             $payment_meta->brand = (string) \sprintf('%s (%s)', $method->sepa_debit->bank_code, ctrans('texts.sepa'));
             $payment_meta->last4 = (string) $method->sepa_debit->last4;
             $payment_meta->state = 'authorized';

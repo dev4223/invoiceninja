@@ -4,25 +4,24 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Jobs\Client;
 
+use App\Libraries\MultiDB;
 use App\Models\Client;
 use App\Models\Company;
-use App\Libraries\MultiDB;
-use Illuminate\Bus\Queueable;
-use App\DataProviders\USStates;
-use App\Utils\Traits\MakesHash;
 use App\Services\Tax\TaxService;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Queue\InteractsWithQueue;
+use App\Utils\Traits\MakesHash;
+use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Queue\SerializesModels;
 
 class CheckVat implements ShouldQueue
 {
@@ -59,7 +58,7 @@ class CheckVat implements ShouldQueue
 
     public function middleware()
     {
-        return [new WithoutOverlapping($this->client->id)];
+        return [new WithoutOverlapping($this->client->client_hash)];
     }
 
 }

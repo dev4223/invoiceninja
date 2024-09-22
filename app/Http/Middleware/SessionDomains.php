@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -32,8 +32,7 @@ class SessionDomains
 
         $domain_name = $request->getHost();
 
-        if (strpos($domain_name, 'invoicing.co') !== false) {
-            // config(['session.domain' => '.invoicing.co']);
+        if (strpos($domain_name, config('ninja.app_domain')) !== false) {
         } else {
             config(['session.domain' => $domain_name]);
         }

@@ -4,35 +4,31 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
 
-use App\Utils\Ninja;
-use Illuminate\Support\Carbon;
-use App\Utils\Traits\MakesHash;
-use App\Utils\Traits\MakesDates;
 use App\Helpers\Invoice\InvoiceSum;
-use App\Jobs\Entity\CreateEntityPdf;
-use App\Utils\Traits\MakesReminders;
+use App\Helpers\Invoice\InvoiceSumInclusive;
+use App\Models\Presenters\CreditPresenter;
 use App\Services\Credit\CreditService;
 use App\Services\Ledger\LedgerService;
-use Illuminate\Support\Facades\Storage;
+use App\Utils\Traits\MakesDates;
+use App\Utils\Traits\MakesHash;
 use App\Utils\Traits\MakesInvoiceValues;
-use Laracasts\Presenter\PresentableTrait;
-use App\Models\Presenters\CreditPresenter;
-use App\Helpers\Invoice\InvoiceSumInclusive;
+use App\Utils\Traits\MakesReminders;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Carbon;
+use Laracasts\Presenter\PresentableTrait;
 
 /**
  * App\Models\Credit
  *
  * @property int $id
+ * @property object|null $e_invoice
  * @property int $client_id
  * @property int $user_id
  * @property int|null $assigned_user_id
@@ -50,7 +46,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  * @property string|null $date
  * @property string|null $last_sent_date
  * @property string|null $due_date
- * @property int $is_deleted
+ * @property bool $is_deleted
  * @property array|null $line_items
  * @property object|null $backup
  * @property string|null $footer
@@ -64,7 +60,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  * @property string|null $tax_name3
  * @property float $tax_rate3
  * @property string $total_taxes
- * @property int $uses_inclusive_taxes
+ * @property bool $uses_inclusive_taxes
  * @property string|null $custom_value1
  * @property string|null $custom_value2
  * @property string|null $custom_value3
@@ -125,7 +121,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\CreditInvitation> $invitations
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Invoice> $invoices
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Payment> $payments
- * 
+ *
  * @mixin \Eloquent
  */
 class Credit extends BaseModel
@@ -184,18 +180,19 @@ class Credit extends BaseModel
         'created_at' => 'timestamp',
         'deleted_at' => 'timestamp',
         'is_amount_discount' => 'bool',
+        'e_invoice' => 'object',
 
     ];
 
     protected $touches = [];
 
-    const STATUS_DRAFT = 1;
+    public const STATUS_DRAFT = 1;
 
-    const STATUS_SENT = 2;
+    public const STATUS_SENT = 2;
 
-    const STATUS_PARTIAL = 3;
+    public const STATUS_PARTIAL = 3;
 
-    const STATUS_APPLIED = 4;
+    public const STATUS_APPLIED = 4;
 
     public function getEntityType()
     {
@@ -209,7 +206,7 @@ class Credit extends BaseModel
 
     public function getDueDateAttribute($value)
     {
-        return $this->dateMutator($value);
+        return $value ? $this->dateMutator($value) : null;
     }
 
     public function getPartialDueDateAttribute($value)
@@ -358,53 +355,6 @@ class Credit extends BaseModel
     {
         $this->status_id = $status;
         $this->saveQuietly();
-    }
-
-    public function pdf_file_path($invitation = null, string $type = 'path', bool $portal = false)
-    {
-        if (! $invitation) {
-            if ($this->invitations()->exists()) {
-                $invitation = $this->invitations()->first();
-            } else {
-                $this->service()->createInvitations();
-                $invitation = $this->invitations()->first();
-            }
-        }
-
-        if (! $invitation) {
-            throw new \Exception('Hard fail, could not create an invitation - is there a valid contact?');
-        }
-
-        $file_path = $this->client->credit_filepath($invitation).$this->numberFormatter().'.pdf';
-
-        if (Ninja::isHosted() && $portal && Storage::disk(config('filesystems.default'))->exists($file_path)) {
-            return Storage::disk(config('filesystems.default'))->{$type}($file_path);
-        } elseif (Ninja::isHosted() && $portal) {
-            $file_path = (new CreateEntityPdf($invitation, config('filesystems.default')))->handle();
-
-            return Storage::disk(config('filesystems.default'))->{$type}($file_path);
-        }
-
-        $file_exists = false;
-
-        try {
-            $file_exists = Storage::disk(config('filesystems.default'))->exists($file_path);
-        } catch (\Exception $e) {
-            nlog($e->getMessage());
-        }
-
-        if ($file_exists) {
-            return Storage::disk(config('filesystems.default'))->{$type}($file_path);
-        }
-
-
-        if (Storage::disk('public')->exists($file_path)) {
-            return Storage::disk('public')->{$type}($file_path);
-        }
-
-        $file_path = (new CreateEntityPdf($invitation))->handle();
-
-        return Storage::disk('public')->{$type}($file_path);
     }
 
     public function markInvitationsSent()

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -89,11 +89,11 @@ class ClientGatewayTokenController extends BaseController
      *       ),
      *     )
      * @param ListClientGatewayTokenRequest $request
-     * @return Response|mixed
+     * @return Response| \Illuminate\Http\JsonResponse|mixed
      */
     public function index(ListClientGatewayTokenRequest $request)
     {
-        $client_gateway_token_gateway_tokens = ClientGatewayToken::scope();
+        $client_gateway_token_gateway_tokens = ClientGatewayToken::query()->company();
 
         return $this->listResponse($client_gateway_token_gateway_tokens);
     }
@@ -103,7 +103,7 @@ class ClientGatewayTokenController extends BaseController
      *
      * @param ShowClientGatewayTokenRequest $request
      * @param ClientGatewayToken $client_gateway_token
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -157,7 +157,7 @@ class ClientGatewayTokenController extends BaseController
      *
      * @param EditClientGatewayTokenRequest $request
      * @param ClientGatewayToken $client_gateway_token
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -211,7 +211,7 @@ class ClientGatewayTokenController extends BaseController
      *
      * @param UpdateClientGatewayTokenRequest $request
      * @param ClientGatewayToken $client_gateway_token
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -267,7 +267,7 @@ class ClientGatewayTokenController extends BaseController
      * Show the form for creating a new resource.
      *
      * @param CreateClientGatewayTokenRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -303,7 +303,10 @@ class ClientGatewayTokenController extends BaseController
      */
     public function create(CreateClientGatewayTokenRequest $request)
     {
-        $client_gateway_token = ClientGatewayTokenFactory::create(auth()->user()->company()->id);
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        $client_gateway_token = ClientGatewayTokenFactory::create($user->company()->id);
 
         $client_gateway_token = $this->client_gateway_token_repo->save($request->all(), $client_gateway_token);
 
@@ -314,7 +317,7 @@ class ClientGatewayTokenController extends BaseController
      * Store a newly created resource in storage.
      *
      * @param StoreClientGatewayTokenRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -350,7 +353,11 @@ class ClientGatewayTokenController extends BaseController
      */
     public function store(StoreClientGatewayTokenRequest $request)
     {
-        $client_gateway_token = ClientGatewayTokenFactory::create(auth()->user()->company()->id);
+
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        $client_gateway_token = ClientGatewayTokenFactory::create($user->company()->id);
 
         $client_gateway_token = $this->client_gateway_token_repo->save($request->all(), $client_gateway_token);
 
@@ -362,7 +369,7 @@ class ClientGatewayTokenController extends BaseController
      *
      * @param DestroyClientGatewayTokenRequest $request
      * @param ClientGatewayToken $client_gateway_token
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @throws \Exception

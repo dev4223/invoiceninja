@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -34,31 +34,31 @@ use Laracasts\Presenter\PresentableTrait;
  * @property int|null $vendor_id
  * @property int $status_id
  * @property float $discount
- * @property int $is_amount_discount
+ * @property bool $is_amount_discount
  * @property string|null $number
  * @property string|null $po_number
  * @property string|null $date
  * @property string|null $due_date
- * @property int $is_deleted
- * @property object|null $line_items
+ * @property bool $is_deleted
+ * @property array $line_items
  * @property object|null $backup
  * @property string|null $footer
  * @property string|null $public_notes
  * @property string|null $private_notes
  * @property string|null $terms
  * @property string|null $tax_name1
- * @property string $tax_rate1
+ * @property float $tax_rate1
  * @property string|null $tax_name2
- * @property string $tax_rate2
+ * @property float $tax_rate2
  * @property string|null $tax_name3
- * @property string $tax_rate3
- * @property string $total_taxes
+ * @property float $tax_rate3
+ * @property float $total_taxes
  * @property string|null $custom_value1
  * @property string|null $custom_value2
  * @property string|null $custom_value3
  * @property string|null $custom_value4
- * @property string $amount
- * @property string $balance
+ * @property float $amount
+ * @property float $balance
  * @property string|null $last_viewed
  * @property int $frequency_id
  * @property int $design_id
@@ -69,22 +69,22 @@ use Laracasts\Presenter\PresentableTrait;
  * @property int|null $updated_at
  * @property int|null $deleted_at
  * @property string $auto_bill
- * @property int $auto_bill_enabled
- * @property string $paid_to_date
- * @property string|null $custom_surcharge1
- * @property string|null $custom_surcharge2
- * @property string|null $custom_surcharge3
- * @property string|null $custom_surcharge4
+ * @property bool $auto_bill_enabled
+ * @property float $paid_to_date
+ * @property float|null $custom_surcharge1
+ * @property float|null $custom_surcharge2
+ * @property float|null $custom_surcharge3
+ * @property float|null $custom_surcharge4
  * @property int $custom_surcharge_tax1
  * @property int $custom_surcharge_tax2
  * @property int $custom_surcharge_tax3
  * @property int $custom_surcharge_tax4
  * @property string|null $due_date_days
- * @property string $exchange_rate
+ * @property float $exchange_rate
  * @property float|null $partial
  * @property string|null $partial_due_date
  * @property int|null $subscription_id
- * @property int $uses_inclusive_taxes
+ * @property bool $uses_inclusive_taxes
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Activity> $activities
  * @property-read int|null $activities_count
  * @property-read \App\Models\User|null $assigned_user
@@ -134,44 +134,44 @@ class RecurringQuote extends BaseModel
     /**
      * Quote Statuses.
      */
-    const STATUS_DRAFT = 1;
+    public const STATUS_DRAFT = 1;
 
-    const STATUS_ACTIVE = 2;
+    public const STATUS_ACTIVE = 2;
 
-    const STATUS_PAUSED = 3;
+    public const STATUS_PAUSED = 3;
 
-    const STATUS_COMPLETED = 4;
+    public const STATUS_COMPLETED = 4;
 
-    const STATUS_PENDING = -1;
+    public const STATUS_PENDING = -1;
 
     /**
      * Quote Frequencies.
      */
-    const FREQUENCY_DAILY = 1;
+    public const FREQUENCY_DAILY = 1;
 
-    const FREQUENCY_WEEKLY = 2;
+    public const FREQUENCY_WEEKLY = 2;
 
-    const FREQUENCY_TWO_WEEKS = 3;
+    public const FREQUENCY_TWO_WEEKS = 3;
 
-    const FREQUENCY_FOUR_WEEKS = 4;
+    public const FREQUENCY_FOUR_WEEKS = 4;
 
-    const FREQUENCY_MONTHLY = 5;
+    public const FREQUENCY_MONTHLY = 5;
 
-    const FREQUENCY_TWO_MONTHS = 6;
+    public const FREQUENCY_TWO_MONTHS = 6;
 
-    const FREQUENCY_THREE_MONTHS = 7;
+    public const FREQUENCY_THREE_MONTHS = 7;
 
-    const FREQUENCY_FOUR_MONTHS = 8;
+    public const FREQUENCY_FOUR_MONTHS = 8;
 
-    const FREQUENCY_SIX_MONTHS = 9;
+    public const FREQUENCY_SIX_MONTHS = 9;
 
-    const FREQUENCY_ANNUALLY = 10;
+    public const FREQUENCY_ANNUALLY = 10;
 
-    const FREQUENCY_TWO_YEARS = 11;
+    public const FREQUENCY_TWO_YEARS = 11;
 
-    const FREQUENCY_THREE_YEARS = 12;
+    public const FREQUENCY_THREE_YEARS = 12;
 
-    const RECURS_INDEFINITELY = -1;
+    public const RECURS_INDEFINITELY = -1;
 
     protected $fillable = [
         'client_id',
@@ -326,7 +326,7 @@ class RecurringQuote extends BaseModel
         }
     }
 
-    public function nextSendDate() :?Carbon
+    public function nextSendDate(): ?Carbon
     {
         if (! $this->next_send_date) {
             return null;
@@ -406,7 +406,7 @@ class RecurringQuote extends BaseModel
         }
     }
 
-    public function remainingCycles() : int
+    public function remainingCycles(): int
     {
         if ($this->remaining_cycles == 0) {
             return 0;
@@ -417,7 +417,7 @@ class RecurringQuote extends BaseModel
         }
     }
 
-    public function setCompleted() :  void
+    public function setCompleted(): void
     {
         $this->status_id = self::STATUS_COMPLETED;
         $this->next_send_date = null;
@@ -443,7 +443,7 @@ class RecurringQuote extends BaseModel
         }
     }
 
-    public static function frequencyForKey(int $frequency_id) :string
+    public static function frequencyForKey(int $frequency_id): string
     {
         switch ($frequency_id) {
             case self::FREQUENCY_DAILY:
@@ -482,9 +482,9 @@ class RecurringQuote extends BaseModel
     {
         $invoice_calc = null;
 
-        if ($this->uses_inclusive_taxes) {            
+        if ($this->uses_inclusive_taxes) {
             $invoice_calc = new InvoiceSumInclusive($this);
-        } else {            
+        } else {
             $invoice_calc = new InvoiceSum($this);
         }
 
@@ -549,7 +549,7 @@ class RecurringQuote extends BaseModel
             case 'terms':
                 return $this->calculateDateFromTerms($date);
             default:
-                return $this->setDayOfMonth($date, $this->due_date_days);
+                return $this->setDayOfMonth($date, ($this->due_date_days ?? 1));
         }
     }
 
@@ -569,14 +569,14 @@ class RecurringQuote extends BaseModel
             return null;
         }
 
-        return $new_date->addDays($client_payment_terms); //add the number of days in the payment terms to the date
+        return $new_date->addDays((int)$client_payment_terms); //add the number of days in the payment terms to the date
     }
 
     /**
      * Service entry points.
      * @return RecurringService
      */
-    public function service() :RecurringService
+    public function service(): RecurringService
     {
         return new RecurringService($this);
     }

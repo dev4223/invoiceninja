@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -49,12 +49,12 @@ class PaymentObserver
         if ($payment->getOriginal('deleted_at') && !$payment->deleted_at) {
             $event = Webhook::EVENT_RESTORE_PAYMENT;
         }
-        
+
         if ($payment->is_deleted) {
             $event = Webhook::EVENT_DELETE_PAYMENT;
         }
-        
-        
+
+
         $subscriptions = Webhook::where('company_id', $payment->company_id)
                                     ->where('event_id', $event)
                                     ->exists();

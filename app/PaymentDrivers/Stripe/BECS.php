@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -144,7 +144,7 @@ class BECS
         try {
             $method = $this->stripe->getStripePaymentMethod($intent->payment_method);
 
-            $payment_meta = new \stdClass;
+            $payment_meta = new \stdClass();
             $payment_meta->brand = (string) \sprintf('%s (%s)', $method->au_becs_debit->bank_code, ctrans('texts.becs'));
             $payment_meta->last4 = (string) $method->au_becs_debit->last4;
             $payment_meta->state = 'authorized';

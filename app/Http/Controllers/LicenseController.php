@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -28,7 +28,7 @@ class LicenseController extends BaseController
     /**
      * Claim a white label license.
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      * @OA\Get(
      *      path="/api/v1/claim_license",
@@ -90,7 +90,7 @@ class LicenseController extends BaseController
 
             if(substr($license_key, 0, 3) == 'v5_') {
                 return $this->v5ClaimLicense($license_key, $product_id);
-            } 
+            }
 
             $url = config('ninja.license_url')."/claim_license?license_key={$license_key}&product_id={$product_id}&get_date=true";
             $data = trim(CurlUtils::get($url));
@@ -98,7 +98,7 @@ class LicenseController extends BaseController
             if ($data == Account::RESULT_FAILURE) {
                 $error = [
                     'message' => trans('texts.invalid_white_label_license'),
-                    'errors' => new stdClass,
+                    'errors' => new stdClass(),
                 ];
 
                 return response()->json($error, 400);
@@ -108,7 +108,7 @@ class LicenseController extends BaseController
                 if ($date < date_create()) {
                     $error = [
                         'message' => trans('texts.invalid_white_label_license'),
-                        'errors' => new stdClass,
+                        'errors' => new stdClass(),
                     ];
                     $account = auth()->user()->account;
                     $account->plan_term = Account::PLAN_TERM_YEARLY;
@@ -129,7 +129,7 @@ class LicenseController extends BaseController
 
                     $error = [
                         'message' => trans('texts.bought_white_label'),
-                        'errors' => new stdClass,
+                        'errors' => new stdClass(),
                     ];
 
                     return response()->json($error, 200);
@@ -137,7 +137,7 @@ class LicenseController extends BaseController
             } else {
                 $error = [
                     'message' => 'There was an issue connecting to the license server. Please check your network.',
-                    'errors' => new stdClass,
+                    'errors' => new stdClass(),
                 ];
 
                 return response()->json($error, 400);
@@ -146,7 +146,7 @@ class LicenseController extends BaseController
 
         $error = [
             'message' => ctrans('texts.invoice_license_or_environment', ['environment' => config('ninja.environment')]),
-            'errors' => new stdClass,
+            'errors' => new stdClass(),
         ];
 
         return response()->json($error, 400);
@@ -158,7 +158,6 @@ class LicenseController extends BaseController
 
         /* Catch claim license requests */
         if (config('ninja.environment') == 'selfhost') {
-            // $response = Http::get( "http://ninja.test:8000/claim_license", [
             $response = Http::get("https://invoicing.co/claim_license", [
                 'license_key' => $license_key,
                 'product_id' => 3,
@@ -176,14 +175,14 @@ class LicenseController extends BaseController
 
                 $error = [
                     'message' => trans('texts.bought_white_label'),
-                    'errors' => new \stdClass,
+                    'errors' => new \stdClass(),
                 ];
 
                 return response()->json($error, 200);
             } else {
                 $error = [
                     'message' => trans('texts.white_label_license_error'),
-                    'errors' => new stdClass,
+                    'errors' => new stdClass(),
                 ];
 
                 return response()->json($error, 400);
@@ -192,7 +191,7 @@ class LicenseController extends BaseController
 
         $error = [
             'message' => ctrans('texts.invoice_license_or_environment', ['environment' => config('ninja.environment')]),
-            'errors' => new stdClass,
+            'errors' => new stdClass(),
         ];
 
         return response()->json($error, 400);

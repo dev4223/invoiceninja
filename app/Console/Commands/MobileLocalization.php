@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -61,12 +61,14 @@ class MobileLocalization extends Command
 
     private function laravelResources()
     {
-        $resources = $this->getResources();
+        $resources = (array)$this->getResources();
 
-        foreach ($resources as $key => $val) {
-            $transKey = "texts.{$key}";
-            if (trans($transKey) == $transKey) {
-                echo "'$key' => '$val',\n";
+        if(is_iterable($resources)) {
+            foreach ($resources as $key => $val) {
+                $transKey = "texts.{$key}";
+                if (trans($transKey) == $transKey) {
+                    echo "'$key' => '$val',\n";
+                }
             }
         }
     }

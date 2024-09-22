@@ -4,27 +4,28 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
 
-use App\Utils\Ninja;
 use App\Casts\EncryptedCast;
-use App\Utils\Traits\AppSetup;
-use App\Utils\Traits\MakesHash;
 use App\DataMapper\CompanySettings;
+use App\Models\Presenters\CompanyPresenter;
+use App\Services\Company\CompanyService;
+use App\Services\Notification\NotificationService;
+use App\Utils\Ninja;
+use App\Utils\Traits\AppSetup;
+use App\Utils\Traits\CompanySettingsSaver;
+use App\Utils\Traits\MakesHash;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Cache;
 use Laracasts\Presenter\PresentableTrait;
-use App\Utils\Traits\CompanySettingsSaver;
-use Illuminate\Notifications\Notification;
-use App\Models\Presenters\CompanyPresenter;
-use App\Services\Notification\NotificationService;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * App\Models\Company
@@ -58,7 +59,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $portal_domain
  * @property int $enable_modules
  * @property object $custom_fields
- * @property \App\DataMapper\CompanySettings $settings
+ * @property \App\DataMapper\CompanySettings|\stdClass $settings
  * @property string $slack_webhook_url
  * @property string $google_analytics_key
  * @property int|null $created_at
@@ -111,6 +112,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $notify_vendor_when_paid
  * @property int $invoice_task_hours
  * @property int $deleted_at
+ * @property string|null $smtp_username
+ * @property string|null $smtp_password
+ * @property string|null $smtp_host
+ * @property string|null $smtp_port
+ * @property string|null $smtp_encryption
+ * @property string|null $smtp_local_domain
+ * @property boolean $smtp_verify_peer
  * @property-read \App\Models\Account $account
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Activity> $activities
  * @property-read int|null $activities_count
@@ -351,12 +359,20 @@ class Company extends BaseModel
         'calculate_taxes',
         'tax_data',
         'e_invoice_certificate_passphrase',
+        'smtp_host',
+        'smtp_port',
+        'smtp_encryption',
+        'smtp_local_domain',
+        'smtp_verify_peer',
+        'e_invoice',
     ];
 
     protected $hidden = [
         'id',
         'db',
         'ip',
+        'smtp_username',
+        'smtp_password',
     ];
 
     protected $casts = [
@@ -371,6 +387,9 @@ class Company extends BaseModel
         'tax_data' => 'object',
         'origin_tax_data' => 'object',
         'e_invoice_certificate_passphrase' => EncryptedCast::class,
+        'smtp_username' => 'encrypted',
+        'smtp_password' => 'encrypted',
+        'e_invoice' => 'object',
     ];
 
     protected $with = [];
@@ -403,17 +422,17 @@ class Company extends BaseModel
         return $this->morphMany(Document::class, 'documentable');
     }
 
-    public function schedulers() :HasMany
+    public function schedulers(): HasMany
     {
         return $this->hasMany(Scheduler::class);
     }
 
-    public function task_schedulers() :HasMany
+    public function task_schedulers(): HasMany
     {
         return $this->hasMany(Scheduler::class);
     }
 
-    public function all_documents() :HasMany
+    public function all_documents(): HasMany
     {
         return $this->hasMany(Document::class);
     }
@@ -423,22 +442,22 @@ class Company extends BaseModel
         return self::class;
     }
 
-    public function ledger() :HasMany
+    public function ledger(): HasMany
     {
         return $this->hasMany(CompanyLedger::class);
     }
 
-    public function bank_integrations() :HasMany
+    public function bank_integrations(): HasMany
     {
-        return $this->hasMany(BankIntegration::class);
+        return $this->hasMany(BankIntegration::class)->withTrashed();
     }
 
-    public function bank_transactions() :HasMany
+    public function bank_transactions(): HasMany
     {
         return $this->hasMany(BankTransaction::class);
     }
 
-    public function bank_transaction_rules() :HasMany
+    public function bank_transaction_rules(): HasMany
     {
         return $this->hasMany(BankTransactionRule::class);
     }
@@ -453,7 +472,7 @@ class Company extends BaseModel
         return $this->belongsTo(Account::class);
     }
 
-    public function client_contacts() :HasMany
+    public function client_contacts(): HasMany
     {
         return $this->hasMany(ClientContact::class)->withTrashed();
     }
@@ -466,27 +485,27 @@ class Company extends BaseModel
         return $this->hasManyThrough(User::class, CompanyUser::class, 'company_id', 'id', 'id', 'user_id')->withTrashed();
     }
 
-    public function expense_categories() :HasMany
+    public function expense_categories(): HasMany
     {
         return $this->hasMany(ExpenseCategory::class)->withTrashed();
     }
 
-    public function subscriptions() :HasMany
+    public function subscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class)->withTrashed();
     }
 
-    public function purchase_orders() :HasMany
+    public function purchase_orders(): HasMany
     {
         return $this->hasMany(PurchaseOrder::class)->withTrashed();
     }
 
-    public function task_statuses() :HasMany
+    public function task_statuses(): HasMany
     {
         return $this->hasMany(TaskStatus::class)->withTrashed();
     }
 
-    public function clients() :HasMany
+    public function clients(): HasMany
     {
         return $this->hasMany(Client::class)->withTrashed();
     }
@@ -494,12 +513,12 @@ class Company extends BaseModel
     /**
      * @return HasMany
      */
-    public function tasks() :HasMany
+    public function tasks(): HasMany
     {
         return $this->hasMany(Task::class)->withTrashed();
     }
 
-    public function webhooks() :HasMany
+    public function webhooks(): HasMany
     {
         return $this->hasMany(Webhook::class);
     }
@@ -507,7 +526,7 @@ class Company extends BaseModel
     /**
      * @return HasMany
      */
-    public function projects() :HasMany
+    public function projects(): HasMany
     {
         return $this->hasMany(Project::class)->withTrashed();
     }
@@ -515,17 +534,25 @@ class Company extends BaseModel
     /**
      * @return HasMany
      */
-    public function vendors() :HasMany
+    public function vendor_contacts(): HasMany
+    {
+        return $this->hasMany(VendorContact::class)->withTrashed();
+    }
+
+    /**
+     * @return HasMany
+     */
+    public function vendors(): HasMany
     {
         return $this->hasMany(Vendor::class)->withTrashed();
     }
 
-    public function all_activities() :\Illuminate\Database\Eloquent\Relations\HasMany
+    public function all_activities(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Activity::class);
     }
 
-    public function activities() :HasMany
+    public function activities(): HasMany
     {
         return $this->hasMany(Activity::class)->orderBy('id', 'DESC')->take(50);
     }
@@ -609,20 +636,13 @@ class Company extends BaseModel
 
     public function country()
     {
-        $companies = Cache::get('countries');
 
-        if (! $companies) {
-            $this->buildCache(true);
+        /** @var \Illuminate\Support\Collection<\App\Models\Country> */
+        $countries = app('countries');
 
-            $companies = Cache::get('countries');
-        }
-
-        return $companies->filter(function ($item) {
+        return $countries->first(function ($item) {
             return $item->id == $this->getSetting('country_id');
-        })->first();
-
-//        return $this->belongsTo(Country::class);
-        // return Country::find($this->settings->country_id);
+        });
     }
 
     public function group_settings()
@@ -632,17 +652,14 @@ class Company extends BaseModel
 
     public function timezone()
     {
-        $timezones = Cache::get('timezones');
 
-        if (! $timezones) {
-            $this->buildCache(true);
-        }
+        /** @var \Illuminate\Support\Collection<\App\Models\TimeZone> */
+        $timezones = app('timezones');
 
-        return $timezones->filter(function ($item) {
+        return $timezones->first(function ($item) {
             return $item->id == $this->settings->timezone_id;
-        })->first();
+        });
 
-        // return Timezone::find($this->settings->timezone_id);
     }
 
     public function designs()
@@ -667,22 +684,15 @@ class Company extends BaseModel
 
     public function language()
     {
-        $languages = Cache::get('languages');
+        
+        /** @var \Illuminate\Support\Collection<\App\Models\Language> */
+        $languages = app('languages');
 
-        //build cache and reinit
-        if (! $languages) {
-            $this->buildCache(true);
-            $languages = Cache::get('languages');
-        }
-
-        //if the cache is still dead, get from DB
-        if (!$languages && property_exists($this->settings, 'language_id')) {
-            return Language::find($this->settings->language_id);
-        }
-
-        return $languages->filter(function ($item) {
+        $language = $languages->first(function ($item) {
             return $item->id == $this->settings->language_id;
-        })->first();
+        });
+
+        return $language ?? $languages->first();
     }
 
     public function getLocale()
@@ -690,7 +700,7 @@ class Company extends BaseModel
         return isset($this->settings->language_id) && $this->language() ? $this->language()->locale : config('ninja.i18n.locale');
     }
 
-    public function getLogo() :?string
+    public function getLogo(): ?string
     {
         return $this->settings->company_logo ?: null;
     }
@@ -704,7 +714,7 @@ class Company extends BaseModel
     {
         App::setLocale($this->getLocale());
     }
-    
+
     public function getSetting($setting)
     {
         //todo $this->setting ?? false
@@ -723,11 +733,13 @@ class Company extends BaseModel
 
     public function currency()
     {
-        $currencies = Cache::get('currencies');
+        
+        /** @var \Illuminate\Support\Collection<\App\Models\Currency> */
+        $currencies = app('currencies');
 
-        return $currencies->filter(function ($item) {
+        return $currencies->first(function ($item) {
             return $item->id == $this->settings->currency_id;
-        })->first();
+        });
     }
 
     /**
@@ -786,6 +798,26 @@ class Company extends BaseModel
         return $this->hasMany(CompanyUser::class)->withTrashed();
     }
 
+    public function invoice_invitations(): HasMany
+    {
+        return $this->hasMany(InvoiceInvitation::class);
+    }
+
+    public function quote_invitations(): HasMany
+    {
+        return $this->hasMany(QuoteInvitation::class);
+    }
+
+    public function credit_invitations(): HasMany
+    {
+        return $this->hasMany(CreditInvitation::class);
+    }
+
+    public function purchase_order_invitations(): HasMany
+    {
+        return $this->hasMany(PurchaseOrderInvitation::class);
+    }
+
     /**
      * @return \App\Models\User|null
      */
@@ -810,7 +842,6 @@ class Company extends BaseModel
                           ->get();
     }
 
-
     public function resolveRouteBinding($value, $field = null)
     {
         return $this->where('id', $this->decodePrimaryKey($value))
@@ -818,7 +849,7 @@ class Company extends BaseModel
                     ->firstOrFail();
     }
 
-    public function domain(): string 
+    public function domain(): string
     {
         if (Ninja::isHosted()) {
             if ($this->portal_mode == 'domain' && strlen($this->portal_domain) > 3) {
@@ -867,11 +898,11 @@ class Company extends BaseModel
 
     private function createRBit($type, $source, $properties)
     {
-        $data = new \stdClass;
+        $data = new \stdClass();
         $data->receive_time = time();
         $data->type = $type;
         $data->source = $source;
-        $data->properties = new \stdClass;
+        $data->properties = new \stdClass();
 
         foreach ($properties as $key => $val) {
             $data->properties->$key = $val;
@@ -882,9 +913,14 @@ class Company extends BaseModel
 
     public function utc_offset(): int
     {
+        $offset = 0;
         $timezone = $this->timezone();
 
-        return $timezone->utc_offset ?? 0;
+        date_default_timezone_set('GMT');
+        $date = new \DateTime("now", new \DateTimeZone($timezone->name));
+        $offset = $date->getOffset();
+
+        return $offset;
     }
 
     public function timezone_offset(): int
@@ -899,7 +935,10 @@ class Company extends BaseModel
 
         $timezone = $this->timezone();
 
-        $offset -= $timezone->utc_offset;
+        date_default_timezone_set('GMT');
+        $date = new \DateTime("now", new \DateTimeZone($timezone->name));
+        $offset -= $date->getOffset();
+
         $offset += ($entity_send_time * 3600);
 
         return $offset;
@@ -912,21 +951,20 @@ class Company extends BaseModel
 
     public function date_format()
     {
-        $date_formats = Cache::get('date_formats');
+        
+        /** @var \Illuminate\Support\Collection<\App\Models\DateFormat> */
+        $date_formats = app('date_formats');
 
-        if (! $date_formats) {
-            $this->buildCache(true);
-        }
-
-        return $date_formats->filter(function ($item) {
+        return $date_formats->first(function ($item) {
             return $item->id == $this->getSetting('date_format_id');
-        })->first()->format;
+        })->format;
     }
 
     public function getInvoiceCert()
     {
-        if($this->e_invoice_certificate)
+        if($this->e_invoice_certificate) {
             return base64_decode($this->e_invoice_certificate);
+        }
 
         return false;
     }
@@ -934,6 +972,11 @@ class Company extends BaseModel
     public function getSslPassPhrase()
     {
         return $this->e_invoice_certificate_passphrase;
+    }
+
+    public function service(): CompanyService
+    {
+        return new CompanyService($this);
     }
 
 }

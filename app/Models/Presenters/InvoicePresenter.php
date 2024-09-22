@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -23,7 +23,7 @@ use App\Utils\Traits\MakesDates;
  *
  * Shortcuts to other presenters are here to facilitate
  * a clean UI / UX
- * 
+ *
  * @property \App\Models\Invoice $entity
  */
 class InvoicePresenter extends EntityPresenter

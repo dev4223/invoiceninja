@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -25,7 +25,7 @@ class CompanyPolicy extends EntityPolicy
      * @param  User $user
      * @return bool
      */
-    public function create(User $user) : bool
+    public function create(User $user): bool
     {
         return $user->isAdmin() || $user->hasPermission('create_company') || $user->hasPermission('create_all');
     }
@@ -38,7 +38,7 @@ class CompanyPolicy extends EntityPolicy
      * @param  $entity
      * @return bool
      */
-    public function view(User $user, $entity) : bool
+    public function view(User $user, $entity): bool
     {
         return ($user->isAdmin() && $entity->id == $user->companyId())
             || ($user->hasPermission('view_'.strtolower(class_basename($entity))) && $entity->id == $user->companyId())
@@ -56,7 +56,7 @@ class CompanyPolicy extends EntityPolicy
      * @param  $entity
      * @return bool
      */
-    public function edit(User $user, $entity) : bool
+    public function edit(User $user, $entity): bool
     {
         return ($user->isAdmin() && $entity->id == $user->companyId())
             || ($user->hasPermission('edit_'.strtolower(class_basename($entity))) && $entity->id == $user->companyId())

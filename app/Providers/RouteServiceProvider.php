@@ -4,24 +4,24 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Providers;
 
-use App\Utils\Ninja;
-use App\Models\Scheduler;
-use Illuminate\Http\Request;
-use App\Utils\Traits\MakesHash;
-use Illuminate\Support\Facades\Route;
-use Illuminate\Cache\RateLimiting\Limit;
-use Illuminate\Support\Facades\RateLimiter;
 use App\Http\Middleware\ThrottleRequestsWithPredis;
-use Illuminate\Routing\Middleware\ThrottleRequests;
+use App\Models\Scheduler;
+use App\Utils\Ninja;
+use App\Utils\Traits\MakesHash;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\ModelNotFoundException as ModelNotFoundException;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
+use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 
 class RouteServiceProvider extends ServiceProvider
 {
@@ -35,8 +35,8 @@ class RouteServiceProvider extends ServiceProvider
     public function boot()
     {
         parent::boot();
-        
-        if (Ninja::isHosted() && !config('ninja.testvars.travis')){
+
+        if (Ninja::isHosted() && !config('ninja.testvars.travis')) {
             app('router')->aliasMiddleware('throttle', ThrottleRequestsWithPredis::class);
         } else {
             app('router')->aliasMiddleware('throttle', ThrottleRequests::class);
@@ -65,7 +65,7 @@ class RouteServiceProvider extends ServiceProvider
             if (Ninja::isSelfHost()) {
                 return Limit::none();
             } else {
-                return Limit::perMinute(300)->by($request->ip());
+                return Limit::perMinute(500)->by($request->ip());
             }
         });
 
@@ -92,8 +92,7 @@ class RouteServiceProvider extends ServiceProvider
         RateLimiter::for('portal', function (Request $request) {
             return Limit::perMinute(15)->by($request->ip());
         });
-
-
+        
     }
 
     /**

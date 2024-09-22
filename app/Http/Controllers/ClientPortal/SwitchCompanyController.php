@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -22,9 +22,10 @@ class SwitchCompanyController extends Controller
 
     public function __invoke(string $contact)
     {
-        $client_contact = ClientContact::where('email', auth()->user()->email)
-            ->where('id', $this->transformKeys($contact))
-            ->first();
+        $client_contact = ClientContact::query()
+                                       ->where('email', auth()->user()->email)
+                                       ->where('id', $this->transformKeys($contact))
+                                       ->firstOrFail();
 
         auth()->guard('contact')->loginUsingId($client_contact->id, true);
 

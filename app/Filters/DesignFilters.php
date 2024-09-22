@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -51,7 +51,26 @@ class DesignFilters extends QueryFilters
             return $this->builder;
         }
 
-        return $this->builder->orderBy($sort_col[0], $sort_col[1]);
+        $dir = ($sort_col[1] == 'asc') ? 'asc' : 'desc';
+
+        return $this->builder->orderBy($sort_col[0], $dir);
+    }
+
+    public function entities(string $entities = ''): Builder
+    {
+
+        if(stripos($entities, 'statement') !== false) {
+            $entities = 'client';
+        }
+
+        if (strlen($entities) == 0 || str_contains($entities, ',')) {
+            return $this->builder;
+        }
+
+        return $this->builder
+                    ->where('is_template', true)
+                    ->whereRaw('FIND_IN_SET( ? ,entities)', [trim($entities)]);
+
     }
 
     /**
@@ -64,9 +83,21 @@ class DesignFilters extends QueryFilters
         /** @var \App\Models\User $user */
         $user = auth()->user();
 
-        return  $this->builder->where(function ($query) use($user){
+        return  $this->builder->where(function ($query) use ($user) {
             $query->where('company_id', $user->company()->id)->orWhere('company_id', null)->orderBy('id', 'asc');
         });
+    }
+
+    public function template(string $template = 'false'): Builder
+    {
+
+        if (strlen($template) == 0) {
+            return $this->builder;
+        }
+
+        $bool_val = $template == 'true' ? true : false;
+
+        return $this->builder->where('is_template', $bool_val);
     }
 
     /**

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -59,7 +59,7 @@ class PortalComposer
      * @param  View  $view
      * @return void
      */
-    public function compose(View $view) :void
+    public function compose(View $view): void
     {
         $view->with($this->portalData());
 
@@ -73,11 +73,15 @@ class PortalComposer
     /**
      * @return array
      */
-    private function portalData() :array
+    private function portalData(): array
     {
         if (! auth()->guard('contact')->user()) {
             return [];
         }
+
+        auth()->guard('contact')->user()->loadMissing(['client' => function ($query) {
+            $query->without('gateway_tokens', 'documents'); // Exclude 'grandchildren' relation of 'client'
+        }]);
 
         $this->settings = auth()->guard('contact')->user()->client->getMergedSettings();
 
@@ -96,14 +100,14 @@ class PortalComposer
         return $data;
     }
 
-    private function sidebarMenu() :array
+    private function sidebarMenu(): array
     {
         $enabled_modules = auth()->guard('contact')->user()->company->enabled_modules;
         $data = [];
 
-        // TODO: Enable dashboard once it's completed.
-        // $this->settings->enable_client_portal_dashboard
-        // $data[] = [ 'title' => ctrans('texts.dashboard'), 'url' => 'client.dashboard', 'icon' => 'activity'];
+        if ($this->settings->enable_client_portal_dashboard) {
+            $data[] = [ 'title' => ctrans('texts.dashboard'), 'url' => 'client.dashboard', 'icon' => 'activity'];
+        }
 
         if (self::MODULE_INVOICES & $enabled_modules) {
             $data[] = ['title' => ctrans('texts.invoices'), 'url' => 'client.invoices.index', 'icon' => 'file-text'];
@@ -141,7 +145,7 @@ class PortalComposer
         if (auth()->guard('contact')->user()->client->getSetting('client_initiated_payments')) {
             $data[] = ['title' => ctrans('texts.pre_payment'), 'url' => 'client.pre_payments.index', 'icon' => 'dollar-sign'];
         }
-        
+
         return $data;
     }
 }

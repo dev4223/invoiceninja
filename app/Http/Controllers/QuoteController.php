@@ -4,46 +4,48 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers;
 
-use App\Utils\Ninja;
-use App\Models\Quote;
-use App\Models\Client;
-use App\Models\Account;
-use App\Models\Invoice;
-use Illuminate\Http\Request;
-use App\Factory\QuoteFactory;
-use App\Filters\QuoteFilters;
-use App\Jobs\Quote\ZipQuotes;
-use Illuminate\Http\Response;
-use App\Utils\Traits\MakesHash;
-use App\Factory\CloneQuoteFactory;
-use App\Services\PdfMaker\PdfMerge;
-use Illuminate\Support\Facades\App;
-use App\Utils\Traits\SavesDocuments;
 use App\Events\Quote\QuoteWasCreated;
 use App\Events\Quote\QuoteWasUpdated;
-use App\Repositories\QuoteRepository;
-use App\Transformers\QuoteTransformer;
-use App\Utils\Traits\GeneratesCounter;
-use Illuminate\Support\Facades\Storage;
-use App\Transformers\InvoiceTransformer;
+use App\Factory\CloneQuoteFactory;
 use App\Factory\CloneQuoteToInvoiceFactory;
-use App\Factory\CloneQuoteToProjectFactory;
+use App\Factory\QuoteFactory;
+use App\Filters\QuoteFilters;
+use App\Http\Requests\Quote\ActionQuoteRequest;
+use App\Http\Requests\Quote\BulkActionQuoteRequest;
+use App\Http\Requests\Quote\CreateQuoteRequest;
+use App\Http\Requests\Quote\DestroyQuoteRequest;
 use App\Http\Requests\Quote\EditQuoteRequest;
 use App\Http\Requests\Quote\ShowQuoteRequest;
 use App\Http\Requests\Quote\StoreQuoteRequest;
-use App\Http\Requests\Quote\ActionQuoteRequest;
-use App\Http\Requests\Quote\CreateQuoteRequest;
 use App\Http\Requests\Quote\UpdateQuoteRequest;
 use App\Http\Requests\Quote\UploadQuoteRequest;
-use App\Http\Requests\Quote\DestroyQuoteRequest;
-use App\Http\Requests\Quote\BulkActionQuoteRequest;
+use App\Jobs\Quote\ZipQuotes;
+use App\Models\Account;
+use App\Models\Client;
+use App\Models\Invoice;
+use App\Models\Project;
+use App\Models\Quote;
+use App\Repositories\QuoteRepository;
+use App\Services\PdfMaker\PdfMerge;
+use App\Services\Template\TemplateAction;
+use App\Transformers\InvoiceTransformer;
+use App\Transformers\ProjectTransformer;
+use App\Transformers\QuoteTransformer;
+use App\Utils\Ninja;
+use App\Utils\Traits\GeneratesCounter;
+use App\Utils\Traits\MakesHash;
+use App\Utils\Traits\SavesDocuments;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Class QuoteController.
@@ -81,7 +83,7 @@ class QuoteController extends BaseController
      * Display a listing of the resource.
      *
      * @param QuoteFilters $filters
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -126,7 +128,7 @@ class QuoteController extends BaseController
      * Show the form for creating a new resource.
      *
      * @param CreateQuoteRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -166,6 +168,7 @@ class QuoteController extends BaseController
         $user = auth()->user();
 
         $quote = QuoteFactory::create($user->company()->id, $user->id);
+        $quote->date = now()->addSeconds($user->company()->utc_offset())->format('Y-m-d');
 
         return $this->itemResponse($quote);
     }
@@ -175,7 +178,7 @@ class QuoteController extends BaseController
      *
      * @param StoreQuoteRequest $request  The request
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -213,7 +216,7 @@ class QuoteController extends BaseController
     {
         /** @var \App\Models\User $user */
         $user = auth()->user();
-        
+
         $quote = $this->quote_repo->save($request->all(), QuoteFactory::create($user->company()->id, $user->id));
 
         $quote = $quote->service()
@@ -232,7 +235,7 @@ class QuoteController extends BaseController
      * @param ShowQuoteRequest $request  The request
      * @param Quote $quote  The quote
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -287,7 +290,7 @@ class QuoteController extends BaseController
      * @param EditQuoteRequest $request  The request
      * @param Quote $quote  The quote
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -342,7 +345,7 @@ class QuoteController extends BaseController
      * @param UpdateQuoteRequest $request  The request
      * @param Quote $quote  The quote
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Put(
@@ -395,8 +398,7 @@ class QuoteController extends BaseController
         $quote = $this->quote_repo->save($request->all(), $quote);
 
         $quote->service()
-              ->triggeredActions($request)
-              ->deletePdf();
+              ->triggeredActions($request);
 
         event(new QuoteWasUpdated($quote, $quote->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
 
@@ -463,7 +465,7 @@ class QuoteController extends BaseController
     /**
      * Perform bulk actions on the list view.
      *
-     * @return \Illuminate\Support\Collection
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse | \Illuminate\Http\JsonResponse | \Illuminate\Http\Response
      *
      *
      * @OA\Post(
@@ -516,32 +518,31 @@ class QuoteController extends BaseController
         /** @var \App\Models\User $user */
         $user = auth()->user();
 
-        $action = request()->input('action');
+        $action = $request->input('action');
 
-        $ids = request()->input('ids');
+        $ids = $request->input('ids');
 
         if (Ninja::isHosted() && (stripos($action, 'email') !== false) && !$user->account->account_sms_verified) {
             return response(['message' => 'Please verify your account to send emails.'], 400);
         }
 
-        $quotes = Quote::withTrashed()->whereIn('id', $this->transformKeys($ids))->company()->get();
+        $quotes = Quote::query()->with('invitations')->withTrashed()->whereIn('id', $this->transformKeys($ids))->company()->get();
 
         if (! $quotes) {
             return response()->json(['message' => ctrans('texts.quote_not_found')]);
         }
 
         /*
-         * Download Invoice/s
+         * Download Quote/s
          */
-
         if ($action == 'bulk_download' && $quotes->count() >= 1) {
-            $quotes->each(function ($quote) use($user){
+            $quotes->each(function ($quote) use ($user) {
                 if ($user->cannot('view', $quote)) {
-                    return response()->json(['message'=> ctrans('texts.access_denied')]);
+                    return response()->json(['message' => ctrans('texts.access_denied')]);
                 }
             });
 
-            ZipQuotes::dispatch($quotes, $quotes->first()->company, auth()->user());
+            ZipQuotes::dispatch($quotes->pluck('id')->toArray(), $quotes->first()->company, auth()->user());
 
             return response()->json(['message' => ctrans('texts.sent_message')], 200);
         }
@@ -556,12 +557,12 @@ class QuoteController extends BaseController
                 }
             });
 
-            return $this->listResponse(Quote::withTrashed()->whereIn('id', $this->transformKeys($ids))->company());
+            return $this->listResponse(Quote::query()->withTrashed()->whereIn('id', $this->transformKeys($ids))->company());
         }
 
         if ($action == 'bulk_print' && $user->can('view', $quotes->first())) {
             $paths = $quotes->map(function ($quote) {
-                return $quote->service()->getQuotePdf();
+                return (new \App\Jobs\Entity\CreateRawPdf($quote->invitations->first()))->handle();
             });
 
             $merge = (new PdfMerge($paths->toArray()))->run();
@@ -575,19 +576,36 @@ class QuoteController extends BaseController
         if ($action == 'convert_to_project') {
             $quotes->each(function ($quote, $key) use ($user) {
                 if ($user->can('edit', $quote)) {
-                    $project = CloneQuoteToProjectFactory::create($quote, $user->id);
-                    
-                    if (empty($project->number)) {
-                        $project->number = $this->getNextProjectNumber($project);
-                    }
-                    $project->save();
-                    $quote->project_id = $project->id;
-                    $quote->save();
+
+                    $quote->service()->convertToProject();
+
                 }
             });
 
-            return $this->listResponse(Quote::withTrashed()->whereIn('id', $this->transformKeys($ids))->company());
+            return $this->listResponse(Quote::query()->withTrashed()->whereIn('id', $this->transformKeys($ids))->company());
         }
+
+
+        if($action == 'template' && $user->can('view', $quotes->first())) {
+
+            $hash_or_response = $request->boolean('send_email') ? 'email sent' : \Illuminate\Support\Str::uuid();
+
+            TemplateAction::dispatch(
+                $ids,
+                $request->template_id,
+                Quote::class,
+                $user->id,
+                $user->company(),
+                $user->company()->db,
+                $hash_or_response,
+                $request->boolean('send_email')
+            );
+
+            return response()->json(['message' => $hash_or_response], 200);
+        }
+
+
+
 
         /*
          * Send the other actions to the switch
@@ -674,7 +692,7 @@ class QuoteController extends BaseController
      * @param ActionQuoteRequest $request
      * @param Quote $quote
      * @param $action
-     * @return \Illuminate\Http\JsonResponse|Response|mixed|\Symfony\Component\HttpFoundation\StreamedResponse
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\Response|Response|mixed|\Symfony\Component\HttpFoundation\StreamedResponse
      */
     public function action(ActionQuoteRequest $request, Quote $quote, $action)
     {
@@ -684,6 +702,13 @@ class QuoteController extends BaseController
     private function performAction(Quote $quote, $action, $bulk = false)
     {
         switch ($action) {
+            case 'convert_to_project':
+
+                $this->entity_type = Project::class;
+                $this->entity_transformer = ProjectTransformer::class;
+
+                return $this->itemResponse($quote->service()->convertToProject());
+
             case 'convert':
             case 'convert_to_invoice':
 
@@ -691,8 +716,6 @@ class QuoteController extends BaseController
                 $this->entity_transformer = InvoiceTransformer::class;
 
                 return $this->itemResponse($quote->service()->convertToInvoice());
-
-                break;
 
             case 'clone_to_invoice':
 
@@ -702,41 +725,36 @@ class QuoteController extends BaseController
                 $invoice = CloneQuoteToInvoiceFactory::create($quote, auth()->user()->id);
 
                 return $this->itemResponse($invoice);
-                break;
+
             case 'clone_to_quote':
                 $quote = CloneQuoteFactory::create($quote, auth()->user()->id);
 
                 return $this->itemResponse($quote);
-                break;
+
             case 'approve':
                 if (! in_array($quote->status_id, [Quote::STATUS_SENT, Quote::STATUS_DRAFT])) {
                     return response()->json(['message' => ctrans('texts.quote_unapprovable')], 400);
                 }
 
                 return $this->itemResponse($quote->service()->approveWithNoCoversion()->save());
-                break;
+
             case 'history':
                 // code...
                 break;
             case 'download':
 
-                //$file = $quote->pdf_file_path();
-                $file = $quote->service()->getQuotePdf();
+                return response()->streamDownload(function () use ($quote) {
+                    echo $quote->service()->getQuotePdf();
+                }, $quote->getFileName(), ['Content-Type' => 'application/pdf']);
 
-                return response()->streamDownload(function () use ($file) {
-                    echo Storage::get($file);
-                }, basename($file), ['Content-Type' => 'application/pdf']);
-
-
-                break;
             case 'restore':
                 $this->quote_repo->restore($quote);
 
                 if (! $bulk) {
                     return $this->itemResponse($quote);
                 }
-
                 break;
+
             case 'archive':
                 $this->quote_repo->archive($quote);
 
@@ -754,16 +772,11 @@ class QuoteController extends BaseController
 
                 break;
             case 'email':
-                $quote->service()->sendEmail();
-
-                return response()->json(['message'=> ctrans('texts.sent_message')], 200);
-                break;
-
             case 'send_email':
+
                 $quote->service()->sendEmail();
 
-                return response()->json(['message'=> ctrans('texts.sent_message')], 200);
-                break;
+                return response()->json(['message' => ctrans('texts.sent_message')], 200);
 
             case 'mark_sent':
                 $quote->service()->markSent()->save();
@@ -774,7 +787,6 @@ class QuoteController extends BaseController
                 break;
             default:
                 return response()->json(['message' => ctrans('texts.action_unavailable', ['action' => $action])], 400);
-                break;
         }
     }
 
@@ -819,23 +831,21 @@ class QuoteController extends BaseController
      *       ),
      *     )
      * @param $invitation_key
-     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse | \Illuminate\Http\JsonResponse | \Illuminate\Http\Response | \Symfony\Component\HttpFoundation\BinaryFileResponse
      */
 
     public function downloadPdf($invitation_key)
     {
         $invitation = $this->quote_repo->getInvitationByKey($invitation_key);
-        
+
         if (! $invitation) {
             return response()->json(['message' => 'no record found'], 400);
         }
 
         $contact = $invitation->contact;
         $quote = $invitation->quote;
-        
-        App::setLocale($invitation->contact->preferredLocale());
 
-        $file = $quote->service()->getQuotePdf($contact);
+        App::setLocale($invitation->contact->preferredLocale());
 
         $headers = ['Content-Type' => 'application/pdf'];
 
@@ -843,17 +853,87 @@ class QuoteController extends BaseController
             $headers = array_merge($headers, ['Content-Disposition' => 'inline']);
         }
 
-        return response()->streamDownload(function () use ($file) {
-            echo Storage::get($file);
-        }, basename($file), $headers);
+        return response()->streamDownload(function () use ($quote, $contact) {
+            echo $quote->service()->getQuotePdf($contact);
+        }, $quote->getFileName(), $headers);
+
     }
+
+    /**
+     * @OA\Get(
+     *      path="/api/v1/invoice/{invitation_key}/download_e_quote",
+     *      operationId="downloadXQuote",
+     *      tags={"quotes"},
+     *      summary="Download a specific x-quote by invitation key",
+     *      description="Downloads a specific x-quote",
+     *      @OA\Parameter(ref="#/components/parameters/X-API-TOKEN"),
+     *      @OA\Parameter(ref="#/components/parameters/X-Requested-With"),
+     *      @OA\Parameter(ref="#/components/parameters/include"),
+     *      @OA\Parameter(
+     *          name="invitation_key",
+     *          in="path",
+     *          description="The Quote Invitation Key",
+     *          example="D2J234DFA",
+     *          required=true,
+     *          @OA\Schema(
+     *              type="string",
+     *              format="string",
+     *          ),
+     *      ),
+     *      @OA\Response(
+     *          response=200,
+     *          description="Returns the x-quote pdf",
+     *          @OA\Header(header="X-MINIMUM-CLIENT-VERSION", ref="#/components/headers/X-MINIMUM-CLIENT-VERSION"),
+     *          @OA\Header(header="X-RateLimit-Remaining", ref="#/components/headers/X-RateLimit-Remaining"),
+     *          @OA\Header(header="X-RateLimit-Limit", ref="#/components/headers/X-RateLimit-Limit"),
+     *       ),
+     *       @OA\Response(
+     *          response=422,
+     *          description="Validation error",
+     *          @OA\JsonContent(ref="#/components/schemas/ValidationError"),
+     *
+     *       ),
+     *       @OA\Response(
+     *           response="default",
+     *           description="Unexpected Error",
+     *           @OA\JsonContent(ref="#/components/schemas/Error"),
+     *       ),
+     *     )
+     * @param $invitation_key
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse|\Illuminate\Http\JsonResponse
+     */
+    public function downloadEQuote($invitation_key)
+    {
+        $invitation = $this->quote_repo->getInvitationByKey($invitation_key);
+
+        if (! $invitation) {
+            return response()->json(['message' => 'no record found'], 400);
+        }
+
+        $contact = $invitation->contact;
+        $quote = $invitation->quote;
+
+        $file = $quote->service()->getEQuote($contact);
+        $file_name = $quote->getFileName("xml");
+
+        $headers = ['Content-Type' => 'application/xml'];
+
+        if (request()->input('inline') == 'true') {
+            $headers = array_merge($headers, ['Content-Disposition' => 'inline']);
+        }
+
+        return response()->streamDownload(function () use ($file) {
+            echo $file;
+        }, $file_name, $headers);
+    }
+
 
     /**
      * Update the specified resource in storage.
      *
      * @param UploadQuoteRequest $request
      * @param Quote $quote
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *

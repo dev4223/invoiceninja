@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -21,7 +21,10 @@ use Illuminate\Queue\SerializesModels;
 
 class UpdateOrCreateProduct implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     public $products;
 
@@ -66,8 +69,11 @@ class UpdateOrCreateProduct implements ShouldQueue
          * we do NOT update the product details this short block we
          * check for the presence of a task_id and/or expense_id
          */
-        $expense_count = count(array_column((array) $this->products, 'expense_id'));
-        $task_count = count(array_column((array) $this->products, 'task_id'));
+        // $expense_count = count(array_column((array) $this->products, 'expense_id'));
+        // $task_count = count(array_column((array) $this->products, 'task_id'));
+
+        $task_count = implode("", array_column((array) $this->products, 'task_id'));
+        $expense_count = implode("", array_column((array) $this->products, 'expense_id'));
 
         if ($task_count >= 1 || $expense_count >= 1) {
             return;
@@ -107,22 +113,22 @@ class UpdateOrCreateProduct implements ShouldQueue
                 $product->quantity = isset($item->quantity) ? $item->quantity : 0;
             }
 
-            if (isset($item->custom_value1) && strlen($item->custom_value1) >=1) {
+            if (isset($item->custom_value1) && strlen($item->custom_value1) >= 1) {
                 $product->custom_value1 = $item->custom_value1;
             }
 
-            if (isset($item->custom_value2) && strlen($item->custom_value1) >=1) {
+            if (isset($item->custom_value2) && strlen($item->custom_value1) >= 1) {
                 $product->custom_value2 = $item->custom_value2;
             }
-            
-            if (isset($item->custom_value3) && strlen($item->custom_value1) >=1) {
+
+            if (isset($item->custom_value3) && strlen($item->custom_value1) >= 1) {
                 $product->custom_value3 = $item->custom_value3;
             }
-            
-            if (isset($item->custom_value4) && strlen($item->custom_value1) >=1) {
+
+            if (isset($item->custom_value4) && strlen($item->custom_value1) >= 1) {
                 $product->custom_value4 = $item->custom_value4;
             }
-                       
+
             $product->user_id = $this->invoice->user_id;
             $product->company_id = $this->invoice->company_id;
             $product->project_id = $this->invoice->project_id;
@@ -134,6 +140,6 @@ class UpdateOrCreateProduct implements ShouldQueue
     public function failed($exception = null)
     {
         info('update create failed with = ');
-        info(print_r($exception->getMessage(), 1));
+        nlog($exception->getMessage());
     }
 }

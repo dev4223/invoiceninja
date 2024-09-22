@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -28,7 +28,7 @@ class AccountTransformer extends EntityTransformer
     /**
      * @var array
      */
-    protected $defaultIncludes = [
+    protected array $defaultIncludes = [
         //'default_company',
         //'user',
         //'company_users'
@@ -37,7 +37,7 @@ class AccountTransformer extends EntityTransformer
     /**
      * @var array
      */
-    protected $availableIncludes = [
+    protected array $availableIncludes = [
         'default_company',
         'company_users',
         'companies',
@@ -91,7 +91,9 @@ class AccountTransformer extends EntityTransformer
             'trial_days_left' => Ninja::isHosted() ? (int) $account->getTrialDays() : 0,
             'account_sms_verified' => (bool) $account->account_sms_verified,
             'has_iap_plan' => (bool)$account->inapp_transaction_id,
-
+            'tax_api_enabled' => (bool) config('services.tax.zip_tax.key') ? true : false,
+            'nordigen_enabled' => (bool) (config('ninja.nordigen.secret_id') && config('ninja.nordigen.secret_key')) ? true : false,
+            'upload_extensions' => (string) "png,ai,jpeg,tiff,pdf,gif,psd,txt,doc,xls,ppt,xlsx,docx,pptx,webp,xml,zip,csv,ods,odt,odp,".config('ninja.upload_extensions'),
         ];
     }
 

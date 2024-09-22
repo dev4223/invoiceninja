@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -28,9 +28,12 @@ class StoreUserRequest extends Request
      *
      * @return bool
      */
-    public function authorize() : bool
+    public function authorize(): bool
     {
-        return auth()->user()->isAdmin();
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        return $user->isAdmin();
     }
 
     public function rules()
@@ -45,7 +48,7 @@ class StoreUserRequest extends Request
         } else {
             $rules['email'] = ['email', new AttachableUser()];
         }
-                
+
         if (Ninja::isHosted()) {
             $rules['id'] = new CanAddUserRule();
 
@@ -92,11 +95,13 @@ class StoreUserRequest extends Request
             $input['last_name'] = strip_tags($input['last_name']);
         }
 
+        $input['id'] = null;
+
         $this->replace($input);
     }
 
     //@todo make sure the user links back to the account ID for this company!!!!!!
-    public function fetchUser() :User
+    public function fetchUser(): User
     {
         $user = MultiDB::hasUser(['email' => $this->input('email')]);
 

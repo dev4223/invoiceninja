@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -23,7 +23,7 @@ class ClientPresenter extends EntityPresenter
      */
     public function name()
     {
-        if ($this->entity->name) {
+        if (strlen($this->entity->name) > 1) {
             return $this->entity->name;
         }
 
@@ -103,11 +103,16 @@ class ClientPresenter extends EntityPresenter
         if ($cityState = $this->getShippingCityState()) {
             $str .= e($cityState).'<br/>';
         }
-        if ($country = $client->shipping_country) {
+        if ($country = $client->shipping_country ?? $client->country) {
             $str .= e($country->name).'<br/>';
         }
 
         return $str;
+    }
+
+    public function shipping_country_code(): string
+    {
+        return $this->entity->shipping_country ? $this->entity->shipping_country->iso_3166_2 : $this->entity->country->iso_3166_2;
     }
 
     public function phone()

@@ -4,14 +4,13 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Notifications\Ninja;
 
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Messages\SlackMessage;
 use Illuminate\Notifications\Notification;
 
@@ -44,7 +43,7 @@ class EmailQuotaNotification extends Notification
      * Get the mail representation of the notification.
      *
      * @param  mixed  $notifiable
-     * 
+     *
      */
     public function toMail($notifiable)
     {
@@ -67,11 +66,13 @@ class EmailQuotaNotification extends Notification
     {
         $content = "Email quota exceeded by Account {$this->account->key} \n";
 
-        $owner = $this->account->companies()->first()->owner();
+        $owner = $this->account->companies()->first()->owner() ?? $this->account->users()->orderBy('id','asc')->first();
+        $owner_name = $owner->present()->name() ?? 'No Owner Found';
+        $owner_email = $owner->email ?? 'No Owner Email Found';
 
-        $content .= "Owner {$owner->present()->name() } | {$owner->email}";
+        $content .= "Owner {$owner_name} | {$owner_email}";
 
-        return (new SlackMessage)
+        return (new SlackMessage())
                 ->success()
                 ->from(ctrans('texts.notification_bot'))
                 ->image('https://app.invoiceninja.com/favicon.png')

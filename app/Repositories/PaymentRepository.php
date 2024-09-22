@@ -4,27 +4,27 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Repositories;
 
-use App\Utils\Ninja;
+use App\Events\Payment\PaymentWasCreated;
+use App\Events\Payment\PaymentWasDeleted;
+use App\Jobs\Credit\ApplyCreditPayment;
+use App\Libraries\Currency\Conversion\CurrencyApi;
 use App\Models\Client;
 use App\Models\Credit;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Paymentable;
-use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
+use App\Utils\Ninja;
 use App\Utils\Traits\MakesHash;
 use App\Utils\Traits\SavesDocuments;
-use App\Jobs\Credit\ApplyCreditPayment;
-use App\Events\Payment\PaymentWasCreated;
-use App\Events\Payment\PaymentWasDeleted;
-use App\Libraries\Currency\Conversion\CurrencyApi;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 /**
  * PaymentRepository.
@@ -59,7 +59,7 @@ class PaymentRepository extends BaseRepository
      * @param  Payment $payment The $payment entity
      * @return Payment          The updated/created payment object
      */
-    private function applyPayment(array $data, Payment $payment): ?Payment
+    private function applyPayment(array $data, Payment $payment): Payment
     {
         $is_existing_payment = true;
         $client = false;
@@ -83,7 +83,7 @@ class PaymentRepository extends BaseRepository
                     if ($data['amount'] == '') {
                         $data['amount'] = array_sum(array_column($data['invoices'], 'amount'));
                     }
-                    
+
                     $client->service()->updatePaidToDate($data['amount'])->save();
                     $client->saveQuietly();
                 } else {
@@ -101,14 +101,23 @@ class PaymentRepository extends BaseRepository
                     $client->saveQuietly();
                 }
             }, 1);
+
+            $client = Client::query()->where('id', $data['client_id'])->withTrashed()->first();
+
         }
 
         /*Fill the payment*/
-        $payment->fill($data);
+        $fill_data = $data;
+
+        if($this->import_mode && isset($fill_data['invoices'])) {
+            unset($fill_data['invoices']);
+        }
+
+        $payment->fill($fill_data);
         $payment->is_manual = true;
         $payment->status_id = Payment::STATUS_COMPLETED;
 
-        if (! $payment->currency_id && $client) {
+        if ((!$payment->currency_id || $payment->currency_id == 0) && $client) {
             if (property_exists($client->settings, 'currency_id')) {
                 $payment->currency_id = $client->settings->currency_id;
             } else {
@@ -125,7 +134,6 @@ class PaymentRepository extends BaseRepository
 
         /*Ensure payment number generated*/
         if (! $payment->number || strlen($payment->number) == 0) {
-            // $payment->number = $payment->client->getNextPaymentNumber($payment->client, $payment);
             $payment->service()->applyNumber();
         }
 
@@ -139,16 +147,13 @@ class PaymentRepository extends BaseRepository
 
             $invoices = Invoice::withTrashed()->whereIn('id', array_column($data['invoices'], 'invoice_id'))->get();
 
-            // $payment->invoices()->saveMany($invoices); //25-06-2023
-
             //todo optimize this into a single query
             foreach ($data['invoices'] as $paid_invoice) {
-                // $invoice = Invoice::withTrashed()->whereId($paid_invoice['invoice_id'])->first();
                 $invoice = $invoices->firstWhere('id', $paid_invoice['invoice_id']);
 
                 if ($invoice) {
 
-                //25-06-2023
+                    //25-06-2023
 
                     $paymentable = new Paymentable();
                     $paymentable->payment_id = $payment->id;
@@ -177,7 +182,7 @@ class PaymentRepository extends BaseRepository
 
                 /** @var \App\Models\Credit $credit **/
                 $credit = $credits->firstWhere('id', $paid_credit['credit_id']);
-                
+
                 if ($credit) {
 
                     $paymentable = new Paymentable();
@@ -237,7 +242,7 @@ class PaymentRepository extends BaseRepository
 
             return $payment;
         }
-        
+
         $payment->currency_id = $company_currency;
 
         return $payment;

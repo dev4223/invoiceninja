@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -22,7 +22,11 @@ use Illuminate\Queue\SerializesModels;
 
 class VerifyPhone implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, MakesHash;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
+    use MakesHash;
 
 
     /**
@@ -39,7 +43,7 @@ class VerifyPhone implements ShouldQueue
      *
      * @return void
      */
-    public function handle() : void
+    public function handle(): void
     {
         MultiDB::checkUserEmailExists($this->user->email);
 
@@ -52,7 +56,7 @@ class VerifyPhone implements ShouldQueue
 
         $twilio = new \Twilio\Rest\Client($sid, $token);
 
-        $country = $this->user->account?->companies()?->first()?->country();
+        $country = $this->user->account?->companies()?->first()?->country(); //@phpstan-ignore-line
 
         if (!$country || strlen($this->user->phone) < 2) {
             return;
@@ -69,7 +73,7 @@ class VerifyPhone implements ShouldQueue
             return;
         }
 
-        if ($phone_number && strlen($phone_number->phoneNumber) > 1) {
+        if ($phone_number && strlen($phone_number->phoneNumber) > 1) { //@phpstan-ignore-line
             $this->user->phone = $phone_number->phoneNumber;
             $this->user->verified_phone_number = true;
             $this->user->save();

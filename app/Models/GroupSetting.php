@@ -4,18 +4,17 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
 
-use App\Models\Filterable;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\ModelNotFoundException as ModelNotFoundException;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * App\Models\GroupSetting
@@ -29,7 +28,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException as ModelNotFoundExceptio
  * @property int|null $deleted_at
  * @property int|null $created_at
  * @property int|null $updated_at
- * @property int $is_deleted
+ * @property bool $is_deleted
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Client> $clients
  * @property-read int|null $clients_count
  * @property-read \App\Models\Company $company
@@ -63,7 +62,7 @@ class GroupSetting extends StaticModel
     use MakesHash;
     use SoftDeletes;
     use Filterable;
-    
+
     protected $casts = [
         'settings' => 'object',
         'updated_at' => 'timestamp',

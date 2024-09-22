@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -31,7 +31,11 @@ use Illuminate\Queue\SerializesModels;
 
 class PaymentIntentWebhook implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, Utilities;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
+    use Utilities;
 
     public $tries = 1; //number of retries
 
@@ -59,22 +63,32 @@ class PaymentIntentWebhook implements ShouldQueue
         $company = Company::query()->where('company_key', $this->company_key)->first();
 
         foreach ($this->stripe_request as $transaction) {
-            if (array_key_exists('payment_intent', $transaction)) {
-                $payment = Payment::query()
-                    ->where('company_id', $company->id)
-                    ->where('transaction_reference', $transaction['payment_intent'])
-                    ->first();
-            } else {
-                $payment = Payment::query()
-                   ->where('company_id', $company->id)
-                   ->where('transaction_reference', $transaction['id'])
-                   ->first();
-            }
+
+            $payment = Payment::query()
+                ->where('company_id', $company->id)
+                ->where(function ($query) use ($transaction) {
+
+                    if(isset($transaction['payment_intent'])) {
+                        $query->where('transaction_reference', $transaction['payment_intent']);
+                    }
+
+                    if(isset($transaction['payment_intent']) && isset($transaction['id'])) {
+                        $query->orWhere('transaction_reference', $transaction['id']);
+                    }
+
+                    if(!isset($transaction['payment_intent']) && isset($transaction['id'])) {
+                        $query->where('transaction_reference', $transaction['id']);
+                    }
+
+                })
+                ->first();
+
+
 
             if ($payment) {
                 $payment->status_id = Payment::STATUS_COMPLETED;
                 $payment->save();
-    
+
                 $this->payment_completed = true;
             }
         }
@@ -85,6 +99,11 @@ class PaymentIntentWebhook implements ShouldQueue
         }
 
         $company_gateway = CompanyGateway::query()->find($this->company_gateway_id);
+
+        if(!$company_gateway) {
+            return;
+        }
+
         $stripe_driver = $company_gateway->driver()->init();
 
         $charge_id = false;
@@ -240,7 +259,7 @@ class PaymentIntentWebhook implements ShouldQueue
                 return;
             }
 
-            $payment_meta = new \stdClass;
+            $payment_meta = new \stdClass();
             $payment_meta->brand = (string) \sprintf('%s (%s)', $method->us_bank_account['bank_name'], ctrans('texts.ach'));
             $payment_meta->last4 = (string) $method->us_bank_account['last4'];
             $payment_meta->type = GatewayType::BANK_TRANSFER;
@@ -293,5 +312,14 @@ class PaymentIntentWebhook implements ShouldQueue
             $client,
             $client->company,
         );
+    }
+
+    public function failed($exception = null)
+    {
+        if ($exception) {
+            nlog($exception->getMessage());
+        }
+
+        config(['queue.failed.driver' => null]);
     }
 }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -38,7 +38,7 @@ class ConnectedAccountController extends BaseController
      * Connect an OAuth account to a regular email/password combination account
      *
      * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\Response
      *
      *
      * @OA\Post(
@@ -105,7 +105,7 @@ class ConnectedAccountController extends BaseController
                       ->execute();
 
         if ($user) {
-            $email = $user->getMail() ?: $user->getUserPrincipalName();
+            $email = $user->getUserPrincipalName() ?? false;
 
             nlog("microsoft");
             nlog($email);
@@ -118,15 +118,19 @@ class ConnectedAccountController extends BaseController
                 'email' => $email,
                 'oauth_user_id' => $user->getId(),
                 'oauth_provider_id' => 'microsoft',
-                'email_verified_at' =>now()
+                'email_verified_at' => now()
             ];
 
-            auth()->user()->update($connected_account);
-            auth()->user()->email_verified_at = now();
-            auth()->user()->save();
-            
+
+            /** @var \App\Models\User $user */
+            $user = auth()->user();
+
+            $user->update($connected_account);
+            $user->email_verified_at = now();
+            $user->save();
+
             $this->setLoginCache(auth()->user());
-            
+
             return $this->itemResponse(auth()->user());
         }
 
@@ -162,16 +166,19 @@ class ConnectedAccountController extends BaseController
                 'email' => $email,
                 'oauth_user_id' => $google->harvestSubField($user),
                 'oauth_provider_id' => 'google',
-                'email_verified_at' =>now(),
+                'email_verified_at' => now(),
             ];
 
-            auth()->user()->update($connected_account);
-            auth()->user()->email_verified_at = now();
-            auth()->user()->save();
+            /** @var \App\Models\User $logged_in_user */
+            $logged_in_user = auth()->user();
 
-            $this->setLoginCache(auth()->user());
+            $logged_in_user->update($connected_account);
+            $logged_in_user->email_verified_at = now();
+            $logged_in_user->save();
 
-            return $this->itemResponse(auth()->user());
+            $this->setLoginCache($logged_in_user);
+
+            return $this->itemResponse($logged_in_user);
         }
 
         return response()
@@ -210,20 +217,22 @@ class ConnectedAccountController extends BaseController
                 // 'email_verified_at' =>now(),
             ];
 
-            if (auth()->user()->email != $google->harvestEmail($user)) {
+            /** @var \App\Models\User $logged_in_user */
+            $logged_in_user = auth()->user();
+
+            if ($logged_in_user->email != $google->harvestEmail($user)) {
                 return response()->json(['message' => 'Primary Email differs to OAuth email. Emails must match.'], 400);
             }
 
-            auth()->user()->update($connected_account);
-            auth()->user()->email_verified_at = now();
-            auth()->user()->oauth_user_token = $token;
-            auth()->user()->oauth_user_refresh_token = $refresh_token;
+            $logged_in_user->update($connected_account);
+            $logged_in_user->email_verified_at = now();
+            $logged_in_user->oauth_user_token = $token;
+            $logged_in_user->oauth_user_refresh_token = $refresh_token;
+            $logged_in_user->save();
 
-            auth()->user()->save();
+            $this->activateGmail($logged_in_user);
 
-            $this->activateGmail(auth()->user());
-
-            return $this->itemResponse(auth()->user());
+            return $this->itemResponse($logged_in_user);
         }
 
         return response()

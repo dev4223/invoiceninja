@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -32,7 +32,10 @@ use Illuminate\Support\Str;
 
 class CSVIngest implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     public Company $company;
 
@@ -74,7 +77,7 @@ class CSVIngest implements ShouldQueue
 
         $engine = $this->bootEngine();
 
-        foreach (['client', 'product', 'invoice', 'payment', 'vendor', 'expense', 'quote', 'bank_transaction', 'recurring_invoice'] as $entity) {
+        foreach (['client', 'product', 'invoice', 'payment', 'vendor', 'expense', 'quote', 'bank_transaction', 'recurring_invoice', 'task'] as $entity) {
             $engine->import($entity);
         }
 

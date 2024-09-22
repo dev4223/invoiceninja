@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -86,7 +86,10 @@ class NinjaPlanController extends Controller
 
     public function trial_confirmation(Request $request)
     {
+        $trial_started = "Trial Started @ ".now()->format('Y-m-d H:i:s');
+
         $client = auth()->guard('contact')->user()->client;
+        $client->private_notes = $trial_started;
         $client->fill($request->all());
         $client->save();
 
@@ -121,7 +124,7 @@ class NinjaPlanController extends Controller
         $gateway_driver->attach($stripe_response->payment_method, $customer);
         $method = $gateway_driver->getStripePaymentMethod($stripe_response->payment_method);
 
-        $payment_meta = new \stdClass;
+        $payment_meta = new \stdClass();
         $payment_meta->exp_month = (string) $method->card->exp_month;
         $payment_meta->exp_year = (string) $method->card->exp_year;
         $payment_meta->brand = (string) $method->card->brand;
@@ -148,8 +151,10 @@ class NinjaPlanController extends Controller
             $account->plan_term = 'month';
             $account->plan_started = now();
             $account->plan_expires = now()->addDays(14);
-            $account->is_trial=true;
+            $account->is_trial = true;
             $account->hosted_company_count = 10;
+            $account->trial_started = now();
+            $account->trial_plan = 'pro';
             $account->save();
         }
 

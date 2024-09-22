@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -109,14 +109,36 @@ class ACH
 
     public function verificationView(ClientGatewayToken $token)
     {
-        if (isset($token->meta->state) && $token->meta->state === 'authorized') {
-            return redirect()
-                ->route('client.payment_methods.show', $token->hashed_id)
-                ->with('message', __('texts.payment_method_verified'));
-        }
 
         //double check here if we need to show the verification view.
         $this->stripe->init();
+
+        if(substr($token->token, 0, 2) == 'pm') {
+            $pm = $this->stripe->getStripePaymentMethod($token->token);
+
+            if(!$pm->customer) {
+
+                $meta = $token->meta;
+                $meta->state = 'unauthorized';
+                $token->meta = $meta;
+                $token->save();
+
+                return redirect()
+                    ->route('client.payment_methods.show', $token->hashed_id);
+
+            }
+
+            if (isset($token->meta->state) && $token->meta->state === 'authorized') {
+                return redirect()
+                    ->route('client.payment_methods.show', $token->hashed_id)
+                    ->with('message', __('texts.payment_method_verified'));
+            }
+
+            if($token->meta->next_action) {
+                return redirect($token->meta->next_action);
+            }
+
+        }
 
         $bank_account = Customer::retrieveSource($token->gateway_customer_reference, $token->token, [], $this->stripe->stripe_connect_auth);
 
@@ -188,13 +210,14 @@ class ACH
         $intent = false;
 
         if (count($data['tokens']) == 1) {
-        
+
             $token = $data['tokens'][0];
 
             $meta = $token->meta;
 
-            if(isset($meta->state) && $meta->state == 'unauthorized')
+            if(isset($meta->state) && $meta->state == 'unauthorized') {
                 return redirect()->route('client.payment_methods.show', $token->hashed_id);
+            }
         }
 
         if (count($data['tokens']) == 0) {
@@ -307,6 +330,7 @@ class ACH
 
             switch ($e) {
                 case $e instanceof CardException:
+                    /** @var CardException $e */
                     $data['status'] = $e->getHttpStatus();
                     $data['error_type'] = $e->getError()->type;
                     $data['error_code'] = $e->getError()->code;
@@ -317,8 +341,9 @@ class ACH
                     $data['message'] = 'Too many requests made to the API too quickly';
                     break;
                 case $e instanceof InvalidRequestException:
-                    $data['message'] = 'Invalid parameters were supplied to Stripe\'s API';
-                    break;
+
+                    return redirect()->route('client.payment_methods.verification', ['payment_method' => $cgt->hashed_id, 'method' => GatewayType::BANK_TRANSFER]);
+
                 case $e instanceof AuthenticationException:
                     $data['message'] = 'Authentication with Stripe\'s API failed';
                     break;
@@ -567,7 +592,7 @@ class ACH
         $state = property_exists($method, 'state') ? $method->state : 'unauthorized';
 
         try {
-            $payment_meta = new \stdClass;
+            $payment_meta = new \stdClass();
             $payment_meta->brand = (string) \sprintf('%s (%s)', $method->bank_name, ctrans('texts.ach'));
             $payment_meta->last4 = (string) $method->last4;
             $payment_meta->type = GatewayType::BANK_TRANSFER;
@@ -594,8 +619,9 @@ class ACH
                 'company_id' => $this->stripe->client->company_id,
             ])->first();
 
-            if($token)
+            if($token) {
                 return $token;
+            }
 
             return $this->stripe->storeGatewayToken($data, ['gateway_customer_reference' => $customer->id]);
         } catch (Exception $e) {

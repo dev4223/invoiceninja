@@ -5,14 +5,13 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Jobs\Invoice;
 
-use App\Models\Client;
 use App\Models\Invoice;
 use App\Repositories\BaseRepository;
 use Illuminate\Bus\Queueable;
@@ -23,7 +22,10 @@ use Illuminate\Queue\SerializesModels;
 
 class InvoiceWorkflowSettings implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     public $client;
 

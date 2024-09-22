@@ -11,15 +11,17 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\Task;
+use App\DataMapper\ClientSettings;
+use App\Models\Client;
 use App\Models\Project;
-use Tests\MockAccountData;
+use App\Models\Task;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Tests\MockAccountData;
+use Tests\TestCase;
 
 /**
  * @test
@@ -101,7 +103,358 @@ class TaskApiTest extends TestCase
             return true;
         }
     }
+
+    public function testTimeLogWithSameStartAndStopTimes()
+    {
+        $settings = ClientSettings::defaults();
+        $settings->default_task_rate = 41;
+
+        $c = Client::factory()->create([
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'settings' => $settings,
+        ]);
+
+        $data = [
+            'client_id' => $c->hashed_id,
+            'description' => 'Test Task',
+            'time_log' => '[[1681165417,1681165432,"sumtin",true],[1681165446,1681165446]]',
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson("/api/v1/tasks", $data);
+
+        $response->assertStatus(200);
+        $arr = $response->json();
     
+    }
+
+    public function testRoundingViaApi()
+    {
+                
+        $data = [
+            'client_id' => $this->client->hashed_id,
+            'description' => 'Test Task',
+            'time_log' => '[[1681165417,1681165432,"sumtin",true],[1681165446,0]]',
+            'assigned_user' => [],
+            'project' => [],
+            'user' => [],
+            // 'status' => [],
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson("/api/v1/tasks", $data);
+
+        $response->assertStatus(200);
+
+    }
+
+    public function testRoundingToNearestXXX()
+    {
+
+        $time = 1680036807;
+
+        $round_up_to_next_minute = ceil($time / 60) * 60;
+        $round_down_to_next_minute = floor($time / 60) * 60;
+        $this->assertEquals(1680036840, $round_up_to_next_minute);
+        $this->assertEquals(1680036780, $round_down_to_next_minute);
+
+        $round_up_to_next_minute = ceil($round_up_to_next_minute / 3600) * 3600;
+        $round_down_to_next_minute = floor($round_down_to_next_minute / 3600) * 3600;
+        $this->assertEquals(1680037200, $round_up_to_next_minute);
+        $this->assertEquals(1680033600, $round_down_to_next_minute);
+
+    }
+
+    public function testKsortPerformance()
+    {
+        $logs = [
+        [1680035007,1680036807,"",true],
+        [1681156840,1681158000,"",true],
+        [1680302433,1680387960,"",true],
+        [1680715620,1680722820,"",true],
+        [1,1680737460,"",true]
+        ];
+        
+        $key_values = array_column($logs, 0);
+        array_multisort($key_values, SORT_ASC, $logs);
+
+        $start = $logs[0];
+
+        $this->assertEquals(1, $start[0]);
+
+    }
+
+    public function testTaskDivisionByZero()
+    {
+        $data = [
+        "rate" => 0, 
+        "time_log" => '[[1719350900,1719352700,"",true]]', 
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson("/api/v1/tasks", $data);
+
+        $response->assertStatus(200);
+
+    }
+
+    public function testRequestRuleParsing()
+    {
+                
+        $data = [
+            'client_id' => $this->client->hashed_id,
+            'description' => 'Test Task',
+            'time_log' => '[[1681165417,1681165432,"sumtin",true],[1681165446,0]]',
+            'assigned_user' => [],
+            'project' => [],
+            'user' => [],
+            // 'status' => [],
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson("/api/v1/tasks", $data);
+
+        $response->assertStatus(200);
+
+    }
+    public function testUserFilters()
+    {
+        
+        $response = $this->withHeaders([
+                    'X-API-SECRET' => config('ninja.api_secret'),
+                    'X-API-TOKEN' => $this->token,
+                ])->getJson("/api/v1/tasks")->assertStatus(200);
+
+        $response = $this->withHeaders([
+                    'X-API-SECRET' => config('ninja.api_secret'),
+                    'X-API-TOKEN' => $this->token,
+                ])->getJson("/api/v1/tasks?user_id={$this->user->hashed_id}");
+
+        $response->assertStatus(200);
+
+        $arr = $response->json();
+
+        $this->assertEquals($this->user->hashed_id, $arr['data'][0]['user_id']);
+        $this->assertCount(1, $arr['data']);
+
+        $t = Task::factory()->create([
+            'client_id' => $this->client->id,
+            'user_id' => $this->user->id,
+            'assigned_user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'description' => 'Test Task',
+            'time_log' => '[[1681165417,1681165432,"sumtin",true],[1681165446,0]]',
+        ]);
+
+        $response = $this->withHeaders([
+                    'X-API-SECRET' => config('ninja.api_secret'),
+                    'X-API-TOKEN' => $this->token,
+                ])->getJson("/api/v1/tasks?assigned_user={$this->user->hashed_id}");
+
+        $response->assertStatus(200);
+
+        $arr = $response->json();
+
+        $this->assertEquals($this->user->hashed_id, $arr['data'][0]['user_id']);
+        $this->assertEquals($this->user->hashed_id, $arr['data'][0]['assigned_user_id']);
+        $this->assertCount(1, $arr['data']);
+
+    }
+
+    public function testEmptyTimeLogArray()
+    {
+        
+        $data = [
+            'client_id' => $this->client->id,
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'description' => 'Test Task',
+            'time_log' => null,
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson("/api/v1/tasks", $data);
+
+        $response->assertStatus(200);
+
+        $data = [
+            'client_id' => $this->client->id,
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'description' => 'Test Task',
+            'time_log' => '',
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson("/api/v1/tasks", $data);
+
+        $response->assertStatus(200);
+
+        $data = [
+           'client_id' => $this->client->id,
+           'user_id' => $this->user->id,
+           'company_id' => $this->company->id,
+           'description' => 'Test Task',
+           'time_log' => '[]',
+       ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson("/api/v1/tasks", $data);
+
+        $response->assertStatus(200);
+
+        $data = [
+            'client_id' => $this->client->id,
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'description' => 'Test Task',
+            'time_log' => '{}',
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson("/api/v1/tasks", $data);
+
+        $response->assertStatus(200);
+    }
+
+    public function testFaultyTimeLogArray()
+    {
+        
+        $data = [
+            'client_id' => $this->client->id,
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'description' => 'Test Task',
+            'time_log' => 'ABBA is the best band in the world',
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson("/api/v1/tasks", $data);
+
+        $response->assertStatus(422);
+    
+    }
+
+    public function testTaskClientRateSet()
+    {
+        $settings = ClientSettings::defaults();
+        $settings->default_task_rate = 41;
+
+        $c = Client::factory()->create([
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'settings' => $settings,
+        ]);
+
+        $data = [
+            'client_id' => $c->hashed_id,
+            'description' => 'Test Task',
+            'time_log' => '[[1681165417,1681165432,"sumtin",true],[1681165446,0]]',
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson("/api/v1/tasks", $data);
+
+        $response->assertStatus(200);
+        $arr = $response->json();
+
+        $this->assertEquals(41, $arr['data']['rate']);
+    }
+
+    public function testTaskTimelogParse()
+    {
+        $data = [
+            "description" => "xx",
+            "rate" => "6574",
+            "time_log" => "[[Oct 31, 2023 12:00 am,Oct 31, 2023 1:00 am]]"
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson("/api/v1/tasks", $data);
+
+        $response->assertStatus(422);
+        $arr = $response->json();
+
+
+
+    }
+
+    public function testTaskProjectRateSet()
+    {
+        
+        $p = Project::factory()->create([
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'client_id' => $this->client->id,
+            'name' => 'proggy',
+            'task_rate' => 101,
+        ]);
+
+        $data = [
+            'project_id' => $p->hashed_id,
+            'client_id' => $this->client->id,
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'description' => 'Test Task',
+            'time_log' => '[[1681165417,1681165432,"sumtin",true],[1681165446,0]]',
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson("/api/v1/tasks", $data);
+
+        $response->assertStatus(200);
+        $arr = $response->json();
+
+        $this->assertEquals(101, $arr['data']['rate']);
+    }
+
+    public function testStatusSet()
+    {
+        
+        $data = [
+            'client_id' => $this->client->id,
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'description' => 'Test Task',
+            'time_log' => '[[1681165417,1681165432,"sumtin",true],[1681165446,0]]',
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson("/api/v1/tasks");
+
+        $response->assertStatus(200);
+        $arr = $response->json();
+
+        $this->assertNotEmpty($arr['data']['status_id']);
+    }
+
     public function testStartDate()
     {
         $x = [];
@@ -141,26 +494,6 @@ class TaskApiTest extends TestCase
 
 
     }
-
-    public function testKsortPerformance()
-    {
-        $logs = [
-        [1680035007,1680036807,"",true],
-        [1681156840,1681158000,"",true],
-        [1680302433,1680387960,"",true],
-        [1680715620,1680722820,"",true],
-        [1,1680737460,"",true]
-        ];
-        
-        $key_values = array_column($logs, 0);
-        array_multisort($key_values, SORT_ASC, $logs);
-
-        $start = $logs[0];
-
-        $this->assertEquals(1, $start[0]);
-
-    }
-
     public function testStartStopSanity()
     {
         
@@ -178,6 +511,45 @@ class TaskApiTest extends TestCase
         ])->putJson("/api/v1/tasks/{$task->hashed_id}?stop=true");
 
         $response->assertStatus(200);
+
+        $task->time_log = 'A very strange place';
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->putJson("/api/v1/tasks/{$task->hashed_id}?stop=true", $task->toArray());
+
+        $response->assertStatus(422);
+
+        $task->time_log = null;
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->putJson("/api/v1/tasks/{$task->hashed_id}?stop=true", $task->toArray());
+
+        $response->assertStatus(200);
+
+        $task->time_log = '';
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->putJson("/api/v1/tasks/{$task->hashed_id}?stop=true", $task->toArray());
+
+        $response->assertStatus(200);
+
+
+        $task->time_log = '{}';
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->putJson("/api/v1/tasks/{$task->hashed_id}?stop=true", $task->toArray());
+
+        $response->assertStatus(200);
+
+
 
     }
 
@@ -208,12 +580,11 @@ class TaskApiTest extends TestCase
         $logs = [
         '[[1680302433,1680387960,"",true]]',
         '[[1680715620,1680722820,"",true],[1680729660,1680737460,"",true]]',
-        '[[1681156840,1681158000,"",true]]',        
+        '[[1681156840,1681158000,"",true]]',
         '[[1680035007,1680036807,"",true]]',
         ];
 
-        foreach($logs as $log)
-        {
+        foreach($logs as $log) {
             $this->assertTrue($this->checkTimeLog(json_decode($log)));
         }
 
@@ -236,8 +607,7 @@ class TaskApiTest extends TestCase
         "[[1681156881,0]]",
         ];
 
-        foreach($logs as $log)
-        {
+        foreach($logs as $log) {
             $this->assertTrue($this->checkTimeLog(json_decode($log)));
         }
 
@@ -496,19 +866,16 @@ class TaskApiTest extends TestCase
     public function testTimeLogValidation()
     {
         $data = [
-            'timelog' => $this->faker->firstName(),
+            'time_log' => $this->faker->firstName(),
         ];
 
-        try {
-            $response = $this->withHeaders([
-                'X-API-SECRET' => config('ninja.api_secret'),
-                'X-API-TOKEN' => $this->token,
-            ])->post('/api/v1/tasks', $data);
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson('/api/v1/tasks', $data);
 
-            $arr = $response->json();
-        } catch (ValidationException $e) {
-            $response->assertStatus(302);
-        }
+        $response->assertStatus(422);
+
     }
 
     public function testTimeLogValidation1()
@@ -546,19 +913,16 @@ class TaskApiTest extends TestCase
     public function testTimeLogValidation3()
     {
         $data = [
-            'timelog' => [["a","b",'d'],["c","d",'d']],
+            'time_log' => [["a","b",'d'],["c","d",'d']],
         ];
 
-        try {
-            $response = $this->withHeaders([
-                'X-API-SECRET' => config('ninja.api_secret'),
-                'X-API-TOKEN' => $this->token,
-            ])->post('/api/v1/tasks', $data);
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson('/api/v1/tasks', $data);
 
-            $arr = $response->json();
-        } catch (ValidationException $e) {
-            $response->assertStatus(302);
-        }
+        $response->assertStatus(422);
+
     }
 
     public function testTimeLogValidation4()

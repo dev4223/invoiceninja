@@ -12,7 +12,6 @@
 namespace Tests\Feature\Export;
 
 use App\DataMapper\CompanySettings;
-use App\Export\CSV\ProductSalesExport;
 use App\Factory\InvoiceItemFactory;
 use App\Models\Account;
 use App\Models\Client;
@@ -22,6 +21,8 @@ use App\Models\User;
 use App\Services\Report\UserSalesReport;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
@@ -44,6 +45,7 @@ class UserSalesReportTest extends TestCase
         );
 
         $this->withoutExceptionHandling();
+
     }
 
     public $company;

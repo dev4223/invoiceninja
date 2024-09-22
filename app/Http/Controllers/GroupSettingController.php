@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -55,7 +55,7 @@ class GroupSettingController extends BaseController
      * Show the form for creating a new resource.
      *
      * @param GroupSettingFilters $filters
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
     */
     public function index(GroupSettingFilters $filters)
@@ -69,7 +69,7 @@ class GroupSettingController extends BaseController
      * Show the form for creating a new resource.
      *
      * @param CreateGroupSettingRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
     */
     public function create(CreateGroupSettingRequest $request)
@@ -86,7 +86,7 @@ class GroupSettingController extends BaseController
      * Store a newly created resource in storage.
      *
      * @param StoreGroupSettingRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      */
     public function store(StoreGroupSettingRequest $request)
@@ -108,7 +108,7 @@ class GroupSettingController extends BaseController
      *
      * @param ShowGroupSettingRequest $request
      * @param GroupSetting $group_setting
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      */
     public function show(ShowGroupSettingRequest $request, GroupSetting $group_setting)
@@ -121,7 +121,7 @@ class GroupSettingController extends BaseController
      *
      * @param EditGroupSettingRequest $request
      * @param GroupSetting $group_setting
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      */
     public function edit(EditGroupSettingRequest $request, GroupSetting $group_setting)
@@ -134,12 +134,15 @@ class GroupSettingController extends BaseController
      *
      * @param UpdateGroupSettingRequest $request
      * @param GroupSetting $group_setting
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      */
     public function update(UpdateGroupSettingRequest $request, GroupSetting $group_setting)
     {
-        $group_setting = $this->group_setting_repo->save($request->all(), $group_setting);
+        /** Need this to prevent settings from being overwritten */
+        if(!$request->file('company_logo')) {
+            $group_setting = $this->group_setting_repo->save($request->all(), $group_setting);
+        }
 
         $this->uploadLogo($request->file('company_logo'), $group_setting->company, $group_setting);
 
@@ -155,7 +158,7 @@ class GroupSettingController extends BaseController
      *
      * @param DestroyGroupSettingRequest $request
      * @param GroupSetting $group_setting
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @throws \Exception
@@ -170,7 +173,7 @@ class GroupSettingController extends BaseController
     /**
      * Perform bulk actions on the list view.
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      */
     public function bulk()
@@ -207,7 +210,7 @@ class GroupSettingController extends BaseController
      *
      * @param UploadGroupSettingRequest $request
      * @param GroupSetting $group_setting
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      */
     public function upload(UploadGroupSettingRequest $request, GroupSetting $group_setting)

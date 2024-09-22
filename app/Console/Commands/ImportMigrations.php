@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -18,7 +18,6 @@ use App\Exceptions\ProcessingMigrationArchiveFailed;
 use App\Exceptions\ResourceDependencyMissing;
 use App\Exceptions\ResourceNotAvailableForMigration;
 use App\Jobs\Util\Import;
-use App\Jobs\Util\StartMigration;
 use App\Mail\MigrationFailed;
 use App\Models\Account;
 use App\Models\Company;
@@ -75,8 +74,6 @@ class ImportMigrations extends Command
     public function handle()
     {
         $this->faker = Factory::create();
-
-        $this->buildCache();
 
         $path = $this->option('path') ?? public_path('storage/migrations/import');
 

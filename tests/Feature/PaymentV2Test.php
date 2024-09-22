@@ -11,21 +11,20 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
+use App\Factory\InvoiceItemFactory;
 use App\Models\Client;
+use App\Models\ClientContact;
 use App\Models\Credit;
 use App\Models\Invoice;
 use App\Models\Payment;
-use Tests\MockAccountData;
-use App\Models\ClientContact;
 use App\Utils\Traits\MakesHash;
-use App\Factory\InvoiceItemFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Foundation\Testing\WithoutEvents;
-use Illuminate\Routing\Middleware\ThrottleRequests;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Tests\MockAccountData;
+use Tests\TestCase;
 
 /**
  * @test
@@ -36,7 +35,6 @@ class PaymentV2Test extends TestCase
     use MakesHash;
     use DatabaseTransactions;
     use MockAccountData;
-    use WithoutEvents;
 
     public $faker;
     
@@ -61,7 +59,7 @@ class PaymentV2Test extends TestCase
     public function testUsingDraftCreditsForPayments()
     {
 
-        $invoice = Invoice::factory()->create([ 
+        $invoice = Invoice::factory()->create([
             'company_id' => $this->company->id,
             'user_id' => $this->user->id,
             'client_id' => $this->client->id,
@@ -113,10 +111,10 @@ class PaymentV2Test extends TestCase
 
         $response = null;
 
-            $response = $this->withHeaders([
-                'X-API-SECRET' => config('ninja.api_secret'),
-                'X-API-TOKEN' => $this->token,
-            ])->postJson('/api/v1/payments?include=invoices', $data);
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson('/api/v1/payments?include=invoices', $data);
 
         $arr = $response->json();
         $response->assertStatus(200);
@@ -263,7 +261,7 @@ class PaymentV2Test extends TestCase
 
     }
 
-public function testStorePaymentWithCreditsThenDeletingInvoicesAndThenPayments()
+    public function testStorePaymentWithCreditsThenDeletingInvoicesAndThenPayments()
     {
         $client = Client::factory()->create(['company_id' =>$this->company->id, 'user_id' => $this->user->id, 'balance' => 100, 'paid_to_date' => 0]);
         ClientContact::factory()->create([

@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -87,7 +87,9 @@ class Alipay
                 return $this->processSuccesfulRedirect($pi);
             }
 
-            if ($pi->status == 'requires_source_action') {
+            /** @phpstan-ignore-next-line */
+            if ($pi->status == 'requires_source_action' && $pi->next_action->alipay_handle_redirect) {
+                /** @phpstan-ignore-next-line */
                 return redirect($pi->next_action->alipay_handle_redirect->url);
             }
         }

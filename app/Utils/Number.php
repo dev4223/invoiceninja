@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -25,7 +25,7 @@ class Number
      *
      * @return float
      */
-    public static function roundValue(float $value, int $precision = 2) : float
+    public static function roundValue(float $value, int $precision = 2): float
     {
         return round($value, $precision, PHP_ROUND_HALF_UP);
     }
@@ -38,7 +38,7 @@ class Number
      *
      * @return string           The formatted value
      */
-    public static function formatValue($value, $currency) :string
+    public static function formatValue($value, $currency): string
     {
         $value = floatval($value);
 
@@ -56,7 +56,7 @@ class Number
      *
      * @return string           The formatted value
      */
-    public static function formatValueNoTrailingZeroes($value, $entity) :string
+    public static function formatValueNoTrailingZeroes($value, $entity): string
     {
         $value = floatval($value);
 
@@ -86,6 +86,42 @@ class Number
         return rtrim(rtrim(number_format($value, $precision, $decimal, $thousand), '0'), $decimal);
     }
 
+    public static function parseFloat($value)
+    {
+
+        if(!$value) {
+            return 0;
+        }
+
+        //remove everything except for numbers, decimals, commas and hyphens
+        $value = preg_replace('/[^0-9.,-]+/', '', $value);
+
+        $decimal = strpos($value, '.');
+        $comma = strpos($value, ',');
+
+        if($comma === false) { //no comma must be a decimal number already
+            return (float) $value;
+        }
+
+        if(!$decimal && substr($value, -3, 1) != ",") {
+            $value = $value.".00";
+        }
+
+        $decimal = strpos($value, '.');
+
+        if($decimal < $comma) { //decimal before a comma = euro
+            $value = str_replace(['.',','], ['','.'], $value);
+            return (float) $value;
+        }
+
+        //comma first = traditional thousand separator
+        $value = str_replace(',', '', $value);
+
+        return (float)$value;
+
+
+    }
+
     /**
      * Formats a given value based on the clients currency
      * BACK to a float.
@@ -93,24 +129,81 @@ class Number
      * @param string $value The formatted number to be converted back to float
      * @return float            The formatted value
      */
-    public static function parseFloat($value)
+    public static function parseFloatXX($value)
     {
-        // convert "," to "."
+
+        if(!$value) {
+            return 0;
+        }
+
+        $multiplier = false;
+
+        if(substr($value, 0, 1) == '-') {
+            $multiplier = -1;
+        }
+
         $s = str_replace(',', '.', $value);
 
-        // remove everything except numbers and dot "."
         $s = preg_replace("/[^0-9\.]/", '', $s);
 
         if ($s < 1) {
             return (float) $s;
         }
 
-        // remove all separators from first part and keep the end
         $s = str_replace('.', '', substr($s, 0, -3)).substr($s, -3);
 
-        // return float
+        if($multiplier) {
+            $s = floatval($s) * -1;
+        }
+
         return (float) $s;
     }
+
+
+    //next iteration of float parsing
+    public static function parseFloat2($value)
+    {
+
+        if(!$value) {
+            return 0;
+        }
+
+        //remove everything except for numbers, decimals, commas and hyphens
+        $value = preg_replace('/[^0-9.,-]+/', '', $value);
+
+        $decimal = strpos($value, '.');
+        $comma = strpos($value, ',');
+
+        //check the 3rd last character
+        if(!in_array(substr($value, -3, 1), [".", ","])) {
+
+            if($comma && (substr($value, -3, 1) != ".")) {
+                $value .= ".00";
+            } elseif($decimal && (substr($value, -3, 1) != ",")) {
+                $value .= ",00";
+            }
+
+        }
+
+        $decimal = strpos($value, '.');
+        $comma = strpos($value, ',');
+
+        if($comma === false) { //no comma must be a decimal number already
+            return (float) $value;
+        }
+
+        if($decimal < $comma) { //decimal before a comma = euro
+            $value = str_replace(['.',','], ['','.'], $value);
+            return (float) $value;
+        }
+
+        //comma first = traditional thousand separator
+        $value = str_replace(',', '', $value);
+
+        return (float)$value;
+
+    }
+
 
     public static function parseStringFloat($value)
     {
@@ -133,7 +226,7 @@ class Number
      * @param $entity
      * @return string           The formatted value
      */
-    public static function formatMoney($value, $entity) :string
+    public static function formatMoney($value, $entity): string
     {
         $value = floatval($value);
 
@@ -146,9 +239,6 @@ class Number
         $precision = $currency->precision;
         $code = $currency->code;
         $swapSymbol = $currency->swap_currency_symbol;
-
-        // App\Models\Client::country() returns instance of BelongsTo.
-        // App\Models\Company::country() returns record for the country, that's why we check for the instance.
 
         if ($entity instanceof Company) {
             $country = $entity->country();
@@ -165,7 +255,7 @@ class Number
             $decimal = $country->decimal_separator;
         }
 
-        if (isset($country->swap_currency_symbol) && strlen($country->swap_currency_symbol) >= 1) {
+        if (isset($country->swap_currency_symbol) && $country->swap_currency_symbol == 1) {
             $swapSymbol = $country->swap_currency_symbol;
         }
 
@@ -187,7 +277,7 @@ class Number
 
             return "{$symbol}{$value}";
         } else {
-            return self::formatValue($value, $currency);
+            return self::formatValue($value, $currency); //@phpstan-ignore-line
         }
     }
 
@@ -198,10 +288,10 @@ class Number
      * @param mixed $entity
      * @return string           The formatted value
      */
-    public static function formatMoneyNoRounding($value, $entity) :string
+    public static function formatMoneyNoRounding($value, $entity): string
     {
         $currency = $entity->currency();
-        
+
         $_value = $value;
 
         $thousand = $currency->thousand_separator;
@@ -239,7 +329,7 @@ class Number
         } elseif ($v < 1) {
             $precision = strlen($v) - strrpos($v, '.') - 1;
         }
-        
+
         if (is_array($parts) && $parts[0] != 0) {
             $precision = 2;
         }
@@ -249,7 +339,7 @@ class Number
             $precision = 0;
         }
 
-        $value = number_format($v, $precision, $decimal, $thousand);
+        $value = number_format($v, $precision, $decimal, $thousand);//@phpstan-ignore-line
         $symbol = $currency->symbol;
 
         if ($entity->getSetting('show_currency_code') === true && $currency->code == 'CHF') {
@@ -266,7 +356,7 @@ class Number
 
             return "{$symbol}{$value}";
         } else {
-            return self::formatValue($value, $currency);
+            return self::formatValue($value, $currency); //@phpstan-ignore-line
         }
     }
 }

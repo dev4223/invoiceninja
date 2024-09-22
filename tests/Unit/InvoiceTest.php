@@ -11,15 +11,15 @@
 
 namespace Tests\Unit;
 
-use Tests\TestCase;
-use App\Models\Invoice;
-use Tests\MockAccountData;
 use App\DataMapper\InvoiceItem;
 use App\Factory\InvoiceFactory;
 use App\Factory\InvoiceItemFactory;
 use App\Helpers\Invoice\InvoiceSum;
 use App\Helpers\Invoice\InvoiceSumInclusive;
+use App\Models\Invoice;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Tests\MockAccountData;
+use Tests\TestCase;
 
 /**
  * @test
@@ -47,6 +47,340 @@ class InvoiceTest extends TestCase
         $this->invoice->uses_inclusive_taxes = true;
 
         $this->invoice_calc = new InvoiceSum($this->invoice);
+    }
+
+    public function testRappenRounding()
+    {
+
+        $c_settings = $this->client->settings;
+        $c_settings->enable_rappen_rounding = true;
+
+        $c = \App\Models\Client::factory()->create([
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'settings' => $c_settings,
+        ]);
+        
+        $this->assertEquals(0, $c->balance);
+        
+        $item = InvoiceItemFactory::create();
+        $item->quantity = 1;
+        $item->cost = 10.01;
+        $item->type_id = '1';
+        $item->tax_id = '1';
+        $line_items[] = $item;
+
+        $i = Invoice::factory()->create([
+            'discount' => 0,
+            'tax_name1' => '',
+            'tax_name2' => '',
+            'tax_name3' => '',
+            'tax_rate1' => 0,
+            'tax_rate2' => 0,
+            'tax_rate3' => 0,
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'client_id' => $c->id,
+            'line_items' => $line_items,
+            'status_id' => 1,
+        ]);
+        
+        $invoice_calc = new InvoiceSum($i);
+        $ii = $invoice_calc->build()->getInvoice();
+
+        $this->assertEquals(10, $ii->amount);
+
+        $ii->service()->markSent()->save();
+
+        $this->assertEquals(10, $c->fresh()->balance);
+
+    }
+
+    public function testRappenRoundingUp()
+    {
+
+        $c_settings = $this->client->settings;
+        $c_settings->enable_rappen_rounding = true;
+
+        $c = \App\Models\Client::factory()->create([
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'settings' => $c_settings,
+        ]);
+        
+        $item = InvoiceItemFactory::create();
+        $item->quantity = 1;
+        $item->cost = 10.09;
+        $item->type_id = '1';
+        $item->tax_id = '1';
+        $line_items[] = $item;
+
+        $i = Invoice::factory()->create([
+            'discount' => 0,
+            'tax_name1' => '',
+            'tax_name2' => '',
+            'tax_name3' => '',
+            'tax_rate1' => 0,
+            'tax_rate2' => 0,
+            'tax_rate3' => 0,
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'client_id' => $c->id,
+            'line_items' => $line_items,
+            'status_id' => 1,
+        ]);
+        
+        $invoice_calc = new InvoiceSum($i);
+        $ii = $invoice_calc->build()->getInvoice();
+
+        $this->assertEquals(10.10, round($ii->amount,2));
+
+        $ii->service()->markSent()->save();
+
+        $this->assertEquals(10.10, $c->fresh()->balance);
+
+        $item = InvoiceItemFactory::create();
+        $item->quantity = 2;
+        $item->cost = 10.09;
+        $item->type_id = '1';
+        $item->tax_id = '1';
+
+        $i->line_items = [$item];
+
+        $invoice_calc = new InvoiceSum($i);
+        $ii = $invoice_calc->build()->getInvoice();
+
+        $ii->client->service()->calculateBalance($ii);
+
+        $this->assertEquals(20.20, round($ii->amount,2));
+        $this->assertEquals(20.20, round($ii->balance,2));
+        $this->assertEquals(20.20, round($c->fresh()->balance,2));
+    }
+
+    public function testPartialDueDateCast()
+    {
+        $i = Invoice::factory()
+        ->create([
+            'company_id' => $this->company->id,
+            'user_id' => $this->user->id,
+            'client_id' => $this->client->id
+        ]);
+
+        $this->assertNull($i->partial_due_date);
+
+        $i = Invoice::factory()
+        ->create([
+            'company_id' => $this->company->id,
+            'user_id' => $this->user->id,
+            'client_id' => $this->client->id,
+            'partial_due_date' => '2023-10-10',
+        ]);
+
+        $this->assertEquals('2023-10-10', $i->partial_due_date->format('Y-m-d'));
+    }
+   
+    public function testMarkPaidWithPartial()
+    {
+        $item = InvoiceItemFactory::create();
+        $item->quantity = 1;
+        $item->cost = 50;
+        $line_items[] = $item;
+
+        $this->invoice->partial = 5;
+        $this->invoice->partial_due_date = now()->addDay();
+        $this->invoice->due_date = now()->addDays(10);
+        $this->invoice->line_items = $line_items;
+        $this->invoice->save();
+
+        $invoice_calc = new InvoiceSum($this->invoice);
+
+        /** @var \App\Models\Invoice $ii */
+        $ii = $invoice_calc->build()->getInvoice();
+        $invoice = $ii->service()->markSent()->save();
+
+        $this->assertEquals(5, $invoice->partial);
+        $this->assertNotNull($invoice->partial_due_date);
+        $this->assertEquals(50, $invoice->amount);
+
+        $invoice = $invoice->service()->markPaid()->save();
+
+        $this->assertEquals(0, $invoice->partial);
+        $this->assertEquals(0, $invoice->balance);
+
+        $this->assertNull($invoice->partial_due_date);
+    }
+
+    public function testSurchargesAndTaxes()
+    {
+                
+        $invoice = InvoiceFactory::create($this->company->id, $this->user->id);
+        $invoice->client_id = $this->client->id;
+        $invoice->uses_inclusive_taxes = true;
+        $invoice->discount = 0;
+        $invoice->is_amount_discount = true;
+        $invoice->status_id = 2;
+        $invoice->tax_name1 = 'GST';
+        $invoice->tax_rate1 = 10;
+        $invoice->custom_surcharge1 = 100;
+        $invoice->custom_surcharge_tax1 = true;
+
+        $line_items = [];
+
+        $line_item = new InvoiceItem();
+        $line_item->quantity = 1;
+        $line_item->cost = 100;
+        $line_item->tax_rate1 = 0;
+        $line_item->tax_name1 = '';
+        $line_item->product_key = 'line1';
+        $line_item->notes = 'Test';
+        $line_item->tax_id = 1;
+        $line_items[] = $line_item;
+
+        $invoice->line_items = $line_items;
+        $invoice->save();
+
+        $calc = $invoice->calc();
+        $invoice = $calc->getInvoice();
+
+        $this->assertEquals(200, $invoice->amount);
+        $this->assertEquals(200, $invoice->balance);
+        $this->assertEquals(0,$invoice->paid_to_date);
+        $this->assertEquals(18.18, $calc->getTotalTaxes());
+
+    }
+
+    public function testSurchargesAndTaxes2()
+    {
+                
+        $invoice = InvoiceFactory::create($this->company->id, $this->user->id);
+        $invoice->client_id = $this->client->id;
+        $invoice->uses_inclusive_taxes = true;
+        $invoice->discount = 0;
+        $invoice->is_amount_discount = true;
+        $invoice->status_id = 2;
+        $invoice->tax_name1 = '';
+        $invoice->tax_rate1 = 0;
+        $invoice->custom_surcharge1 = 100;
+        $invoice->custom_surcharge_tax1 = true;
+
+        $line_items = [];
+
+        $line_item = new InvoiceItem();
+        $line_item->quantity = 1;
+        $line_item->cost = 100;
+        $line_item->tax_rate1 = 0;
+        $line_item->tax_name1 = '';
+        $line_item->product_key = 'line1';
+        $line_item->notes = 'Test';
+        $line_item->tax_id = 1;
+        $line_item->tax_name1 = 'GST';
+        $line_item->tax_rate1 = 10;
+        $line_items[] = $line_item;
+
+        $invoice->line_items = $line_items;
+        $invoice->save();
+
+        $calc = $invoice->calc();
+        $invoice = $calc->getInvoice();
+
+        $this->assertEquals(200, $invoice->amount);
+        $this->assertEquals(200, $invoice->balance);
+        $this->assertEquals(0,$invoice->paid_to_date);
+        $this->assertEquals(9.09, $calc->getTotalTaxes());
+
+    }
+
+
+    public function testSurchargesAndTaxesExclusive()
+    {
+        
+        $invoice = InvoiceFactory::create($this->company->id, $this->user->id);
+        $invoice->client_id = $this->client->id;
+        $invoice->uses_inclusive_taxes = false;
+        $invoice->discount = 0;
+        $invoice->is_amount_discount = true;
+        $invoice->status_id = 2;
+        $invoice->tax_name1 = 'GST';
+        $invoice->tax_rate1 = 10;
+        $invoice->custom_surcharge1 = 10;
+        $invoice->custom_surcharge_tax1 = true;
+
+        $line_items = [];
+
+        $line_item = new InvoiceItem();
+        $line_item->quantity = 1;
+        $line_item->cost = 10;
+        $line_item->tax_rate1 = 0;
+        $line_item->tax_name1 = '';
+        $line_item->product_key = 'line1';
+        $line_item->notes = 'Test';
+        $line_item->tax_id = 1;
+        $line_items[] = $line_item;
+
+        $invoice->line_items = $line_items;
+        $invoice->save();
+
+        $calc = $invoice->calc();
+        $invoice = $calc->getInvoice();
+
+        $this->assertEquals(22, $invoice->amount);
+        $this->assertEquals(22, $invoice->balance);
+        $this->assertEquals(0,$invoice->paid_to_date);
+        $this->assertEquals(2, $calc->getTotalTaxes());
+
+    }
+
+
+    public function testGrossTaxAmountCalcuations()
+    {
+        $invoice = InvoiceFactory::create($this->company->id, $this->user->id);
+        $invoice->client_id = $this->client->id;
+        $invoice->uses_inclusive_taxes = false;
+        $invoice->discount = 14191;
+        $invoice->is_amount_discount = true;
+        $invoice->status_id = 2;
+        $line_items = [];
+              
+        $line_item = new InvoiceItem;
+        $line_item->quantity = 1;
+        $line_item->cost = 8000;
+        $line_item->tax_rate1 = 5;
+        $line_item->tax_name1 = 'CA';
+        $line_item->product_key = 'line1';
+        $line_item->notes = 'Test';
+        $line_item->tax_id = 1;
+        $line_items[] = $line_item;
+
+        $line_item = new InvoiceItem;
+        $line_item->quantity = 1;
+        $line_item->cost = 9500;
+        $line_item->tax_rate1 = 5;
+        $line_item->tax_name1 = 'CA';
+        $line_item->product_key = 'line2';
+        $line_item->notes = 'Test';
+        $line_item->tax_id = 1;
+
+        $line_items[] = $line_item;
+
+        $invoice->line_items = $line_items;
+        $invoice->save();
+
+        $calc = $invoice->calc();
+        $invoice = $calc->getInvoice();
+
+        $this->assertEquals(3474.45, $invoice->amount);
+        $this->assertEquals(14191, $invoice->discount);
+        $this->assertEquals(165.45, $invoice->total_taxes);
+
+        $item = collect($invoice->line_items)->firstWhere('product_key', 'line1');
+        $this->assertEquals(75.63, $item->tax_amount);
+        $this->assertEquals(8075.63, $item->gross_line_total);
+
+        $item = collect($invoice->line_items)->firstWhere('product_key', 'line2');
+        $this->assertEquals(89.82, $item->tax_amount);
+        $this->assertEquals(9589.82, $item->gross_line_total);
+
+
     }
 
     public function testTaskRoundingPrecisionThree()
@@ -107,7 +441,7 @@ class InvoiceTest extends TestCase
 
         $invoice = $invoice->calc()->getInvoice();
 
-        $this->assertEquals(57.90, $invoice->amount);
+        $this->assertEquals(57.92, $invoice->amount);
 
     }
 

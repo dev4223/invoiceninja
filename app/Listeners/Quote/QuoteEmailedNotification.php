@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -21,9 +21,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 
 class QuoteEmailedNotification implements ShouldQueue
 {
-    public $delay = 5;
-
     use UserNotifies;
+    public $delay = 5;
 
     public function __construct()
     {
@@ -53,7 +52,7 @@ class QuoteEmailedNotification implements ShouldQueue
             if (($key = array_search('mail', $methods)) !== false) {
                 unset($methods[$key]);
 
-                $nmo = new NinjaMailerObject;
+                $nmo = new NinjaMailerObject();
                 $nmo->mailable = new NinjaMailer((new EntitySentObject($event->invitation, 'quote', $event->template, $company_user->portalType()))->build());
                 $nmo->company = $quote->company;
                 $nmo->settings = $quote->company->settings;

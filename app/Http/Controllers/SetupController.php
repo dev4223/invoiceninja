@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -43,7 +43,7 @@ class SetupController extends Controller
 
     public function index()
     {
-        $check = SystemHealth::check(false);
+        $check = SystemHealth::check(false, false);
 
         if ($check['system_health'] == true && $check['simple_db_check'] && Schema::hasTable('accounts') && $account = Account::first()) {
             return redirect('/');
@@ -59,7 +59,7 @@ class SetupController extends Controller
     public function doSetup(StoreSetupRequest $request)
     {
         try {
-            $check = SystemHealth::check(false);
+            $check = SystemHealth::check(false, false);
         } catch (Exception $e) {
             nlog(['message' => $e->getMessage(), 'action' => 'SetupController::doSetup()']);
 
@@ -121,9 +121,8 @@ class SetupController extends Controller
             unset($env_values['DB_DATABASE']);
             unset($env_values['DB_USERNAME']);
             unset($env_values['DB_PASSWORD']);
-        }
-        else {
-            
+        } else {
+
             config(['database.connections.mysql.host' => $request->input('db_host')]);
             config(['database.connections.mysql.port' => $request->input('db_port')]);
             config(['database.connections.mysql.database' => $request->input('db_database')]);
@@ -146,6 +145,7 @@ class SetupController extends Controller
 
             Artisan::call('config:clear');
 
+            Artisan::call('key:generate', ['--force' => true]);
 
             Artisan::call('migrate', ['--force' => true]);
             Artisan::call('db:seed', ['--force' => true]);
@@ -159,8 +159,6 @@ class SetupController extends Controller
             }
 
             (new VersionCheck())->handle();
-
-            $this->buildCache(true);
 
             return redirect('/');
         } catch (Exception $e) {
@@ -182,7 +180,8 @@ class SetupController extends Controller
      * @return Application|ResponseFactory|JsonResponse|Response
      */
     public function checkDB(CheckDatabaseRequest $request)
-    {nlog("trying");
+    {
+
         try {
             $status = SystemHealth::dbCheck($request);
 
@@ -230,24 +229,6 @@ class SetupController extends Controller
         } catch (Exception $e) {
             nlog($e->getMessage());
 
-            return response([], 500);
-        }
-    }
-
-    private function testPhantom()
-    {
-        try {
-            $key = config('ninja.phantomjs_key');
-            $url = 'https://www.invoiceninja.org/';
-
-            $phantom_url = "https://phantomjscloud.com/api/browser/v2/{$key}/?request=%7Burl:%22{$url}%22,renderType:%22pdf%22%7D";
-            $pdf = CurlUtils::get($phantom_url);
-
-            Storage::disk(config('filesystems.default'))->put('test.pdf', $pdf);
-            Storage::disk('local')->put('test.pdf', $pdf);
-
-            return response(['url' => Storage::disk('local')->url('test.pdf')], 200);
-        } catch (Exception $e) {
             return response([], 500);
         }
     }
@@ -305,8 +286,7 @@ class SetupController extends Controller
 
         Artisan::call('migrate', ['--force' => true]);
         Artisan::call('db:seed', ['--force' => true]);
-
-        $this->buildCache(true);
+        Artisan::call('cache:clear');
 
         (new SchedulerCheck())->handle();
 

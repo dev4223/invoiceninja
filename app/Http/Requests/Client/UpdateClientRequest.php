@@ -4,20 +4,21 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Requests\Client;
 
-use App\DataMapper\CompanySettings;
 use App\Http\Requests\Request;
-use App\Http\ValidationRules\ValidClientGroupSettingsRule;
-use App\Utils\Traits\ChecksEntityStatus;
 use App\Utils\Traits\MakesHash;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
+use App\DataMapper\CompanySettings;
+use Illuminate\Support\Facades\Cache;
+use App\Utils\Traits\ChecksEntityStatus;
+use App\Http\ValidationRules\EInvoice\ValidClientScheme;
+use App\Http\ValidationRules\ValidClientGroupSettingsRule;
 
 class UpdateClientRequest extends Request
 {
@@ -29,7 +30,7 @@ class UpdateClientRequest extends Request
      *
      * @return bool
      */
-    public function authorize() : bool
+    public function authorize(): bool
     {
         /** @var \App\Models\User $user */
         $user = auth()->user();
@@ -44,30 +45,29 @@ class UpdateClientRequest extends Request
         $user = auth()->user();
 
         if ($this->file('documents') && is_array($this->file('documents'))) {
-            $rules['documents.*'] = $this->file_validation;
+            $rules['documents.*'] = $this->fileValidation();
         } elseif ($this->file('documents')) {
-            $rules['documents'] = $this->file_validation;
+            $rules['documents'] = $this->fileValidation();
         }
 
         if ($this->file('file') && is_array($this->file('file'))) {
-            $rules['file.*'] = $this->file_validation;
+            $rules['file.*'] = $this->fileValidation();
         } elseif ($this->file('file')) {
-            $rules['file'] = $this->file_validation;
+            $rules['file'] = $this->fileValidation();
+        } else {
+            $rules['documents'] = 'bail|sometimes|array';
         }
 
         $rules['company_logo'] = 'mimes:jpeg,jpg,png,gif|max:10000';
         $rules['industry_id'] = 'integer|nullable';
         $rules['size_id'] = 'integer|nullable';
-        $rules['country_id'] = 'integer|nullable';
-        $rules['shipping_country_id'] = 'integer|nullable';
+        $rules['country_id'] = 'integer|nullable|exists:countries,id';
+        $rules['shipping_country_id'] = 'integer|nullable|exists:countries,id';
+        $rules['classification'] = 'bail|sometimes|nullable|in:individual,business,company,partnership,trust,charity,government,other';
+        $rules['id_number'] = ['sometimes', 'bail', 'nullable', Rule::unique('clients')->where('company_id', $user->company()->id)->ignore($this->client->id)];
+        $rules['number'] = ['sometimes', 'bail', Rule::unique('clients')->where('company_id', $user->company()->id)->ignore($this->client->id)];
 
-        if ($this->id_number) {
-            $rules['id_number'] = Rule::unique('clients')->where('company_id', $user->company()->id)->ignore($this->client->id);
-        }
-
-        if ($this->number) {
-            $rules['number'] = Rule::unique('clients')->where('company_id', $user->company()->id)->ignore($this->client->id);
-        }
+        $rules['e_invoice'] = ['sometimes','nullable', new ValidClientScheme()];
 
         $rules['settings'] = new ValidClientGroupSettingsRule();
         $rules['contacts'] = 'array';
@@ -108,6 +108,8 @@ class UpdateClientRequest extends Request
         /* If the user removes the currency we must always set the default */
         if (array_key_exists('settings', $input) && ! array_key_exists('currency_id', $input['settings'])) {
             $input['settings']['currency_id'] = (string) $user->company()->settings->currency_id;
+        } elseif (empty($input['settings']['currency_id']) ?? true) {
+            $input['settings']['currency_id'] = (string) $user->company()->settings->currency_id;
         }
 
         if (isset($input['language_code'])) {
@@ -123,23 +125,45 @@ class UpdateClientRequest extends Request
         if (array_key_exists('name', $input)) {
             $input['name'] = strip_tags($input['name']);
         }
-        
+
+        // allow setting country_id by iso code
+        if (isset($input['country_code'])) {
+            $input['country_id'] = $this->getCountryCode($input['country_code']);
+        }
+
+        // allow setting country_id by iso code
+        if (isset($input['shipping_country_code'])) {
+            $input['shipping_country_id'] = $this->getCountryCode($input['shipping_country_code']);
+        }
+
+
         $this->replace($input);
+    }
+
+    private function getCountryCode($country_code)
+    {
+        
+        /** @var \Illuminate\Support\Collection<\App\Models\Country> */
+        $countries = app('countries');
+
+        $country = $countries->first(function ($item) use ($country_code) {
+            return $item->iso_3166_2 == $country_code || $item->iso_3166_3 == $country_code;
+        });
+
+        return $country ? (string) $country->id : '';
     }
 
     private function getLanguageId($language_code)
     {
-        $languages = Cache::get('languages');
+        
+        /** @var \Illuminate\Support\Collection<\App\Models\Language> */
+        $languages = app('languages');
 
-        $language = $languages->filter(function ($item) use ($language_code) {
+        $language = $languages->first(function ($item) use ($language_code) {
             return $item->locale == $language_code;
-        })->first();
+        });
 
-        if ($language) {
-            return (string) $language->id;
-        }
-
-        return '';
+        return $language ? (string) $language->id : '';
     }
 
     /**
@@ -149,7 +173,7 @@ class UpdateClientRequest extends Request
      * down to the free plan setting properties which
      * are saveable
      *
-     * @param  \stdClass $settings
+     * @param  mixed $settings
      * @return \stdClass $settings
      */
     private function filterSaveableSettings($settings)

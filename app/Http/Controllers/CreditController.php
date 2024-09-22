@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -16,6 +16,7 @@ use App\Models\Client;
 use App\Models\Credit;
 use App\Models\Account;
 use App\Models\Invoice;
+use App\Models\Webhook;
 use Illuminate\Http\Response;
 use App\Factory\CreditFactory;
 use App\Filters\CreditFilters;
@@ -31,6 +32,7 @@ use App\Events\Credit\CreditWasCreated;
 use App\Events\Credit\CreditWasUpdated;
 use App\Transformers\CreditTransformer;
 use Illuminate\Support\Facades\Storage;
+use App\Services\Template\TemplateAction;
 use App\Http\Requests\Credit\BulkCreditRequest;
 use App\Http\Requests\Credit\EditCreditRequest;
 use App\Http\Requests\Credit\ShowCreditRequest;
@@ -67,7 +69,7 @@ class CreditController extends BaseController
      *
      * @param CreditFilters $filters  The filters
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      * @OA\Get(
      *      path="/api/v1/credits",
@@ -113,7 +115,7 @@ class CreditController extends BaseController
      *
      * @param CreateCreditRequest $request  The request
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -150,8 +152,9 @@ class CreditController extends BaseController
     {
         /** @var \App\Models\User $user **/
         $user = auth()->user();
-        
+
         $credit = CreditFactory::create($user->company()->id, $user->id);
+        $credit->date = now()->addSeconds($user->company()->utc_offset())->format('Y-m-d');
 
         return $this->itemResponse($credit);
     }
@@ -161,7 +164,7 @@ class CreditController extends BaseController
      *
      * @param StoreCreditRequest $request  The request
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Post(
@@ -223,7 +226,7 @@ class CreditController extends BaseController
      * @param ShowCreditRequest $request  The request
      * @param Credit $credit  The credit
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -278,7 +281,7 @@ class CreditController extends BaseController
      * @param EditCreditRequest $request The request
      * @param Credit $credit The credit
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      * @OA\Get(
      *      path="/api/v1/credits/{id}/edit",
@@ -331,7 +334,7 @@ class CreditController extends BaseController
      *
      * @param UpdateCreditRequest $request The request
      * @param Credit $credit
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @throws \ReflectionException
@@ -385,8 +388,8 @@ class CreditController extends BaseController
         $credit = $this->credit_repository->save($request->all(), $credit);
 
         $credit->service()
-               ->triggeredActions($request)
-               ->deletePdf();
+               ->triggeredActions($request);
+        //    ->deletePdf();
 
         /** @var \App\Models\User $user**/
         $user = auth()->user();
@@ -455,7 +458,7 @@ class CreditController extends BaseController
     /**
      * Perform bulk actions on the list view.
      *
-     * @return \Illuminate\Support\Collection
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse | \Illuminate\Http\JsonResponse | \Illuminate\Http\Response
      *
      * @OA\Post(
      *      path="/api/v1/credits/bulk",
@@ -527,22 +530,20 @@ class CreditController extends BaseController
          */
 
         if ($action == 'bulk_download' && $credits->count() > 1) {
-            $credits->each(function ($credit) use($user){
+            $credits->each(function ($credit) use ($user) {
                 if ($user->cannot('view', $credit)) {
-                    nlog('access denied');
-
                     return response()->json(['message' => ctrans('text.access_denied')]);
                 }
             });
 
-            ZipCredits::dispatch($credits, $credits->first()->company, $user);
+            ZipCredits::dispatch($credits->pluck('id')->toArray(), $user->company(), $user);
 
             return response()->json(['message' => ctrans('texts.sent_message')], 200);
         }
 
         if ($action == 'bulk_print' && $user->can('view', $credits->first())) {
             $paths = $credits->map(function ($credit) {
-                return $credit->service()->getCreditPdf($credit->invitations->first());
+                return (new \App\Jobs\Entity\CreateRawPdf($credit->invitations->first()))->handle();
             });
 
             $merge = (new PdfMerge($paths->toArray()))->run();
@@ -550,6 +551,25 @@ class CreditController extends BaseController
             return response()->streamDownload(function () use ($merge) {
                 echo($merge);
             }, 'print.pdf', ['Content-Type' => 'application/pdf']);
+        }
+
+
+        if($action == 'template' && $user->can('view', $credits->first())) {
+
+            $hash_or_response = $request->boolean('send_email') ? 'email sent' : \Illuminate\Support\Str::uuid();
+
+            TemplateAction::dispatch(
+                $credits->pluck('hashed_id')->toArray(),
+                $request->template_id,
+                Credit::class,
+                $user->id,
+                $user->company(),
+                $user->company()->db,
+                $hash_or_response,
+                $request->boolean('send_email')
+            );
+
+            return response()->json(['message' => $hash_or_response], 200);
         }
 
         $credits->each(function ($credit, $key) use ($action, $user) {
@@ -574,33 +594,28 @@ class CreditController extends BaseController
                 $credit->service()->markPaid()->save();
 
                 return $this->itemResponse($credit);
-                break;
 
             case 'clone_to_credit':
                 $credit = CloneCreditFactory::create($credit, auth()->user()->id);
 
                 return $this->itemResponse($credit);
-                break;
             case 'history':
                 // code...
                 break;
             case 'mark_sent':
-                $credit->service()->markSent()->save();
+                $credit->service()->markSent(true)->save();
 
                 if (! $bulk) {
                     return $this->itemResponse($credit);
                 }
                 break;
             case 'download':
-                // $file = $credit->pdf_file_path();
                 $file = $credit->service()->getCreditPdf($credit->invitations->first());
 
-                // return response()->download($file, basename($file), ['Cache-Control:' => 'no-cache'])->deleteFileAfterSend(true);
-
                 return response()->streamDownload(function () use ($file) {
-                    echo Storage::get($file);
-                }, basename($file), ['Content-Type' => 'application/pdf']);
-                break;
+                    echo $file;
+                }, $credit->numberFormatter() . '.pdf', ['Content-Type' => 'application/pdf']);
+                
             case 'archive':
                 $this->credit_repository->archive($credit);
 
@@ -623,31 +638,21 @@ class CreditController extends BaseController
                 }
                 break;
             case 'email':
-
-                $credit->invitations->load('contact.client.country', 'credit.client.country', 'credit.company')->each(function ($invitation) use ($credit) {
-                    EmailEntity::dispatch($invitation, $credit->company, 'credit');
-                });
-
-
-                if (! $bulk) {
-                    return response()->json(['message'=>'email sent'], 200);
-                }
-                break;
-
             case 'send_email':
 
                 $credit->invitations->load('contact.client.country', 'credit.client.country', 'credit.company')->each(function ($invitation) use ($credit) {
                     EmailEntity::dispatch($invitation, $credit->company, 'credit');
                 });
 
+                // $credit->sendEvent(Webhook::EVENT_SENT_CREDIT, "client");
+
                 if (! $bulk) {
-                    return response()->json(['message'=>'email sent'], 200);
+                    return response()->json(['message' => 'email sent'], 200);
                 }
                 break;
 
             default:
                 return response()->json(['message' => ctrans('texts.action_unavailable', ['action' => $action])], 400);
-                break;
         }
     }
 
@@ -692,7 +697,7 @@ class CreditController extends BaseController
      *       ),
      *     )
      * @param $invitation_key
-     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse | \Illuminate\Http\JsonResponse | \Illuminate\Http\Response
      */
     public function downloadPdf($invitation_key)
     {
@@ -705,7 +710,7 @@ class CreditController extends BaseController
         $credit = $invitation->credit;
 
         App::setLocale($invitation->contact->preferredLocale());
-        
+
         $file = $credit->service()->getCreditPdf($invitation);
 
         $headers = ['Content-Type' => 'application/pdf'];
@@ -715,16 +720,85 @@ class CreditController extends BaseController
         }
 
         return response()->streamDownload(function () use ($file) {
-            echo Storage::get($file);
-        }, basename($file), $headers);
+            echo $file;
+        }, $credit->numberFormatter() . '.pdf', $headers);
+
     }
+    /**
+     * @OA\Get(
+     *      path="/api/v1/credit/{invitation_key}/download_e_credit",
+     *      operationId="downloadXcredit",
+     *      tags={"credit"},
+     *      summary="Download a specific x-credit by invitation key",
+     *      description="Downloads a specific x-credit",
+     *      @OA\Parameter(ref="#/components/parameters/X-API-TOKEN"),
+     *      @OA\Parameter(ref="#/components/parameters/X-Requested-With"),
+     *      @OA\Parameter(ref="#/components/parameters/include"),
+     *      @OA\Parameter(
+     *          name="invitation_key",
+     *          in="path",
+     *          description="The credit Invitation Key",
+     *          example="D2J234DFA",
+     *          required=true,
+     *          @OA\Schema(
+     *              type="string",
+     *              format="string",
+     *          ),
+     *      ),
+     *      @OA\Response(
+     *          response=200,
+     *          description="Returns the x-credit pdf",
+     *          @OA\Header(header="X-MINIMUM-CLIENT-VERSION", ref="#/components/headers/X-MINIMUM-CLIENT-VERSION"),
+     *          @OA\Header(header="X-RateLimit-Remaining", ref="#/components/headers/X-RateLimit-Remaining"),
+     *          @OA\Header(header="X-RateLimit-Limit", ref="#/components/headers/X-RateLimit-Limit"),
+     *       ),
+     *       @OA\Response(
+     *          response=422,
+     *          description="Validation error",
+     *          @OA\JsonContent(ref="#/components/schemas/ValidationError"),
+     *
+     *       ),
+     *       @OA\Response(
+     *           response="default",
+     *           description="Unexpected Error",
+     *           @OA\JsonContent(ref="#/components/schemas/Error"),
+     *       ),
+     *     )
+     * @param $invitation_key
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse | \Illuminate\Http\JsonResponse | \Illuminate\Http\Response
+     */
+    public function downloadECredit($invitation_key)
+    {
+        $invitation = $this->credit_repository->getInvitationByKey($invitation_key);
+
+        if (! $invitation) {
+            return response()->json(['message' => 'no record found'], 400);
+        }
+
+        $contact = $invitation->contact;
+        $credit = $invitation->credit;
+
+        $file = $credit->service()->getECredit($contact);
+        $file_name = $credit->getFileName("xml");
+
+        $headers = ['Content-Type' => 'application/xml'];
+
+        if (request()->input('inline') == 'true') {
+            $headers = array_merge($headers, ['Content-Disposition' => 'inline']);
+        }
+
+        return response()->streamDownload(function () use ($file) {
+            echo $file;
+        }, $file_name, $headers);
+    }
+
 
     /**
      * Update the specified resource in storage.
      *
      * @param UploadCreditRequest $request
      * @param Credit $credit
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *

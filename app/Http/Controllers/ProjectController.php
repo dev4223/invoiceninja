@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -13,6 +13,7 @@ namespace App\Http\Controllers;
 
 use App\Factory\ProjectFactory;
 use App\Filters\ProjectFilters;
+use App\Http\Requests\Project\BulkProjectRequest;
 use App\Http\Requests\Project\CreateProjectRequest;
 use App\Http\Requests\Project\DestroyProjectRequest;
 use App\Http\Requests\Project\EditProjectRequest;
@@ -23,6 +24,7 @@ use App\Http\Requests\Project\UploadProjectRequest;
 use App\Models\Account;
 use App\Models\Project;
 use App\Repositories\ProjectRepository;
+use App\Services\Template\TemplateAction;
 use App\Transformers\ProjectTransformer;
 use App\Utils\Traits\GeneratesCounter;
 use App\Utils\Traits\MakesHash;
@@ -86,7 +88,7 @@ class ProjectController extends BaseController
      *       ),
      *     )
      * @param ProjectFilters $filters
-     * @return Response|mixed
+     * @return Response| \Illuminate\Http\JsonResponse|mixed
      */
     public function index(ProjectFilters $filters)
     {
@@ -100,7 +102,7 @@ class ProjectController extends BaseController
      *
      * @param ShowProjectRequest $request
      * @param Project $project
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -154,7 +156,7 @@ class ProjectController extends BaseController
      *
      * @param EditProjectRequest $request
      * @param Project $project
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -208,7 +210,7 @@ class ProjectController extends BaseController
      *
      * @param UpdateProjectRequest $request
      * @param Project $project
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -276,7 +278,7 @@ class ProjectController extends BaseController
      * Show the form for creating a new resource.
      *
      * @param CreateProjectRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -324,7 +326,7 @@ class ProjectController extends BaseController
      * Store a newly created resource in storage.
      *
      * @param StoreProjectRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -386,7 +388,7 @@ class ProjectController extends BaseController
      *
      * @param DestroyProjectRequest $request
      * @param Project $project
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @throws \Exception
@@ -443,7 +445,7 @@ class ProjectController extends BaseController
     /**
      * Perform bulk actions on the list view.
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Post(
@@ -490,18 +492,36 @@ class ProjectController extends BaseController
      *       ),
      *     )
      */
-    public function bulk()
+    public function bulk(BulkProjectRequest $request)
     {
         /** @var \App\Models\User $user */
         $user = auth()->user();
 
-        $action = request()->input('action');
+        $action = $request->input('action');
 
-        $ids = request()->input('ids');
+        $ids = $request->input('ids');
 
-        $projects = Project::withTrashed()->find($this->transformKeys($ids));
+        $projects = Project::withTrashed()->whereIn('id', $this->transformKeys($ids))->company()->get();
 
-        $projects->each(function ($project, $key) use ($action, $user) {
+        if($action == 'template' && $user->can('view', $projects->first())) {
+
+            $hash_or_response = $request->boolean('send_email') ? 'email sent' : \Illuminate\Support\Str::uuid();
+
+            TemplateAction::dispatch(
+                $projects->pluck('hashed_id')->toArray(),
+                $request->template_id,
+                Project::class,
+                $user->id,
+                $user->company(),
+                $user->company()->db,
+                $hash_or_response,
+                $request->boolean('send_email')
+            );
+
+            return response()->json(['message' => $hash_or_response], 200);
+        }
+
+        $projects->each(function ($project) use ($action, $user) {
             if ($user->can('edit', $project)) {
                 $this->project_repo->{$action}($project);
             }
@@ -515,7 +535,7 @@ class ProjectController extends BaseController
      *
      * @param UploadProjectRequest $request
      * @param Project $project
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      * @OA\Put(
      *      path="/api/v1/projects/{id}/upload",

@@ -4,21 +4,17 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Mail;
 
-use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
-use Illuminate\Queue\SerializesModels;
 
 class TestMailServer extends Mailable
 {
-    //   use Queueable, SerializesModels;
-
     public $support_messages;
 
     public $from_email;
@@ -36,11 +32,11 @@ class TestMailServer extends Mailable
      */
     public function build()
     {
-        $settings = new \stdClass;
+        $settings = new \stdClass();
         $settings->primary_color = '#4caf50';
         $settings->email_style = 'dark';
         $settings->email_alignment = 'left';
-        
+
         return $this->from(config('mail.from.address'), config('mail.from.name'))
             ->subject(ctrans('texts.email'))
             ->markdown('email.support.message', [

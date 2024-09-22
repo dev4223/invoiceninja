@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -38,7 +38,16 @@ class ExpenseFilters extends QueryFilters
                 ->orWhere('custom_value1', 'like', '%'.$filter.'%')
                 ->orWhere('custom_value2', 'like', '%'.$filter.'%')
                 ->orWhere('custom_value3', 'like', '%'.$filter.'%')
-                ->orWhere('custom_value4', 'like', '%'.$filter.'%');
+                ->orWhere('custom_value4', 'like', '%'.$filter.'%')
+                ->orWhereHas('category', function ($q) use ($filter) {
+                    $q->where('name', 'like', '%'.$filter.'%');
+                })
+                ->orWhereHas('vendor', function ($q) use ($filter) {
+                    $q->where('name', 'like', '%'.$filter.'%');
+                })
+                ->orWhereHas('client', function ($q) use ($filter) {
+                    $q->where('name', 'like', '%'.$filter.'%');
+                });
         });
     }
 
@@ -70,7 +79,7 @@ class ExpenseFilters extends QueryFilters
         $this->builder->where(function ($query) use ($status_parameters) {
             if (in_array('logged', $status_parameters)) {
                 $query->orWhere(function ($query) {
-                    $query->where('amount', '>', 0)
+                    $query->where('amount', '>=', 0)
                           ->whereNull('invoice_id')
                           ->whereNull('payment_date')
                           ->where('should_be_invoiced', false);
@@ -101,6 +110,12 @@ class ExpenseFilters extends QueryFilters
                     $query->whereNull('payment_date');
                 });
             }
+
+            if(in_array('uncategorized', $status_parameters)) {
+                $query->orWhere(function ($query) {
+                    $query->whereNull('category_id');
+                });
+            }
         });
 
         // nlog($this->builder->toSql());
@@ -122,9 +137,9 @@ class ExpenseFilters extends QueryFilters
 
             $search_key = $split[0] == 'client' ? 'client_id' : 'project_id';
 
-            return $this->builder->whereHas('invoice', function ($query) use ($search_key, $split){
-                        $query->where($search_key, $this->decodePrimaryKey($split[1]))
-                              ->whereIn('status_id', [\App\Models\Invoice::STATUS_DRAFT, \App\Models\Invoice::STATUS_SENT, \App\Models\Invoice::STATUS_PARTIAL]);
+            return $this->builder->whereHas('invoice', function ($query) use ($search_key, $split) {
+                $query->where($search_key, $this->decodePrimaryKey($split[1]))
+                      ->whereIn('status_id', [\App\Models\Invoice::STATUS_DRAFT, \App\Models\Invoice::STATUS_SENT, \App\Models\Invoice::STATUS_PARTIAL]);
             });
         }
 
@@ -166,18 +181,35 @@ class ExpenseFilters extends QueryFilters
             return $this->builder;
         }
 
-        if ($sort_col[0] == 'client_id') {
-            return $this->builder->orderBy(\App\Models\Client::select('name')
+        $dir = ($sort_col[1] == 'asc') ? 'asc' : 'desc';
+
+        if ($sort_col[0] == 'client_id' && in_array($sort_col[1], ['asc', 'desc'])) {
+            return $this->builder
+                    ->orderByRaw('ISNULL(client_id), client_id '. $sort_col[1])
+                    ->orderBy(\App\Models\Client::select('name')
                     ->whereColumn('clients.id', 'expenses.client_id'), $sort_col[1]);
         }
 
-        if ($sort_col[0] == 'vendor_id') {
-            return $this->builder->orderBy(\App\Models\Vendor::select('name')
+        if ($sort_col[0] == 'vendor_id' && in_array($sort_col[1], ['asc', 'desc'])) {
+            return $this->builder
+                    ->orderByRaw('ISNULL(vendor_id), vendor_id '. $sort_col[1])
+                    ->orderBy(\App\Models\Vendor::select('name')
                     ->whereColumn('vendors.id', 'expenses.vendor_id'), $sort_col[1]);
+
         }
 
+        if ($sort_col[0] == 'category_id' && in_array($sort_col[1], ['asc', 'desc'])) {
+            return $this->builder
+                    ->orderByRaw('ISNULL(category_id), category_id '. $sort_col[1])
+                    ->orderBy(\App\Models\ExpenseCategory::select('name')
+                    ->whereColumn('expense_categories.id', 'expenses.category_id'), $sort_col[1]);
+        }
 
-        if (is_array($sort_col) && in_array($sort_col[1], ['asc', 'desc']) && in_array($sort_col[0], ['public_notes', 'date', 'id_number', 'custom_value1', 'custom_value2', 'custom_value3', 'custom_value4'])) {
+        if($sort_col[0] == 'number') {
+            return $this->builder->orderByRaw("REGEXP_REPLACE(number,'[^0-9]+','')+0 " . $dir);
+        }
+
+        if (is_array($sort_col) && in_array($sort_col[1], ['asc', 'desc']) && in_array($sort_col[0], ['amount', 'public_notes', 'date', 'id_number', 'custom_value1', 'custom_value2', 'custom_value3', 'custom_value4'])) {
             return $this->builder->orderBy($sort_col[0], $sort_col[1]);
         }
 

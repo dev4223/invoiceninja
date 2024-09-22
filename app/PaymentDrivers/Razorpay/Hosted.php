@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -41,7 +41,7 @@ class Hosted implements MethodInterface
      * Show the authorization page for Razorpay.
      *
      * @param array $data
-     * @return \Illuminate\View\View         
+     * @return \Illuminate\View\View
      */
     public function authorizeView(array $data): View
     {
@@ -52,7 +52,7 @@ class Hosted implements MethodInterface
      * Handle the authorization page for Razorpay.
      *
      * @param Request $request
-     * @return RedirectResponse
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function authorizeResponse(Request $request): RedirectResponse
     {
@@ -63,7 +63,7 @@ class Hosted implements MethodInterface
      * Payment view for the Razorpay.
      *
      * @param array $data
-     * @return \Illuminate\View\View         
+     * @return \Illuminate\View\View
      */
     public function paymentView(array $data): View
     {
@@ -127,7 +127,7 @@ class Hosted implements MethodInterface
      * Handle the successful payment for Razorpay.
      *
      * @param string $payment_id
-     * @return RedirectResponse
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function processSuccessfulPayment(string $payment_id): RedirectResponse
     {

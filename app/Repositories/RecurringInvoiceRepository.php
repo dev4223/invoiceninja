@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -19,14 +19,14 @@ use App\Models\RecurringInvoiceInvitation;
  */
 class RecurringInvoiceRepository extends BaseRepository
 {
-    public function save($data, RecurringInvoice $invoice) : ?RecurringInvoice
+    public function save($data, RecurringInvoice $invoice): ?RecurringInvoice
     {
         $invoice = $this->alternativeSave($data, $invoice);
 
         return $invoice;
     }
 
-    public function getInvitationByKey($key) :?RecurringInvoiceInvitation
+    public function getInvitationByKey($key): ?RecurringInvoiceInvitation
     {
         return RecurringInvoiceInvitation::withTrashed()->where('key', $key)->first();
     }

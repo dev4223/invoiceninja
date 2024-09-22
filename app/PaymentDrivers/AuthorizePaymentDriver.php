@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -41,7 +41,7 @@ class AuthorizePaymentDriver extends BaseDriver
         GatewayType::CREDIT_CARD => AuthorizeCreditCard::class,
     ];
 
-    const SYSTEM_LOG_TYPE = SystemLog::TYPE_AUTHORIZE;
+    public const SYSTEM_LOG_TYPE = SystemLog::TYPE_AUTHORIZE;
 
     public function setPaymentMethod($payment_method_id)
     {
@@ -67,7 +67,7 @@ class AuthorizePaymentDriver extends BaseDriver
     public function getClientRequiredFields(): array
     {
         $data = [
-            ['name' => 'client_name', 'label' => ctrans('texts.name'), 'type' => 'text', 'validation' => 'required|min:2'],
+            // ['name' => 'client_name', 'label' => ctrans('texts.name'), 'type' => 'text', 'validation' => 'required|min:2'],
             ['name' => 'client_phone', 'label' => ctrans('texts.phone'), 'type' => 'text', 'validation' => 'required'],
             ['name' => 'contact_email', 'label' => ctrans('texts.email'), 'type' => 'text', 'validation' => 'required|email:rfc'],
             ['name' => 'client_address_line_1', 'label' => ctrans('texts.address1'), 'type' => 'text', 'validation' => 'required'],
@@ -90,7 +90,7 @@ class AuthorizePaymentDriver extends BaseDriver
         if ($this->company_gateway->require_custom_value1) {
             $fields[] = ['name' => 'client_custom_value1', 'label' => $this->helpers->makeCustomField($this->client->company->custom_fields, 'client1'), 'type' => 'text', 'validation' => 'required'];
         }
-        
+
 
         if ($this->company_gateway->require_custom_value2) {
             $fields[] = ['name' => 'client_custom_value2', 'label' => $this->helpers->makeCustomField($this->client->company->custom_fields, 'client2'), 'type' => 'text', 'validation' => 'required'];
@@ -173,7 +173,7 @@ class AuthorizePaymentDriver extends BaseDriver
         return $env = ANetEnvironment::PRODUCTION;
     }
 
-    public function findClientGatewayRecord() :?ClientGatewayToken
+    public function findClientGatewayRecord(): ?ClientGatewayToken
     {
         return ClientGatewayToken::where('client_id', $this->client->id)
                                  ->where('company_gateway_id', $this->company_gateway->id)
@@ -193,6 +193,20 @@ class AuthorizePaymentDriver extends BaseDriver
 
     public function import()
     {
+        $this->init();
+
+        nlog("starting import auth.net");
+
         return (new AuthorizeCustomer($this))->importCustomers();
+    }
+
+    public function importCustomers()
+    {
+        return $this->import();
+    }
+
+    public function auth(): bool
+    {
+        return $this->init()->getPublicClientKey() ?? false;
     }
 }

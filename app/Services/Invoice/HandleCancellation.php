@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -34,7 +34,7 @@ class HandleCancellation extends AbstractService
             return $this->invoice;
         }
 
-        $adjustment = $this->invoice->balance * -1;
+        $adjustment = ($this->invoice->balance < 0) ? abs($this->invoice->balance) : $this->invoice->balance * -1;
 
         $this->backupCancellation($adjustment);
 
@@ -44,7 +44,8 @@ class HandleCancellation extends AbstractService
         $this->invoice->balance = 0;
         $this->invoice = $this->invoice->service()->setStatus(Invoice::STATUS_CANCELLED)->save();
 
-        $this->invoice->client->service()->updateBalance($adjustment)->save();
+        // $this->invoice->client->service()->updateBalance($adjustment)->save();
+        $this->invoice->client->service()->calculateBalance();
 
         $this->invoice->service()->workFlow()->save();
 
@@ -64,13 +65,17 @@ class HandleCancellation extends AbstractService
         $adjustment = $cancellation->adjustment * -1;
 
         $this->invoice->ledger()->updateInvoiceBalance($adjustment, "Invoice {$this->invoice->number} reversal");
-        $this->invoice->fresh();
+
+        $this->invoice = $this->invoice->fresh();
 
         /* Reverse the invoice status and balance */
         $this->invoice->balance += $adjustment;
         $this->invoice->status_id = $cancellation->status_id;
 
         $this->invoice->client->service()->updateBalance($adjustment)->save();
+
+        $this->invoice->client->service()->calculateBalance();
+
 
         /* Pop the cancellation out of the backup*/
         $backup = $this->invoice->backup;
@@ -91,11 +96,11 @@ class HandleCancellation extends AbstractService
     private function backupCancellation($adjustment)
     {
         if (! is_object($this->invoice->backup)) {
-            $backup = new stdClass;
+            $backup = new stdClass();
             $this->invoice->backup = $backup;
         }
 
-        $cancellation = new stdClass;
+        $cancellation = new stdClass();
         $cancellation->adjustment = $adjustment;
         $cancellation->status_id = $this->invoice->status_id;
 

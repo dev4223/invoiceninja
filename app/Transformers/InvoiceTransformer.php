@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -14,6 +14,7 @@ namespace App\Transformers;
 use App\Models\Activity;
 use App\Models\Backup;
 use App\Models\Client;
+use App\Models\Credit;
 use App\Models\Document;
 use App\Models\Invoice;
 use App\Models\InvoiceInvitation;
@@ -24,12 +25,12 @@ class InvoiceTransformer extends EntityTransformer
 {
     use MakesHash;
 
-    protected $defaultIncludes = [
+    protected array $defaultIncludes = [
         'invitations',
         'documents',
     ];
 
-    protected $availableIncludes = [
+    protected array $availableIncludes = [
         'payments',
         'client',
         'activities',
@@ -61,6 +62,13 @@ class InvoiceTransformer extends EntityTransformer
         $transformer = new PaymentTransformer($this->serializer);
 
         return $this->includeCollection($invoice->payments, $transformer, Payment::class);
+    }
+
+    public function includeCredits(Invoice $invoice)
+    {
+        $transformer = new CreditTransformer($this->serializer);
+
+        return $this->includeCollection($invoice->credits, $transformer, Credit::class);
     }
 
     /*
@@ -124,7 +132,7 @@ class InvoiceTransformer extends EntityTransformer
             'is_amount_discount' => (bool) ($invoice->is_amount_discount ?: false),
             'footer' => $invoice->footer ?: '',
             'partial' => (float) ($invoice->partial ?: 0.0),
-            'partial_due_date' => $invoice->partial_due_date ?: '',
+            'partial_due_date' => ($invoice->partial_due_date && $invoice->partial_due_date != "-0001-11-30") ? $invoice->partial_due_date->format('Y-m-d') : '',
             'custom_value1' => (string) $invoice->custom_value1 ?: '',
             'custom_value2' => (string) $invoice->custom_value2 ?: '',
             'custom_value3' => (string) $invoice->custom_value3 ?: '',
@@ -149,7 +157,9 @@ class InvoiceTransformer extends EntityTransformer
             'paid_to_date' => (float) $invoice->paid_to_date,
             'subscription_id' => $this->encodePrimaryKey($invoice->subscription_id),
             'auto_bill_enabled' => (bool) $invoice->auto_bill_enabled,
-            'tax_info' => $invoice->tax_data ?: new \stdClass,
+            'tax_info' => $invoice->tax_data ?: new \stdClass(),
+            'e_invoice' => $invoice->e_invoice ?: new \stdClass(),
+
         ];
 
         if (request()->has('reminder_schedule') && request()->query('reminder_schedule') == 'true') {

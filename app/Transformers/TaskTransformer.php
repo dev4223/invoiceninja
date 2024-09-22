@@ -4,20 +4,20 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Transformers;
 
-use App\Models\Task;
-use App\Models\User;
 use App\Models\Client;
+use App\Models\Document;
 use App\Models\Invoice;
 use App\Models\Project;
-use App\Models\Document;
+use App\Models\Task;
 use App\Models\TaskStatus;
+use App\Models\User;
 use App\Utils\Traits\MakesHash;
 use League\Fractal\Resource\Item;
 
@@ -28,7 +28,7 @@ class TaskTransformer extends EntityTransformer
 {
     use MakesHash;
 
-    protected $defaultIncludes = [
+    protected array $defaultIncludes = [
         'documents',
         'project',
     ];
@@ -36,12 +36,13 @@ class TaskTransformer extends EntityTransformer
     /**
      * @var array
      */
-    protected $availableIncludes = [
+    protected array $availableIncludes = [
         'client',
         'status',
         'project',
         'user',
         'invoice',
+        'assigned_user',
     ];
 
     public function includeDocuments(Task $task)
@@ -55,7 +56,7 @@ class TaskTransformer extends EntityTransformer
     {
         $transformer = new InvoiceTransformer($this->serializer);
 
-        if (!$task->user) {
+        if (!$task->invoice) {
             return null;
         }
 
@@ -66,13 +67,23 @@ class TaskTransformer extends EntityTransformer
     {
         $transformer = new UserTransformer($this->serializer);
 
-        if (!$task->user) {
+        if (!$task->user) { //@phpstan-ignore-line
             return null;
         }
 
         return $this->includeItem($task->user, $transformer, User::class);
     }
 
+    public function includeAssignedUser(Task $task): ?Item
+    {
+        $transformer = new UserTransformer($this->serializer);
+
+        if (!$task->assigned_user) {
+            return null;
+        }
+
+        return $this->includeItem($task->assigned_user, $transformer, User::class);
+    }
 
     public function includeClient(Task $task): ?Item
     {
@@ -100,11 +111,11 @@ class TaskTransformer extends EntityTransformer
     {
         $transformer = new ProjectTransformer($this->serializer);
 
-        if (!$task->project) {
-            return null;
+        if ($task->project) {
+            return $this->includeItem($task->project, $transformer, Project::class);
         }
 
-        return $this->includeItem($task->project, $transformer, Project::class);
+        return null;
     }
 
     public function transform(Task $task)

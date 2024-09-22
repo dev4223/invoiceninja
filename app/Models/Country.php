@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -77,12 +77,12 @@ class Country extends StaticModel
      *
      * @return string The translated country name
      */
-    public function getName() :string
+    public function getName(): string
     {
         return trans('texts.country_'.$this->name);
     }
-          public function getID() :string
-          {
-              return $this->id;
-          }
+    public function getID(): string
+    {
+        return $this->id;
+    }
 }

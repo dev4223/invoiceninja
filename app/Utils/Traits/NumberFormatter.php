@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -36,7 +36,7 @@ trait NumberFormatter
      * @param      string $value  The value
      * @return     float   Consumable float value
      */
-    private function parseFloat($value) : float
+    private function parseFloat($value): float
     {
         // check for comma as decimal separator
         if (preg_match('/,[\d]{1,2}$/', $value)) {

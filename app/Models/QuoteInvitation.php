@@ -4,20 +4,17 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
 
-use App\Jobs\Entity\CreateEntityPdf;
 use App\Utils\Traits\Inviteable;
 use App\Utils\Traits\MakesDates;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * App\Models\QuoteInvitation
@@ -81,47 +78,52 @@ class QuoteInvitation extends BaseModel
         return self::class;
     }
 
+    public function getEntityString(): string
+    {
+        return 'quote';
+    }
+
     public function entityType()
     {
         return Quote::class;
     }
 
     /**
-     * @return mixed
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public function quote()
+    public function quote(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Quote::class)->withTrashed();
     }
 
     /**
-     * @return mixed
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public function entity()
+    public function entity(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Quote::class)->withTrashed();
     }
 
     /**
-     * @return mixed
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public function contact()
+    public function contact(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(ClientContact::class, 'client_contact_id', 'id')->withTrashed();
     }
 
     /**
-     * @return mixed
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public function user()
+    public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class)->withTrashed();
     }
 
     /**
-     * @return BelongsTo
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public function company()
+    public function company(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Company::class);
     }
@@ -141,14 +143,4 @@ class QuoteInvitation extends BaseModel
         $this->save();
     }
 
-    public function pdf_file_path()
-    {
-        $storage_path = Storage::url($this->quote->client->quote_filepath($this).$this->quote->numberFormatter().'.pdf');
-
-        if (! Storage::exists($this->quote->client->quote_filepath($this).$this->quote->numberFormatter().'.pdf')) {
-            (new CreateEntityPdf($this))->handle();
-        }
-
-        return $storage_path;
-    }
 }

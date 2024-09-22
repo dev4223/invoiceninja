@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -19,7 +19,6 @@ use Illuminate\Http\Request;
  */
 class PostMarkController extends BaseController
 {
-    private $invitation;
 
     public function __construct()
     {
@@ -62,7 +61,7 @@ class PostMarkController extends BaseController
     public function webhook(Request $request)
     {
         if ($request->header('X-API-SECURITY') && $request->header('X-API-SECURITY') == config('services.postmark.token')) {
-            ProcessPostmarkWebhook::dispatch($request->all());
+            ProcessPostmarkWebhook::dispatch($request->all())->delay(10);
 
             return response()->json(['message' => 'Success'], 200);
         }

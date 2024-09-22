@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -26,10 +26,9 @@ class ShowDocumentRequest extends FormRequest
      */
     public function authorize()
     {
-        
-        /** @var \App\Models\VendorContact auth()->guard('vendor')->user() */
-        return auth()->guard('vendor')->user()->vendor_id == $this->document->documentable_id
-            || $this->document->company_id == auth()->guard('vendor')->user()->company_id;
+
+        return (bool) (auth()->guard('vendor')->user()->vendor_id == $this->document->documentable_id
+            || $this->document->company_id == auth()->guard('vendor')->user()->company_id);
     }
 
     /**

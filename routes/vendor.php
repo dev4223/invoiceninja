@@ -24,7 +24,7 @@ Route::get('vendor/key_login/{contact_key}', [VendorContactHashLoginController::
 Route::group(['middleware' => ['invite_db'], 'prefix' => 'vendor', 'as' => 'vendor.'], function () {
     /*Invitation catches*/
     Route::get('purchase_order/{invitation_key}', [InvitationController::class, 'purchaseOrder']);
-    Route::get('purchase_order/{invitation_key}/download', [InvitationController::class, 'download']);
+    Route::get('purchase_order/{invitation_key}/download', [InvitationController::class, 'download']);//->middleware('token_auth');
 });
 
 Route::group(['middleware' => ['auth:vendor', 'vendor_locale', 'domain_db'], 'prefix' => 'vendor', 'as' => 'vendor.'], function () {
@@ -37,6 +37,7 @@ Route::group(['middleware' => ['auth:vendor', 'vendor_locale', 'domain_db'], 'pr
 
     Route::get('profile/{vendor_contact}/edit', [VendorContactController::class, 'edit'])->name('profile.edit');
     Route::put('profile/{vendor_contact}/edit', [VendorContactController::class, 'update'])->name('profile.update');
+    Route::get('purchase_order/{invitation_key}/download_e_purchase_order', [App\Http\Controllers\PurchaseOrderController::class, 'downloadEPurchaseOrder'])->name('purchase_order.download_e_purchase_order')->middleware('token_auth');
 
     Route::post('purchase_orders/bulk', [PurchaseOrderController::class, 'bulk'])->name('purchase_orders.bulk');
     Route::get('logout', [VendorContactLoginController::class, 'logout'])->name('logout');
@@ -45,8 +46,9 @@ Route::group(['middleware' => ['auth:vendor', 'vendor_locale', 'domain_db'], 'pr
     Route::post('documents/download_multiple', [App\Http\Controllers\VendorPortal\DocumentController::class, 'downloadMultiple'])->name('documents.download_multiple');
     Route::get('documents/{document}/download', [App\Http\Controllers\VendorPortal\DocumentController::class, 'download'])->name('documents.download');
     Route::get('documents/{document}/download_pdf', [App\Http\Controllers\VendorPortal\DocumentController::class, 'download'])->name('documents.download_pdf');
+    
     Route::resource('documents', App\Http\Controllers\VendorPortal\DocumentController::class)->only(['index', 'show']);
-
+    
 });
 
 

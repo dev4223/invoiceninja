@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -62,7 +62,7 @@ class OpenApiYaml extends Command
         foreach ($directory as $file) {
             $this->info($file);
         }
-     
+
         Storage::disk('base')->delete('/openapi/api-docs.yaml');
         Storage::disk('base')->append('/openapi/api-docs.yaml', file_get_contents($path.'/info.yaml'));
         Storage::disk('base')->append('/openapi/api-docs.yaml', file_get_contents($path.'/paths.yaml'));
@@ -78,8 +78,9 @@ class OpenApiYaml extends Command
 
         Storage::disk('base')->append('/openapi/api-docs.yaml', file_get_contents($path.'/components.yaml'));
 
-        Storage::disk('base')->append('/openapi/api-docs.yaml', file_get_contents($path.'/components/responses.yaml'));
         Storage::disk('base')->append('/openapi/api-docs.yaml', file_get_contents($path.'/components/examples.yaml'));
+
+        Storage::disk('base')->append('/openapi/api-docs.yaml', file_get_contents($path.'/components/responses.yaml'));
 
         $directory = new DirectoryIterator($path . '/components/responses/');
 
@@ -102,7 +103,7 @@ class OpenApiYaml extends Command
         Storage::disk('base')->append('/openapi/api-docs.yaml', file_get_contents($path.'/components/schemas.yaml'));
 
         //iterate schemas
-        
+
         $directory = new DirectoryIterator($path . '/components/schemas/');
 
         foreach ($directory as $file) {

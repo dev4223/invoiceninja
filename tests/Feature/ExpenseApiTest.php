@@ -13,13 +13,14 @@ namespace Tests\Feature;
 
 use App\Models\BankIntegration;
 use App\Models\BankTransaction;
-use Tests\TestCase;
 use App\Models\Expense;
-use Tests\MockAccountData;
+use App\Models\ExpenseCategory;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Session;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Session;
+use Tests\MockAccountData;
+use Tests\TestCase;
 
 /**
  * @test
@@ -44,6 +45,84 @@ class ExpenseApiTest extends TestCase
         $this->faker = \Faker\Factory::create();
 
         Model::reguard();
+    }
+
+
+
+    public function testVendorPayment()
+    {
+        $data = [
+            'amount' => 100,
+            'payment_date' => now()->format('Y-m-d'),
+            'vendor_id' => $this->vendor->hashed_id,
+            'date' => '2021-10-01',
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson('/api/v1/expenses', $data);
+
+
+        $arr = $response->json();
+        $response->assertStatus(200);
+
+        $this->assertEquals($this->vendor->hashed_id, $arr['data']['vendor_id']);
+        $this->assertEquals(now()->format('Y-m-d'), $arr['data']['payment_date']);
+
+        $data = [
+            'amount' => 100,
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->putJson('/api/v1/expenses/'.$arr['data']['id'], $data);
+        
+        $arr = $response->json();
+        $response->assertStatus(200);
+
+        $this->assertEquals(now()->format('Y-m-d'), $arr['data']['payment_date']);
+
+    }
+
+
+    public function testExpensePutWithVendorStatus()
+    {
+    
+    
+        $data =
+        [
+            'vendor_id' => $this->vendor->hashed_id,
+            'amount' => 10,
+            'date' => '2021-10-01',
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson('/api/v1/expenses', $data);
+
+        $arr = $response->json();
+        $response->assertStatus(200);
+    
+
+        $this->assertEquals($this->vendor->hashed_id, $arr['data']['vendor_id']);
+
+        $data = [
+            'payment_date' => now()->format('Y-m-d')
+        ];
+
+        $response = $this->withHeaders([
+                    'X-API-SECRET' => config('ninja.api_secret'),
+                    'X-API-TOKEN' => $this->token,
+                ])->putJson('/api/v1/expenses/'.$arr['data']['id'], $data);
+
+        $arr = $response->json();
+        $response->assertStatus(200);
+
+        $this->assertEquals($this->vendor->hashed_id, $arr['data']['vendor_id']);
+
     }
 
     public function testTransactionIdClearedOnDelete()
@@ -231,6 +310,42 @@ class ExpenseApiTest extends TestCase
 
         $this->assertTrue($arr['data'][0]['is_deleted']);
     }
+
+    public function testExpenseBulkCategorize()
+    {
+
+
+        $e = Expense::factory()->create([
+            'company_id' => $this->company->id,
+            'user_id' => $this->user->id,
+        ]);
+
+
+        $ec = ExpenseCategory::factory()->create([
+            'company_id' => $this->company->id,
+            'user_id' => $this->user->id,
+            'name' => 'Test Category',
+        ]);
+
+        nlog("expense category id = {$ec->hashed_id}");
+
+        $data = [
+            'category_id' => $ec->hashed_id,
+            'action' => 'bulk_categorize',
+            'ids' => [$this->encodePrimaryKey($e->id)],
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->post('/api/v1/expenses/bulk', $data);
+
+        $arr = $response->json();
+        nlog($arr);
+
+        $this->assertEquals($ec->hashed_id, $arr['data'][0]['category_id']);
+    }
+
 
     public function testAddingExpense()
     {

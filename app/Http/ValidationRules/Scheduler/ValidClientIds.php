@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -28,7 +28,10 @@ class ValidClientIds implements Rule
      */
     public function passes($attribute, $value)
     {
-        return Client::where('company_id', auth()->user()->company()->id)->whereIn('id', $this->transformKeys($value))->count() == count($value);
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        return Client::where('company_id', $user->company()->id)->whereIn('id', $this->transformKeys($value))->count() == count($value);
     }
 
     /**

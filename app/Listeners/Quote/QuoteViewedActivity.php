@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -45,7 +45,7 @@ class QuoteViewedActivity implements ShouldQueue
 
         $event->invitation->quote->service()->markSent()->save();
 
-        $fields = new stdClass;
+        $fields = new stdClass();
 
         $fields->user_id = $event->invitation->quote->user_id;
         $fields->company_id = $event->invitation->company_id;

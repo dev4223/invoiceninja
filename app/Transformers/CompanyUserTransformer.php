@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -22,14 +22,14 @@ class CompanyUserTransformer extends EntityTransformer
     /**
      * @var array
      */
-    protected $defaultIncludes = [
+    protected array $defaultIncludes = [
         // 'user',
     ];
 
     /**
      * @var array
      */
-    protected $availableIncludes = [
+    protected array $availableIncludes = [
         'user',
         'company',
         'token',
@@ -38,7 +38,7 @@ class CompanyUserTransformer extends EntityTransformer
 
     public function transform(CompanyUser $company_user)
     {
-        $blank_obj = new \stdClass;
+        $blank_obj = new \stdClass();
 
         return [
             'permissions' => $company_user->permissions ?: '',

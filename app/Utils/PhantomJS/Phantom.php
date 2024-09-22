@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -33,7 +33,8 @@ use Illuminate\Support\Str;
 
 class Phantom
 {
-    use MakesHash, PageNumbering;
+    use MakesHash;
+    use PageNumbering;
 
     /**
      * Generate a PDF from the
@@ -214,6 +215,8 @@ class Phantom
             'options' => [
                 'all_pages_header' => $entity_obj->client->getSetting('all_pages_header'),
                 'all_pages_footer' => $entity_obj->client->getSetting('all_pages_footer'),
+                'client' => $entity_obj->client,
+                'entity' => $entity_obj,
             ],
             'process_markdown' => $entity_obj->client->company->markdown_enabled,
         ];
@@ -230,4 +233,5 @@ class Phantom
 
         return view('pdf.html', $data);
     }
+
 }
