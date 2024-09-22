@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -87,7 +87,7 @@ class PaymentMigrationRepository extends BaseRepository
 
         if (! array_key_exists('status_id', $data)) {
             info('payment with no status id?');
-            info(print_r($data, 1));
+            info(print_r($data, true));
         }
 
         $payment->status_id = $data['status_id'];
@@ -98,10 +98,10 @@ class PaymentMigrationRepository extends BaseRepository
         }
 
         $payment->deleted_at = $data['deleted_at'] ?: null;
-        
 
-        if ($payment->currency_id == 0) {
-            $payment->currency_id = $payment->company->settings->currency_id;
+
+        if (!$payment->currency_id || $payment->currency_id == 0 || $payment->currency_id == '') {
+            $payment->currency_id = $payment->client->settings->currency_id ?? $payment->company->settings->currency_id;
         }
 
         /*Ensure payment number generated*/
@@ -156,7 +156,7 @@ class PaymentMigrationRepository extends BaseRepository
 
             $payment->credits->each(function ($cre) use ($credit_totals) {
                 $cre->pivot->amount = $credit_totals;
-                $cre->pivot->save(); 
+                $cre->pivot->save();
 
                 $cre->paid_to_date += $credit_totals;
                 $cre->balance -= $credit_totals;
@@ -164,9 +164,10 @@ class PaymentMigrationRepository extends BaseRepository
             });
         }
 
-        $fields = new stdClass;
+        $fields = new stdClass();
 
         $fields->payment_id = $payment->id;
+        $fields->client_id = $payment->client_id;
         $fields->user_id = $payment->user_id;
         $fields->company_id = $payment->company_id;
         $fields->activity_type_id = Activity::CREATE_PAYMENT;
@@ -195,7 +196,7 @@ class PaymentMigrationRepository extends BaseRepository
     /**
      * If the client is paying in a currency other than
      * the company currency, we need to set a record.
-     * 
+     *
      * @param array$data
      * @param \App\Models\Payment $payment
      * @return \App\Models\Payment

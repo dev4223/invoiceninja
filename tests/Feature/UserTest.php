@@ -11,21 +11,21 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\User;
-use App\Models\Account;
-use App\Models\Company;
-use Tests\MockAccountData;
-use App\Models\CompanyUser;
-use App\Models\CompanyToken;
 use App\DataMapper\CompanySettings;
 use App\Factory\CompanyUserFactory;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Session;
 use App\Http\Middleware\PasswordProtection;
-use Illuminate\Validation\ValidationException;
-use Illuminate\Routing\Middleware\ThrottleRequests;
+use App\Models\Account;
+use App\Models\Company;
+use App\Models\CompanyToken;
+use App\Models\CompanyUser;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Validation\ValidationException;
+use Tests\MockAccountData;
+use Tests\TestCase;
 
 /**
  * @test
@@ -109,6 +109,24 @@ class UserTest extends TestCase
 
     }
 
+    public function testUserLocale()
+    {
+        $this->user->language_id = "13";
+        $this->user->save();
+
+        $this->assertEquals("fr_CA", $this->user->getLocale());
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->get('/api/v1/statics');
+
+        $response->assertStatus(200);
+
+    }
+
+
+
     public function testUserResponse()
     {
         $company_token = $this->mockAccount();
@@ -177,7 +195,7 @@ class UserTest extends TestCase
             'X-API-SECRET' => config('ninja.api_secret'),
             'X-API-TOKEN' => $company_token->token,
             'X-API-PASSWORD' => 'ALongAndBriliantPassword',
-        ])->get("/api/v1/users?without={$company_token->user->hashed_id}&status=active");
+        ])->get("/api/v1/users?status=active&without={$company_token->user->hashed_id}");
 
         $response->assertStatus(200);
         $this->assertCount(0, $response->json()['data']);
@@ -186,7 +204,7 @@ class UserTest extends TestCase
             'X-API-SECRET' => config('ninja.api_secret'),
             'X-API-TOKEN' => $company_token->token,
             'X-API-PASSWORD' => 'ALongAndBriliantPassword',
-        ])->get("/api/v1/users?without={$company_token->user->hashed_id}&status=archived");
+        ])->get("/api/v1/users?status=archived&without={$company_token->user->hashed_id}");
 
         $response->assertStatus(200);
         $this->assertCount(1, $response->json()['data']);
@@ -195,7 +213,7 @@ class UserTest extends TestCase
             'X-API-SECRET' => config('ninja.api_secret'),
             'X-API-TOKEN' => $company_token->token,
             'X-API-PASSWORD' => 'ALongAndBriliantPassword',
-        ])->get("/api/v1/users?without={$company_token->user->hashed_id}&status=deleted");
+        ])->get("/api/v1/users?status=deleted&without={$company_token->user->hashed_id}");
 
         $response->assertStatus(200);
         $this->assertCount(0, $response->json()['data']);
@@ -266,7 +284,7 @@ class UserTest extends TestCase
 
     public function testDisconnectUserOauthMailer()
     {
-        $user = 
+        $user =
         User::factory()->create([
             'account_id' => $this->account->id,
             'email' => $this->faker->safeEmail(),

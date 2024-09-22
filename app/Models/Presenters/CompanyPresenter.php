@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -21,8 +21,6 @@ use Illuminate\Support\Str;
  */
 class CompanyPresenter extends EntityPresenter
 {
-
-
     /**
      * @return string
      */
@@ -77,21 +75,31 @@ class CompanyPresenter extends EntityPresenter
             return $this->logoDocker($settings);
         }
 
-        $context_options =[
-            "ssl"=>[
-               "verify_peer"=>false,
-               "verify_peer_name"=>false,
+        $context_options = [
+            "ssl" => [
+               "verify_peer" => false,
+               "verify_peer_name" => false,
             ],
         ];
 
         if (strlen($settings->company_logo) >= 1 && (strpos($settings->company_logo, 'http') !== false)) {
-            return "data:image/png;base64, ". base64_encode(@file_get_contents($settings->company_logo, false, stream_context_create($context_options)));
+            return "data:image/png;base64,". base64_encode(@file_get_contents($settings->company_logo, false, stream_context_create($context_options)));
         } elseif (strlen($settings->company_logo) >= 1) {
-            return "data:image/png;base64, ". base64_encode(@file_get_contents(url('') . $settings->company_logo, false, stream_context_create($context_options)));
+            return "data:image/png;base64,". base64_encode(@file_get_contents(url('') . $settings->company_logo, false, stream_context_create($context_options)));
         } else {
             return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
-            //return "data:image/png;base64, ". base64_encode(@file_get_contents(asset('images/new_logo.png'), false, stream_context_create($context_options)));
         }
+    }
+
+    public function email()
+    {
+        /** @var \App\Models\Company $this */
+        if(str_contains($this->settings->email, "@")) {
+            return $this->settings->email;
+        }
+
+        return $this->owner()->email;
+
     }
 
     public function address($settings = null)
@@ -188,7 +196,7 @@ class CompanyPresenter extends EntityPresenter
     public function website(): string
     {
         $website = $this->entity->getSetting('website');
-        
+
         if (empty($website)) {
             return $website;
         }

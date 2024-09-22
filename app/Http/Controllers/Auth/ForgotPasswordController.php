@@ -4,20 +4,20 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Controller;
+use App\Libraries\MultiDB;
 use App\Models\Account;
 use App\Models\Company;
-use App\Libraries\MultiDB;
-use Illuminate\Http\Request;
-use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\Password;
 use Illuminate\Foundation\Auth\SendsPasswordResetEmails;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Password;
 
 class ForgotPasswordController extends Controller
 {
@@ -46,7 +46,7 @@ class ForgotPasswordController extends Controller
 
     /**
      * @param Request $request
-     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\Response|\Illuminate\Http\RedirectResponse
      * @throws \Illuminate\Validation\ValidationException
      */
     public function sendResetLinkEmail(Request $request)
@@ -90,6 +90,8 @@ class ForgotPasswordController extends Controller
             $account = Account::find($account_id);
         }
 
-        return $this->render('auth.passwords.request', ['root' => 'themes', 'account' => $account]);
+        $is_react = request()->has('react') ? true : false;
+
+        return $this->render('auth.passwords.request', ['root' => 'themes', 'account' => $account, 'is_react' => $is_react]);
     }
 }

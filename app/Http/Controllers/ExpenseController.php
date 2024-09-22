@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -15,13 +15,16 @@ use App\Events\Expense\ExpenseWasCreated;
 use App\Events\Expense\ExpenseWasUpdated;
 use App\Factory\ExpenseFactory;
 use App\Filters\ExpenseFilters;
+use App\Http\Requests\Expense\BulkExpenseRequest;
 use App\Http\Requests\Expense\CreateExpenseRequest;
 use App\Http\Requests\Expense\DestroyExpenseRequest;
 use App\Http\Requests\Expense\EditExpenseRequest;
+use App\Http\Requests\Expense\EDocumentRequest;
 use App\Http\Requests\Expense\ShowExpenseRequest;
 use App\Http\Requests\Expense\StoreExpenseRequest;
 use App\Http\Requests\Expense\UpdateExpenseRequest;
 use App\Http\Requests\Expense\UploadExpenseRequest;
+use App\Jobs\EDocument\ImportEDocument;
 use App\Models\Account;
 use App\Models\Expense;
 use App\Repositories\ExpenseRepository;
@@ -97,7 +100,7 @@ class ExpenseController extends BaseController
      *       ),
      *     )
      * @param ExpenseFilters $filters
-     * @return Response|mixed
+     * @return Response| \Illuminate\Http\JsonResponse|mixed
      */
     public function index(ExpenseFilters $filters)
     {
@@ -111,7 +114,7 @@ class ExpenseController extends BaseController
      *
      * @param ShowExpenseRequest $request
      * @param Expense $expense
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -165,7 +168,7 @@ class ExpenseController extends BaseController
      *
      * @param EditExpenseRequest $request
      * @param Expense $expense
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -219,7 +222,7 @@ class ExpenseController extends BaseController
      *
      * @param UpdateExpenseRequest $request
      * @param Expense $expense
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -285,7 +288,7 @@ class ExpenseController extends BaseController
      * Show the form for creating a new resource.
      *
      * @param CreateExpenseRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -321,7 +324,10 @@ class ExpenseController extends BaseController
      */
     public function create(CreateExpenseRequest $request)
     {
-        $expense = ExpenseFactory::create(auth()->user()->company()->id, auth()->user()->id);
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        $expense = ExpenseFactory::create($user->company()->id, $user->id);
 
         return $this->itemResponse($expense);
     }
@@ -330,7 +336,7 @@ class ExpenseController extends BaseController
      * Store a newly created resource in storage.
      *
      * @param StoreExpenseRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -366,9 +372,12 @@ class ExpenseController extends BaseController
      */
     public function store(StoreExpenseRequest $request)
     {
-        $expense = $this->expense_repo->save($request->all(), ExpenseFactory::create(auth()->user()->company()->id, auth()->user()->id));
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
 
-        event(new ExpenseWasCreated($expense, $expense->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
+        $expense = $this->expense_repo->save($request->all(), ExpenseFactory::create($user->company()->id, $user->id));
+
+        event(new ExpenseWasCreated($expense, $expense->company, Ninja::eventVars($user ? $user->id : null)));
 
         event('eloquent.created: App\Models\Expense', $expense);
 
@@ -380,7 +389,7 @@ class ExpenseController extends BaseController
      *
      * @param DestroyExpenseRequest $request
      * @param Expense $expense
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @throws \Exception
@@ -434,7 +443,7 @@ class ExpenseController extends BaseController
     /**
      * Perform bulk actions on the list view.
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Post(
@@ -481,20 +490,25 @@ class ExpenseController extends BaseController
      *       ),
      *     )
      */
-    public function bulk()
+    public function bulk(BulkExpenseRequest $request)
     {
-        $action = request()->input('action');
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
 
-        $ids = request()->input('ids');
-        $expenses = Expense::withTrashed()->find($this->transformKeys($ids));
+        $expenses = Expense::withTrashed()->find($request->ids);
 
-        $expenses->each(function ($expense, $key) use ($action) {
-            if (auth()->user()->can('edit', $expense)) {
-                $this->expense_repo->{$action}($expense);
+        if($request->action == 'bulk_categorize' && $user->can('edit', $expenses->first())) {
+            $this->expense_repo->categorize($expenses, $request->category_id);
+            $expenses = collect([]);
+        }
+
+        $expenses->each(function ($expense) use ($request, $user) {
+            if ($user->can('edit', $expense)) {
+                $this->expense_repo->{$request->action}($expense);
             }
         });
 
-        return $this->listResponse(Expense::withTrashed()->whereIn('id', $this->transformKeys($ids)));
+        return $this->listResponse(Expense::withTrashed()->whereIn('id', $request->ids));
     }
 
     /**
@@ -512,7 +526,7 @@ class ExpenseController extends BaseController
      *
      * @param UploadExpenseRequest $request
      * @param Expense $expense
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -568,5 +582,16 @@ class ExpenseController extends BaseController
         }
 
         return $this->itemResponse($expense->fresh());
+    }
+
+    public function edocument(EDocumentRequest $request): string
+    {
+        if ($request->hasFile("documents")) {
+            return (new ImportEDocument($request->file("documents")[0]->get(), $request->file("documents")[0]->getClientOriginalName()))->handle();
+        }
+        else {
+            return "No file found";
+        }
+
     }
 }

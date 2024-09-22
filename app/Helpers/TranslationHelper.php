@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -20,7 +20,7 @@
  * @param null $locale
  * @return string
  */
-function ctrans(string $string, $replace = [], $locale = null) : string
+function ctrans(string $string, $replace = [], $locale = null): string
 {
     return trans($string, $replace, $locale);
 }

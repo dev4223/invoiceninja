@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -23,7 +23,7 @@ class SystemLogFilters extends QueryFilters
         if (strlen($type_id) == 0) {
             return $this->builder;
         }
-        
+
         return $this->builder->where('type_id', $type_id);
     }
 
@@ -75,7 +75,9 @@ class SystemLogFilters extends QueryFilters
             return $this->builder;
         }
 
-        return $this->builder->orderBy($sort_col[0], $sort_col[1]);
+        $dir = ($sort_col[1] == 'asc') ? 'asc' : 'desc';
+
+        return $this->builder->orderBy($sort_col[0], $dir);
     }
 
     /**

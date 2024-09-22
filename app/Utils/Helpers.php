@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -18,6 +18,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Str;
 use stdClass;
 
+//30-10-2023: due to HTML encoding, need to remove </ from string when searching for matches
 class Helpers
 {
     use MakesDates;
@@ -26,7 +27,7 @@ class Helpers
     {
         if (! $client) {
             $elements['signature'] = '';
-            $elements['settings'] = new stdClass;
+            $elements['settings'] = new stdClass();
             $elements['whitelabel'] = true;
             $elements['company'] = '';
 
@@ -68,7 +69,7 @@ class Helpers
 
             $quote_or_credit_field = true;
 
-        }elseif($custom_fields && stripos($field, 'credit') !== false && property_exists($custom_fields, $field)) {
+        } elseif($custom_fields && stripos($field, 'credit') !== false && property_exists($custom_fields, $field)) {
             $custom_field = $custom_fields->{$field};
             $custom_field_parts = explode('|', $custom_field);
 
@@ -78,9 +79,9 @@ class Helpers
 
             $quote_or_credit_field = true;
 
-        }elseif($custom_fields && stripos($field, 'credit') !== false) {
+        } elseif($custom_fields && stripos($field, 'credit') !== false) {
             $field = str_replace("credit", "invoice", $field);
-        }elseif($custom_fields && stripos($field, 'quote') !== false) {
+        } elseif($custom_fields && stripos($field, 'quote') !== false) {
             $field = str_replace("quote", "invoice", $field);
         }
 
@@ -96,15 +97,15 @@ class Helpers
         switch ($custom_field) {
             case 'date':
                 return is_null($entity) ? $value : $this->translateDate($value, $entity->date_format(), $entity->locale());
-                break;
+                
 
             case 'switch':
-                return trim($value) == 'yes' ? ctrans('texts.yes') : ctrans('texts.no');
-                break;
+                return trim($value ?? '') == 'yes' ? ctrans('texts.yes') : ctrans('texts.no');
+                
 
             default:
                 return is_null($value) ? '' : $this->processReservedKeywords($value, $entity);
-                break;
+                
         }
     }
 
@@ -251,7 +252,7 @@ class Helpers
                 continue;
             }
 
-            if (Str::contains($match, '|')) {
+            // if (Str::contains($match, '|')) {
                 $parts = explode('|', $match); // [ '[MONTH', 'MONTH+2]' ]
 
                 $left = substr($parts[0], 1); // 'MONTH'
@@ -266,19 +267,19 @@ class Helpers
                 $_right = '';
 
                 // If right side doesn't have any calculations, replace with raw ranges keyword.
-                if (! Str::contains($right, ['-', '+', '/', '*'])) {
+                if (! Str::contains(str_replace("</", "", $right), ['-', '+', '/', '*'])) {
                     $_right = Carbon::createFromDate($currentDateTime->year, $currentDateTime->month)->translatedFormat('F Y');
                 }
 
                 // If right side contains one of math operations, calculate.
-                if (Str::contains($right, ['+'])) {
+                if (Str::contains(str_replace("</", "", $right), ['+'])) {
                     $operation = preg_match_all('/(?!^-)[+*\/-](\s?-)?/', $right, $_matches);
 
                     $_operation = array_shift($_matches)[0]; // + -
 
                     $_value = explode($_operation, $right); // [MONTHYEAR, 4]
 
-                    $_right = Carbon::createFromDate($currentDateTime->year, $currentDateTime->month)->addMonths($_value[1])->translatedFormat('F Y');
+                    $_right = Carbon::createFromDate($currentDateTime->year, $currentDateTime->month)->addMonths($_value[1])->translatedFormat('F Y'); //@phpstan-ignore-line
                 }
 
                 $replacement = sprintf('%s to %s', $_left, $_right);
@@ -289,7 +290,7 @@ class Helpers
                     $value,
                     1
                 );
-            }
+            // }
         }
 
         // Second case with more common calculations.
@@ -306,7 +307,7 @@ class Helpers
                 continue;
             }
 
-            if (! Str::contains($match, ['-', '+', '/', '*'])) {
+            if (! Str::contains(str_replace("</", "", $match), ['-', '+', '/', '*'])) {
                 $value = preg_replace(
                     sprintf('/%s/', $matches->keys()->first()),
                     $replacements['literal'][$matches->keys()->first()],
@@ -315,7 +316,7 @@ class Helpers
                 );
             }
 
-            if (Str::contains($match, ['-', '+', '/', '*'])) {
+            if (Str::contains(str_replace("</", "", $match), ['-', '+', '/', '*'])) {
                 $operation = preg_match_all('/(?!^-)[+*\/-](\s?-)?/', $match, $_matches);
 
                 $_operation = array_shift($_matches)[0];

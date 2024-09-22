@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -66,7 +66,7 @@ class ApplyNumber extends AbstractService
 
     private function trySaving()
     {
-        $x=1;
+        $x = 1;
 
         do {
             try {
@@ -77,7 +77,7 @@ class ApplyNumber extends AbstractService
             } catch(QueryException $e) {
                 $x++;
 
-                if ($x>50) {
+                if ($x > 50) {
                     $this->completed = false;
                 }
             }

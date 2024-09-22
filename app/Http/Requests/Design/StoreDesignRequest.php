@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -16,27 +16,46 @@ use App\Models\Account;
 
 class StoreDesignRequest extends Request
 {
+    private array $valid_entities = [
+        'invoice',
+        'payment',
+        'client',
+        'quote',
+        'credit',
+        'purchase_order',
+        'project',
+        'task'
+    ];
+
     /**
      * Determine if the user is authorized to make this request.
      *
      * @return bool
      */
-    public function authorize() : bool
+    public function authorize(): bool
     {
-        return auth()->user()->isAdmin() && auth()->user()->account->hasFeature(Account::FEATURE_API);
-        ;
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        return $user->isAdmin() && $user->account->hasFeature(Account::FEATURE_API);
+
     }
 
     public function rules()
     {
+
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
         return [
-            //'name' => 'required',
-            'name' => 'required|unique:designs,name,null,null,company_id,'.auth()->user()->companyId(),
+            'name' => 'required|unique:designs,name,null,null,company_id,'.$user->companyId(),
             'design' => 'required|array',
-            'design.header' => 'required|min:1',
-            'design.body' => 'required|min:1',
-            'design.footer' => 'required|min:1',
-            'design.includes' => 'required|min:1',
+            'design.header' => 'sometimes|string',
+            'design.body' => 'sometimes|string',
+            'design.footer' => 'sometimes|string',
+            'design.includes' => 'sometimes|string',
+            'is_template' => 'sometimes|boolean',
+            'entities' => 'sometimes|string|nullable'
         ];
     }
 
@@ -67,6 +86,20 @@ class StoreDesignRequest extends Request
 
         if (! array_key_exists('body', $input['design']) || is_null($input['design']['body'])) {
             $input['design']['body'] = '';
+        }
+
+        if(array_key_exists('entities', $input)) {
+            $user_entities = explode(",", $input['entities']);
+
+            $e = [];
+
+            foreach ($user_entities as $entity) {
+                if (in_array($entity, $this->valid_entities)) {
+                    $e[] = $entity;
+                }
+            }
+
+            $input['entities'] = implode(",", $e);
         }
 
         $this->replace($input);

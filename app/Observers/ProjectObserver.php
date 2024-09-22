@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -49,12 +49,12 @@ class ProjectObserver
         if ($project->getOriginal('deleted_at') && !$project->deleted_at) {
             $event = Webhook::EVENT_RESTORE_PROJECT;
         }
-        
+
         if ($project->is_deleted) {
             $event = Webhook::EVENT_PROJECT_DELETE;
         }
-        
-        
+
+
         $subscriptions = Webhook::where('company_id', $project->company_id)
                                     ->where('event_id', $event)
                                     ->exists();

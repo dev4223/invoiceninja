@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -30,15 +30,12 @@ use Illuminate\Support\Facades\App;
 
 class EmailRefundPayment implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
-    public $payment;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     public $email_builder;
-
-    private $contact;
-
-    private $company;
 
     public $settings;
 
@@ -50,19 +47,14 @@ class EmailRefundPayment implements ShouldQueue
      * @param $contact
      * @param $company
      */
-    public function __construct(Payment $payment, Company $company, ClientContact $contact)
+    public function __construct(public Payment $payment, private Company $company, private ?ClientContact $contact)
     {
-        $this->payment = $payment;
-        $this->contact = $contact;
-        $this->company = $company;
         $this->settings = $payment->client->getMergedSettings();
     }
 
     /**
      * Execute the job.
      *
-     *
-     * @return void
      */
     public function handle()
     {
@@ -84,15 +76,27 @@ class EmailRefundPayment implements ShouldQueue
             $template_data['body'] = ctrans('texts.refunded_payment').' $payment.refunded <br><br>$invoices';
             $template_data['subject'] = ctrans('texts.refunded_payment');
 
-            $email_builder = (new PaymentEmailEngine($this->payment, $this->contact, $template_data))->build();
+            $email_builder = new PaymentEmailEngine($this->payment, $this->contact, $template_data);
+            $email_builder->is_refund = true;
+            $email_builder->build();
 
             $invitation = null;
 
+            $nmo = new NinjaMailerObject();
+
             if ($this->payment->invoices && $this->payment->invoices->count() >= 1) {
-                $invitation = $this->payment->invoices->first()->invitations()->first();
+
+                if($this->contact) {
+                    $invitation = $this->payment->invoices->first()->invitations()->where('client_contact_id', $this->contact->id)->first();
+                } else {
+                    $invitation = $this->payment->invoices->first()->invitations()->first();
+                }
+
+                if($invitation) {
+                    $nmo->invitation = $invitation;
+                }
             }
 
-            $nmo = new NinjaMailerObject;
             $nmo->mailable = new TemplateEmail($email_builder, $this->contact, $invitation);
             $nmo->to_user = $this->contact;
             $nmo->settings = $this->settings;

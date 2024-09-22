@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -17,9 +17,9 @@ use App\Models\ClientContact;
 use App\Models\ClientGatewayToken;
 use App\Models\CompanyLedger;
 use App\Models\Document;
+use App\Models\GroupSetting;
 use App\Models\SystemLog;
 use App\Utils\Traits\MakesHash;
-use League\Fractal\Resource\Collection;
 use stdClass;
 
 /**
@@ -29,7 +29,7 @@ class ClientTransformer extends EntityTransformer
 {
     use MakesHash;
 
-    protected $defaultIncludes = [
+    protected array $defaultIncludes = [
         'contacts',
         'documents',
         'gateway_tokens',
@@ -38,16 +38,17 @@ class ClientTransformer extends EntityTransformer
     /**
      * @var array
      */
-    protected $availableIncludes = [
+    protected array $availableIncludes = [
         'activities',
         'ledger',
         'system_logs',
+        'group_settings',
     ];
 
     /**
      * @param Client $client
      *
-     * @return \Illuminate\Support\Collection
+     * @return \Illuminate\Http\Response|\Illuminate\Http\JsonResponse
      */
     public function includeActivities(Client $client)
     {
@@ -66,7 +67,7 @@ class ClientTransformer extends EntityTransformer
     /**
      * @param Client $client
      *
-     * @return \Illuminate\Support\Collection
+     * @return \Illuminate\Http\Response|\Illuminate\Http\JsonResponse
      */
     public function includeContacts(Client $client)
     {
@@ -94,6 +95,17 @@ class ClientTransformer extends EntityTransformer
         $transformer = new SystemLogTransformer($this->serializer);
 
         return $this->includeCollection($client->system_logs, $transformer, SystemLog::class);
+    }
+
+    public function includeGroupSettings(Client $client)
+    {
+        if (!$client->group_settings) {
+            return null;
+        }
+
+        $transformer = new GroupSettingTransformer($this->serializer);
+
+        return $this->includeItem($client->group_settings, $transformer, GroupSetting::class);
     }
 
     /**
@@ -138,7 +150,7 @@ class ClientTransformer extends EntityTransformer
             'shipping_state' => $client->shipping_state ?: '',
             'shipping_postal_code' => $client->shipping_postal_code ?: '',
             'shipping_country_id' => (string) $client->shipping_country_id ?: '',
-            'settings' => $client->settings ?: new stdClass,
+            'settings' => $client->settings ?: new stdClass(),
             'is_deleted' => (bool) $client->is_deleted,
             'vat_number' => $client->vat_number ?: '',
             'id_number' => $client->id_number ?: '',
@@ -150,7 +162,9 @@ class ClientTransformer extends EntityTransformer
             'has_valid_vat_number' => (bool) $client->has_valid_vat_number,
             'is_tax_exempt' => (bool) $client->is_tax_exempt,
             'routing_id' => (string) $client->routing_id,
-            'tax_info' => $client->tax_data ?: new \stdClass,
+            'tax_info' => $client->tax_data ?: new \stdClass(),
+            'classification' => $client->classification ?: '',
+            'e_invoice' => $client->e_invoice ?: new \stdClass(),
         ];
     }
 }

@@ -4,13 +4,14 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
 
+use App\Services\Template\TemplateService;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -20,15 +21,16 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int|null $user_id
  * @property int|null $company_id
  * @property string $name
- * @property int $is_custom
- * @property int $is_active
+ * @property bool $is_custom
+ * @property bool $is_active
  * @property object|null $design
- * @property int $is_deleted
+ * @property bool $is_deleted
+ * @property bool $is_template
  * @property int|null $created_at
  * @property int|null $updated_at
  * @property int|null $deleted_at
  * @property-read \App\Models\Company|null $company
- * @property-read mixed $hashed_id
+ * @property-read string $hashed_id
  * @method static \Illuminate\Database\Eloquent\Builder|BaseModel company()
  * @method static \Illuminate\Database\Eloquent\Builder|BaseModel exclude($columns)
  * @method static \Illuminate\Database\Eloquent\Builder|Design filter(\App\Filters\QueryFilters $filters)
@@ -68,10 +70,17 @@ class Design extends BaseModel
         'name',
         'design',
         'is_active',
+        'is_template',
+        'entities',
     ];
 
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function service(): TemplateService
+    {
+        return (new TemplateService($this))->setCompany($this->company);
     }
 }

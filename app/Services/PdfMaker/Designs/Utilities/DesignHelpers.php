@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -64,9 +64,9 @@ trait DesignHelpers
 
         $this->document();
 
-        $this->settings_object = $this->vendor ? $this->vendor->company : $this->client;
+        $this->settings_object = $this->vendor ? $this->vendor->company : $this->client; //@phpstan-ignore-line
 
-        $this->company = $this->vendor ? $this->vendor->company : $this->client->company;
+        $this->company = $this->vendor ? $this->vendor->company : $this->client->company; //@phpstan-ignore-line
 
         return $this;
     }
@@ -159,7 +159,7 @@ trait DesignHelpers
         if ($type == 'task') {
             $type_id = 2;
         }
-        
+
         /** 17-05-2023 need to explicity define product_quote here */
         if ($type == 'product_quote') {
             $type_id = 1;
@@ -174,7 +174,7 @@ trait DesignHelpers
         // evaluating the variable.
 
         if (in_array(sprintf('%s%s.tax', '$', $type), (array) $this->context['pdf_variables']["{$column_type}_columns"])) {
-            $line_items = collect($this->entity->line_items)->filter(function ($item) use ($type_id) {
+            $line_items = collect($this->entity->line_items)->filter(function ($item) use ($type_id) { //@phpstan-ignore-line
                 return $item->type_id = $type_id;
             });
 
@@ -241,12 +241,13 @@ trait DesignHelpers
     {
         // We want to show headers for statements, no exceptions.
         $statements = "
-            document.querySelectorAll('#statement-invoice-table > thead > tr > th, #statement-payment-table > thead > tr > th, #statement-aging-table > thead > tr > th').forEach(t => {
+            document.querySelectorAll('#statement-credit-table > thead > tr > th, #statement-invoice-table > thead > tr > th, #statement-payment-table > thead > tr > th, #statement-aging-table > thead > tr > th').forEach(t => {
                 t.hidden = false;
             });
         ";
 
-        $javascript = 'document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("#product-table > tbody > tr > td, #task-table > tbody > tr > td, #delivery-note-table > tbody > tr > td").forEach(t=>{if(""!==t.innerText){let e=t.getAttribute("data-ref").slice(0,-3);document.querySelector(`th[data-ref="${e}-th"]`).removeAttribute("hidden")}}),document.querySelectorAll("#product-table > tbody > tr > td, #task-table > tbody > tr > td, #delivery-note-table > tbody > tr > td").forEach(t=>{let e=t.getAttribute("data-ref").slice(0,-3);(e=document.querySelector(`th[data-ref="${e}-th"]`)).hasAttribute("hidden")&&""==t.innerText&&t.setAttribute("hidden","true")})},!1);';
+        // $javascript = 'document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("#product-table > tbody > tr > td, #task-table > tbody > tr > td, #delivery-note-table > tbody > tr > td").forEach(t=>{if(""!==t.innerText){let e=t.getAttribute("data-ref").slice(0,-3);document.querySelector(`th[data-ref="${e}-th"]`).removeAttribute("hidden")}}),document.querySelectorAll("#product-table > tbody > tr > td, #task-table > tbody > tr > td, #delivery-note-table > tbody > tr > td").forEach(t=>{let e=t.getAttribute("data-ref").slice(0,-3);(e=document.querySelector(`th[data-ref="${e}-th"]`)).hasAttribute("hidden")&&""==t.innerText&&t.setAttribute("hidden","true")})},!1);';
+        $javascript = 'document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("#custom-table > tbody > tr >td, #product-table > tbody > tr > td, #task-table > tbody > tr > td, #delivery-note-table > tbody > tr > td").forEach(t=>{if(""!==t.innerText){let e=t.getAttribute("data-ref").slice(0,-3);document.querySelector(`th[data-ref="${e}-th"]`).removeAttribute("hidden")}}),document.querySelectorAll("#custom-table > tbody > tr > td, #product-table > tbody > tr > td, #task-table > tbody > tr > td, #delivery-note-table > tbody > tr > td").forEach(t=>{let e=t.getAttribute("data-ref").slice(0,-3);(e=document.querySelector(`th[data-ref="${e}-th"]`)).hasAttribute("hidden")&&""==t.innerText&&t.setAttribute("hidden","true")})},!1);';
 
         // Previously we've been decoding the HTML on the backend and XML parsing isn't good options because it requires,
         // strict & valid HTML to even output/decode. Decoding is now done on the frontend with this piece of Javascript.
@@ -386,13 +387,13 @@ trait DesignHelpers
             return '';
         }
 
-        if ($this->client->company->custom_fields && ! property_exists($this->client->company->custom_fields, $field)) {
+        if ($this->client->company->custom_fields && ! property_exists($this->client->company->custom_fields, $field)) { //@phpstan-ignore-line
             return '';
         }
 
         $value = $this->client->company->getSetting($fields[$field]);
 
-        return (new \App\Utils\Helpers)->formatCustomFieldValue(
+        return (new \App\Utils\Helpers())->formatCustomFieldValue(
             $this->client->company->custom_fields,
             $field,
             $value,
@@ -400,6 +401,10 @@ trait DesignHelpers
         );
     }
 
+    /**
+     * @todo - this is being called directl, - not through the calling class!!!!
+     * @design_flaw
+     */
     public static function parseMarkdownToHtml(string $markdown): ?string
     {
         // Use setting to determinate if parsing should be done.

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -13,6 +13,7 @@ namespace App\Http\Controllers\Reports;
 
 use App\Http\Controllers\BaseController;
 use App\Http\Requests\Report\ProfitLossRequest;
+use App\Jobs\Report\PreviewReport;
 use App\Jobs\Report\SendToAdmin;
 use App\Models\Client;
 use App\Services\Report\ProfitLoss;
@@ -63,23 +64,21 @@ class ProfitAndLossController extends BaseController
      */
     public function __invoke(ProfitLossRequest $request)
     {
-        if ($request->has('send_email') && $request->get('send_email')) {
-            SendToAdmin::dispatch(auth()->user()->company(), $request->all(), ProfitLoss::class, $this->filename);
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        if ($request->has('send_email') && $request->get('send_email') && $request->missing('output')) {
+            SendToAdmin::dispatch($user->company(), $request->all(), ProfitLoss::class, $this->filename);
 
             return response()->json(['message' => 'working...'], 200);
         }
-        // expect a list of visible fields, or use the default
 
-        $pnl = new ProfitLoss(auth()->user()->company(), $request->all());
-        $csv = $pnl->run();
+        $hash = \Illuminate\Support\Str::uuid();
 
-        $headers = [
-            'Content-Disposition' => 'attachment',
-            'Content-Type' => 'text/csv',
-        ];
+        PreviewReport::dispatch($user->company(), $request->all(), ProfitLoss::class, $hash);
 
-        return response()->streamDownload(function () use ($csv) {
-            echo $csv;
-        }, $this->filename, $headers);
+        return response()->json(['message' => $hash], 200);
+
+
     }
 }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -44,7 +44,7 @@ class FreeCompanySettings extends BaseSettings
 
     public $date_format_id = '';
 
-//    public $enabled_item_tax_rates          = 0;
+    //    public $enabled_item_tax_rates          = 0;
     public $expense_number_pattern = '';
 
     public $expense_number_counter = 1;

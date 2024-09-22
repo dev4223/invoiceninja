@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -69,7 +69,13 @@ class VendorFilters extends QueryFilters
             return $this->builder;
         }
 
-        return $this->builder->orderBy($sort_col[0], $sort_col[1]);
+        $dir = ($sort_col[1] == 'asc') ? 'asc' : 'desc';
+
+        if($sort_col[0] == 'number') {
+            return $this->builder->orderByRaw("REGEXP_REPLACE(number,'[^0-9]+','')+0 " . $dir);
+        }
+
+        return $this->builder->orderBy($sort_col[0], $dir);
     }
 
     /**

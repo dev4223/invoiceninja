@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -26,9 +26,12 @@ class StoreCompanyGatewayRequest extends Request
      *
      * @return bool
      */
-    public function authorize() : bool
+    public function authorize(): bool
     {
-        return auth()->user()->isAdmin();
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        return $user->isAdmin();
     }
 
     public function rules()
@@ -45,7 +48,7 @@ class StoreCompanyGatewayRequest extends Request
     {
         $input = $this->all();
 
-        if ($gateway = Gateway::where('key', $input['gateway_key'])->first()) {
+        if ($gateway = Gateway::query()->where('key', $input['gateway_key'])->first()) {
             $default_gateway_fields = json_decode($gateway->fields);
 
             /*Force gateway properties */
@@ -64,6 +67,7 @@ class StoreCompanyGatewayRequest extends Request
             if (isset($input['fees_and_limits'])) {
                 $input['fees_and_limits'] = $this->cleanFeesAndLimits($input['fees_and_limits']);
             }
+
         }
 
         $this->replace($input);

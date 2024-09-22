@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -28,8 +28,8 @@ class ProductObserver
     public function created(Product $product)
     {
         $subscriptions = Webhook::where('company_id', $product->company_id)
-                                    ->where('event_id', Webhook::EVENT_CREATE_PRODUCT)
-                                    ->exists();
+            ->where('event_id', Webhook::EVENT_CREATE_PRODUCT)
+            ->exists();
 
         if ($subscriptions) {
             WebhookHandler::dispatch(Webhook::EVENT_CREATE_PRODUCT, $product, $product->company)->delay(0);
@@ -49,15 +49,15 @@ class ProductObserver
         if ($product->getOriginal('deleted_at') && !$product->deleted_at) {
             $event = Webhook::EVENT_RESTORE_PRODUCT;
         }
-        
+
         if ($product->is_deleted) {
             $event = Webhook::EVENT_DELETE_PRODUCT;
         }
-        
-        
+
+
         $subscriptions = Webhook::where('company_id', $product->company_id)
-                                    ->where('event_id', $event)
-                                    ->exists();
+            ->where('event_id', $event)
+            ->exists();
 
         if ($subscriptions) {
             WebhookHandler::dispatch($event, $product, $product->company)->delay(0);
@@ -75,10 +75,10 @@ class ProductObserver
         if ($product->is_deleted) {
             return;
         }
-        
+
         $subscriptions = Webhook::where('company_id', $product->company_id)
-                                    ->where('event_id', Webhook::EVENT_ARCHIVE_PRODUCT)
-                                    ->exists();
+            ->where('event_id', Webhook::EVENT_ARCHIVE_PRODUCT)
+            ->exists();
 
         if ($subscriptions) {
             WebhookHandler::dispatch(Webhook::EVENT_ARCHIVE_PRODUCT, $product, $product->company)->delay(0);

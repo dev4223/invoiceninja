@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -42,10 +42,11 @@ class QuoteFilters extends QueryFilters
                       $q->where('name', 'like', '%'.$filter.'%');
                   })
                   ->orWhereHas('client.contacts', function ($q) use ($filter) {
-                              $q->where('first_name', 'like', '%'.$filter.'%')
-                                ->orWhere('last_name', 'like', '%'.$filter.'%')
-                                ->orWhere('email', 'like', '%'.$filter.'%');
-                          });
+                      $q->where('first_name', 'like', '%'.$filter.'%')
+                        ->orWhere('last_name', 'like', '%'.$filter.'%')
+                        ->orWhere('email', 'like', '%'.$filter.'%');
+                  })
+                  ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(line_items, '$[*].notes')) LIKE ?", ['%'.$filter.'%']);
         });
     }
 
@@ -81,19 +82,19 @@ class QuoteFilters extends QueryFilters
                     ->orWhere('due_date', '>=', now()->toDateString());
                 });
             }
-    
+
             $quote_filters = [];
 
             if (in_array('draft', $status_parameters)) {
                 $quote_filters[] = Quote::STATUS_DRAFT;
             }
 
-            
+
             if (in_array('approved', $status_parameters)) {
                 $quote_filters[] = Quote::STATUS_APPROVED;
             }
 
-            if (count($quote_filters) >0) {
+            if (count($quote_filters) > 0) {
                 $query->orWhereIn('status_id', $quote_filters);
             }
 
@@ -110,6 +111,12 @@ class QuoteFilters extends QueryFilters
                     $q->where('status_id', Quote::STATUS_SENT)
                       ->where('due_date', '>=', now()->toDateString())
                       ->orderBy('due_date', 'DESC');
+                });
+            }
+
+            if(in_array('converted', $status_parameters)) {
+                $query->orWhere(function ($q) {
+                    $q->whereNotNull('invoice_id');
                 });
             }
         });
@@ -140,18 +147,24 @@ class QuoteFilters extends QueryFilters
             return $this->builder;
         }
 
-        if($sort_col[0] == 'client_id'){
+        $dir = ($sort_col[1] == 'asc') ? 'asc' : 'desc';
+
+        if($sort_col[0] == 'client_id') {
 
             return $this->builder->orderBy(\App\Models\Client::select('name')
-                    ->whereColumn('clients.id', 'quotes.client_id'), $sort_col[1]);
+                    ->whereColumn('clients.id', 'quotes.client_id'), $dir);
 
+        }
+
+        if($sort_col[0] == 'number') {
+            return $this->builder->orderByRaw("REGEXP_REPLACE(number,'[^0-9]+','')+0 " . $dir);
         }
 
         if ($sort_col[0] == 'valid_until') {
             $sort_col[0] = 'due_date';
         }
 
-        return $this->builder->orderBy($sort_col[0], $sort_col[1]);
+        return $this->builder->orderBy($sort_col[0], $dir);
     }
 
     /**

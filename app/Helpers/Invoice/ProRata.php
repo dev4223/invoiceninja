@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -28,9 +28,9 @@ class ProRata
      * @param int $frequency
      * @return float
      */
-    public function refund(float $amount, Carbon $from_date, Carbon $to_date, int $frequency) :float
+    public function refund(float $amount, Carbon $from_date, Carbon $to_date, int $frequency): float
     {
-        $days = $from_date->copy()->diffInDays($to_date);
+        $days = intval(abs($from_date->copy()->diffInDays($to_date)));
         $days_in_frequency = $this->getDaysInFrequency($frequency);
 
         return round((($days / $days_in_frequency) * $amount), 2);
@@ -46,9 +46,9 @@ class ProRata
      * @param int $frequency
      * @return float
      */
-    public function charge(float $amount, Carbon $from_date, Carbon $to_date, int $frequency) :float
+    public function charge(float $amount, Carbon $from_date, Carbon $to_date, int $frequency): float
     {
-        $days = $from_date->copy()->diffInDays($to_date);
+        $days = intval(abs($from_date->copy()->diffInDays($to_date)));
         $days_in_frequency = $this->getDaysInFrequency($frequency);
 
         return round((($days / $days_in_frequency) * $amount), 2);
@@ -58,21 +58,21 @@ class ProRata
      * Prepares the line items of an invoice
      * to be pro rata refunded.
      *
-     * @param Invoice $invoice
+     * @param ?Invoice $invoice
      * @param bool $is_credit
      * @return array
      * @throws Exception
      */
-    public function refundItems(Invoice $invoice, $is_credit = false) :array
+    public function refundItems(?Invoice $invoice, $is_credit = false): array
     {
         if (! $invoice) {
             return [];
         }
 
         /** @var \App\Models\RecurringInvoice $recurring_invoice **/
-        $recurring_invoice = RecurringInvoice::find($invoice->recurring_id)->first();
+        $recurring_invoice = RecurringInvoice::find($invoice->recurring_id);
 
-        if (! $recurring_invoice) {
+        if (! $recurring_invoice) { // @phpstan-ignore-line
             throw new \Exception("Invoice isn't attached to a recurring invoice");
         }
 
@@ -107,23 +107,23 @@ class ProRata
             case RecurringInvoice::FREQUENCY_TWO_WEEKS:
                 return 14;
             case RecurringInvoice::FREQUENCY_FOUR_WEEKS:
-                return now()->diffInDays(now()->addWeeks(4));
+                return intval(abs(now()->diffInDays(now()->addWeeks(4))));
             case RecurringInvoice::FREQUENCY_MONTHLY:
-                return now()->diffInDays(now()->addMonthNoOverflow());
+                return intval(abs(now()->diffInDays(now()->addMonthNoOverflow())));
             case RecurringInvoice::FREQUENCY_TWO_MONTHS:
-                return now()->diffInDays(now()->addMonthsNoOverflow(2));
+                return intval(abs(now()->diffInDays(now()->addMonthsNoOverflow(2))));
             case RecurringInvoice::FREQUENCY_THREE_MONTHS:
-                return now()->diffInDays(now()->addMonthsNoOverflow(3));
+                return intval(abs(now()->diffInDays(now()->addMonthsNoOverflow(3))));
             case RecurringInvoice::FREQUENCY_FOUR_MONTHS:
-                return now()->diffInDays(now()->addMonthsNoOverflow(4));
+                return intval(abs(now()->diffInDays(now()->addMonthsNoOverflow(4))));
             case RecurringInvoice::FREQUENCY_SIX_MONTHS:
-                return now()->diffInDays(now()->addMonthsNoOverflow(6));
+                return intval(abs(now()->diffInDays(now()->addMonthsNoOverflow(6))));
             case RecurringInvoice::FREQUENCY_ANNUALLY:
-                return now()->diffInDays(now()->addYear());
+                return intval(abs(now()->diffInDays(now()->addYear())));
             case RecurringInvoice::FREQUENCY_TWO_YEARS:
-                return now()->diffInDays(now()->addYears(2));
+                return intval(abs(now()->diffInDays(now()->addYears(2))));
             case RecurringInvoice::FREQUENCY_THREE_YEARS:
-                return now()->diffInDays(now()->addYears(3));
+                return intval(abs(now()->diffInDays(now()->addYears(3))));
             default:
                 return 0;
         }

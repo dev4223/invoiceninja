@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,7 +12,8 @@
 namespace App\Filters;
 
 use App\Models\Payment;
-use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -36,39 +37,39 @@ class PaymentFilters extends QueryFilters
         return  $this->builder->where(function ($query) use ($filter) {
             $query->where('amount', 'like', '%'.$filter.'%')
                           ->orWhere('date', 'like', '%'.$filter.'%')
-                          ->orWhere('number','like', '%'.$filter.'%')
+                          ->orWhere('number', 'like', '%'.$filter.'%')
                           ->orWhere('transaction_reference', 'like', '%'.$filter.'%')
                           ->orWhere('custom_value1', 'like', '%'.$filter.'%')
                           ->orWhere('custom_value2', 'like', '%'.$filter.'%')
                           ->orWhere('custom_value3', 'like', '%'.$filter.'%')
                           ->orWhere('custom_value4', 'like', '%'.$filter.'%')
                           ->orWhereHas('client', function ($q) use ($filter) {
-                                $q->where('name', 'like', '%'.$filter.'%');
-                            })
+                              $q->where('name', 'like', '%'.$filter.'%');
+                          })
                             ->orWhereHas('client.contacts', function ($q) use ($filter) {
-                              $q->where('first_name', 'like', '%'.$filter.'%')
-                                ->orWhere('last_name', 'like', '%'.$filter.'%')
-                                ->orWhere('email', 'like', '%'.$filter.'%');
-                          });
+                                $q->where('first_name', 'like', '%'.$filter.'%')
+                                  ->orWhere('last_name', 'like', '%'.$filter.'%')
+                                  ->orWhere('email', 'like', '%'.$filter.'%');
+                            });
         });
     }
 
 
- /**
-     * Filter based on client status.
-     *
-     * Statuses we need to handle
-     * - all
-     * - pending
-     * - cancelled
-     * - failed
-     * - completed
-     * - partially refunded
-     * - refunded
-     *
-     * @param string $value The payment status as seen by the client
-     * @return Builder
-     */
+    /**
+        * Filter based on client status.
+        *
+        * Statuses we need to handle
+        * - all
+        * - pending
+        * - cancelled
+        * - failed
+        * - completed
+        * - partially refunded
+        * - refunded
+        *
+        * @param string $value The payment status as seen by the client
+        * @return Builder
+        */
     public function client_status(string $value = ''): Builder
     {
         if (strlen($value) == 0) {
@@ -108,12 +109,12 @@ class PaymentFilters extends QueryFilters
                 $payment_filters[] = Payment::STATUS_REFUNDED;
             }
 
-            if (count($payment_filters) >0) {
+            if (count($payment_filters) > 0) {
                 $query->whereIn('status_id', $payment_filters);
             }
 
             if(in_array('partially_unapplied', $status_parameters)) {
-                $query->where('amount', '>', 'applied')->where('refunded', 0);
+                $query->whereColumn('amount', '>', 'applied')->where('refunded', 0);
             }
         });
 
@@ -128,7 +129,7 @@ class PaymentFilters extends QueryFilters
      */
     public function match_transactions($value = 'true'): Builder
     {
-        
+
         if ($value == 'true') {
             return $this->builder
                         ->where('is_deleted', 0)
@@ -163,18 +164,46 @@ class PaymentFilters extends QueryFilters
     {
         $sort_col = explode('|', $sort);
 
-        if (!is_array($sort_col) || count($sort_col) != 2) {
+        if (!is_array($sort_col) || count($sort_col) != 2 || !in_array($sort_col[0], Schema::getColumnListing('payments'))) {
             return $this->builder;
         }
 
+        $dir = ($sort_col[1] == 'asc') ? 'asc' : 'desc';
 
         if ($sort_col[0] == 'client_id') {
             return $this->builder->orderBy(\App\Models\Client::select('name')
-                    ->whereColumn('clients.id', 'payments.client_id'), $sort_col[1]);
+                    ->whereColumn('clients.id', 'payments.client_id'), $dir);
         }
 
+        if($sort_col[0] == 'number') {
+            return $this->builder->orderByRaw("REGEXP_REPLACE(number,'[^0-9]+','')+0 " . $dir);
+        }
 
-        return $this->builder->orderBy($sort_col[0], $sort_col[1]);
+        return $this->builder->orderBy($sort_col[0], $dir);
+    }
+
+    public function date_range(string $date_range = ''): Builder
+    {
+        $parts = explode(",", $date_range);
+
+        if (count($parts) != 3) {
+            return $this->builder;
+        }
+
+        if(!in_array($parts[0], ['date'])) {
+            return $this->builder;
+        }
+
+        try {
+
+            $start_date = Carbon::parse($parts[1]);
+            $end_date = Carbon::parse($parts[2]);
+
+            return $this->builder->whereBetween($parts[0], [$start_date, $end_date]);
+        } catch(\Exception $e) {
+            return $this->builder;
+        }
+
     }
 
     /**

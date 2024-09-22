@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\ClientPortal\PrePayments;
 
+use App\Utils\Number;
 use App\Http\ViewComposers\PortalComposer;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -14,7 +15,14 @@ class StorePrePaymentRequest extends FormRequest
      */
     public function authorize()
     {
-        return auth()->guard('contact')->user()->company->enabled_modules & PortalComposer::MODULE_INVOICES;
+        
+        auth()->guard('contact')->user()->loadMissing(['company']);
+
+        auth()->guard('contact')->user()->loadMissing(['client' => function ($query) {
+            $query->without('gateway_tokens', 'documents', 'contacts.company', 'contacts'); // Exclude 'grandchildren' relation of 'client'
+        }]);
+
+        return (bool)(auth()->guard('contact')->user()->company->enabled_modules & PortalComposer::MODULE_INVOICES);
     }
 
     /**
@@ -35,6 +43,7 @@ class StorePrePaymentRequest extends FormRequest
     {
         $input = $this->all();
 
+        $input['amount'] = Number::parseFloat($input['amount'], auth()->guard('contact')->user()->client->currency()->precision ?? 2);
 
         $this->replace($input);
 

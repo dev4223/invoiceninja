@@ -4,24 +4,24 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Report;
 
-use Carbon\Carbon;
-use App\Utils\Ninja;
-use App\Utils\Number;
+use App\Export\CSV\BaseExport;
+use App\Libraries\MultiDB;
 use App\Models\Client;
-use League\Csv\Writer;
 use App\Models\Company;
 use App\Models\Invoice;
-use App\Libraries\MultiDB;
-use App\Export\CSV\BaseExport;
+use App\Utils\Ninja;
+use App\Utils\Number;
 use App\Utils\Traits\MakesDates;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\App;
+use League\Csv\Writer;
 
 class ARDetailReport extends BaseExport
 {
@@ -35,7 +35,7 @@ class ARDetailReport extends BaseExport
     //Balance
 
     public Writer $csv;
-    
+
     public string $date_key = 'created_at';
 
     public array $report_keys = [
@@ -74,7 +74,8 @@ class ARDetailReport extends BaseExport
         $t->replace(Ninja::transformTranslations($this->company->settings));
 
         $this->csv = Writer::createFromString();
-        
+        \League\Csv\CharsetConverter::addTo($this->csv, 'UTF-8', 'UTF-8');
+
         $this->csv->insertOne([]);
         $this->csv->insertOne([]);
         $this->csv->insertOne([]);
@@ -89,20 +90,23 @@ class ARDetailReport extends BaseExport
         $this->csv->insertOne($this->buildHeader());
 
         $query = Invoice::query()
+                ->whereIn('invoices.status_id', [Invoice::STATUS_SENT, Invoice::STATUS_PARTIAL])
                 ->withTrashed()
-                ->where('company_id', $this->company->id)
-                ->where('is_deleted', 0)
-                ->where('balance', '>', 0)
-                ->orderBy('due_date', 'ASC')
-                ->whereIn('status_id', [Invoice::STATUS_SENT, Invoice::STATUS_PARTIAL]);
+                ->whereHas('client', function ($query) {
+                    $query->where('is_deleted', 0);
+                })
+                ->where('invoices.company_id', $this->company->id)
+                ->where('invoices.is_deleted', 0)
+                ->where('invoices.balance', '>', 0)
+                ->orderBy('invoices.due_date', 'ASC');
 
-        $query = $this->addDateRange($query);
+        $query = $this->addDateRange($query, 'invoices');
 
         $query = $this->filterByClients($query);
 
         $query->cursor()
             ->each(function ($invoice) {
-                    $this->csv->insertOne($this->buildRow($invoice));
+                $this->csv->insertOne($this->buildRow($invoice));
             });
 
         return $this->csv->toString();
@@ -120,13 +124,13 @@ class ARDetailReport extends BaseExport
             $client->present()->name(),
             $client->number,
             $client->id_number,
-            Carbon::parse($invoice->due_date)->diffInDays(now()),
+            intval(abs(Carbon::parse($invoice->due_date)->diffInDays(now()))),
             Number::formatMoney($invoice->amount, $client),
             Number::formatMoney($invoice->balance, $client),
         ];
     }
-    
-    public function buildHeader() :array
+
+    public function buildHeader(): array
     {
         $header = [];
 

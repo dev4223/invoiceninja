@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -21,7 +21,10 @@ use Illuminate\Support\Facades\Artisan;
 
 class SchedulerCheck implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     public $tries = 1;
 
@@ -42,7 +45,7 @@ class SchedulerCheck implements ShouldQueue
         if (Ninja::isHosted()) {
             return;
         }
-        
+
         if (config('ninja.app_version') != base_path('VERSION.txt')) {
             try {
                 Artisan::call('migrate', ['--force' => true]);

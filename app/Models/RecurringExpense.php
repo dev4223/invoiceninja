@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -33,30 +33,30 @@ use Illuminate\Support\Carbon;
  * @property int|null $payment_type_id
  * @property int|null $recurring_expense_id
  * @property bool $is_deleted
- * @property int $uses_inclusive_taxes
+ * @property bool $uses_inclusive_taxes
  * @property string|null $tax_name1
  * @property string|null $tax_name2
  * @property string|null $tax_name3
  * @property string|null $date
  * @property string|null $payment_date
- * @property int $should_be_invoiced
- * @property int $invoice_documents
+ * @property bool $should_be_invoiced
+ * @property bool $invoice_documents
  * @property string|null $transaction_id
  * @property string|null $custom_value1
  * @property string|null $custom_value2
  * @property string|null $custom_value3
  * @property string|null $custom_value4
  * @property int|null $category_id
- * @property int $calculate_tax_by_amount
- * @property string|null $tax_amount1
- * @property string|null $tax_amount2
- * @property string|null $tax_amount3
- * @property string|null $tax_rate1
- * @property string|null $tax_rate2
- * @property string|null $tax_rate3
- * @property string|null $amount
- * @property string|null $foreign_amount
- * @property string $exchange_rate
+ * @property bool $calculate_tax_by_amount
+ * @property float|null $tax_amount1
+ * @property float|null $tax_amount2
+ * @property float|null $tax_amount3
+ * @property float|null $tax_rate1
+ * @property float|null $tax_rate2
+ * @property float|null $tax_rate3
+ * @property float|null $amount
+ * @property float|null $foreign_amount
+ * @property float|null $exchange_rate
  * @property int|null $assigned_user_id
  * @property string|null $number
  * @property int|null $invoice_currency_id
@@ -77,7 +77,7 @@ use Illuminate\Support\Carbon;
  * @property-read mixed $hashed_id
  * @property-read \App\Models\User $user
  * @property-read \App\Models\Vendor|null $vendor
- * @method static \Illuminate\Database\Eloquent\Builder|BaseModel company()
+ * @property-read \App\Models\ExpenseCategory|null $category
  * @method static \Illuminate\Database\Eloquent\Builder|BaseModel exclude($columns)
  * @method static \Database\Factories\RecurringExpenseFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder|RecurringExpense filter(\App\Filters\QueryFilters $filters)
@@ -139,17 +139,6 @@ use Illuminate\Support\Carbon;
  * @method static \Illuminate\Database\Eloquent\Builder|RecurringExpense whereVendorId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|RecurringExpense withTrashed()
  * @method static \Illuminate\Database\Eloquent\Builder|RecurringExpense withoutTrashed()
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Document> $documents
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Document> $documents
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Document> $documents
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Document> $documents
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Document> $documents
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Document> $documents
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Document> $documents
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Document> $documents
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Document> $documents
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Document> $documents
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Document> $documents
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Document> $documents
  * @mixin \Eloquent
  */
@@ -232,7 +221,7 @@ class RecurringExpense extends BaseModel
         return $this->belongsTo(User::class, 'assigned_user_id', 'id');
     }
 
-    public function company()
+    public function company(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Company::class);
     }
@@ -247,15 +236,21 @@ class RecurringExpense extends BaseModel
         return $this->belongsTo(Client::class);
     }
 
+    public function category(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(ExpenseCategory::class)->withTrashed();
+    }
+
+
     /**
      * Service entry points.
      */
-    public function service() :RecurringService
+    public function service(): RecurringService
     {
         return new RecurringService($this);
     }
 
-    public function nextSendDate() :?Carbon
+    public function nextSendDate(): ?Carbon
     {
         if (! $this->next_send_date) {
             return null;
@@ -291,7 +286,7 @@ class RecurringExpense extends BaseModel
         }
     }
 
-    public function nextSendDateClient() :?Carbon
+    public function nextSendDateClient(): ?Carbon
     {
         if (! $this->next_send_date) {
             return null;
@@ -327,7 +322,7 @@ class RecurringExpense extends BaseModel
         }
     }
 
-    public function remainingCycles() : int
+    public function remainingCycles(): int
     {
         if ($this->remaining_cycles == 0) {
             return 0;

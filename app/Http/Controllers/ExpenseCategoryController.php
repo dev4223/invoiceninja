@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -24,7 +24,6 @@ use App\Models\ExpenseCategory;
 use App\Repositories\BaseRepository;
 use App\Transformers\ExpenseCategoryTransformer;
 use App\Utils\Traits\MakesHash;
-use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
@@ -79,7 +78,7 @@ class ExpenseCategoryController extends BaseController
      *
      * Display a listing of the resource.
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      */
     public function index(ExpenseCategoryFilters $filters)
     {
@@ -94,7 +93,7 @@ class ExpenseCategoryController extends BaseController
      * Show the form for creating a new resource.
      *
      * @param CreateExpenseCategoryRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -129,7 +128,11 @@ class ExpenseCategoryController extends BaseController
      */
     public function create(CreateExpenseCategoryRequest $request)
     {
-        $expense_category = ExpenseCategoryFactory::create(auth()->user()->company()->id, auth()->user()->id);
+
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        $expense_category = ExpenseCategoryFactory::create($user->company()->id, auth()->user()->id);
 
         return $this->itemResponse($expense_category);
     }
@@ -138,8 +141,8 @@ class ExpenseCategoryController extends BaseController
     /**
      * Store a newly created resource in storage.
      *
-     * @param StoreExpenseCategoryRequest $request  
-     * @return Response
+     * @param StoreExpenseCategoryRequest $request
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Post(
@@ -189,7 +192,7 @@ class ExpenseCategoryController extends BaseController
      *
      * @param ShowExpenseCategoryRequest $request
      * @param ExpenseCategory $expense_category
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -242,7 +245,7 @@ class ExpenseCategoryController extends BaseController
      *
      * @param EditExpenseCategoryRequest $request
      * @param ExpenseCategory $expense_category
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -295,7 +298,7 @@ class ExpenseCategoryController extends BaseController
      *
      * @param UpdateExpenseCategoryRequest $request
      * @param ExpenseCategory $expense_category
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -352,7 +355,7 @@ class ExpenseCategoryController extends BaseController
      *
      * @param DestroyExpenseCategoryRequest $request
      * @param ExpenseCategory $expense_category
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @throws \Exception
@@ -407,7 +410,7 @@ class ExpenseCategoryController extends BaseController
     /**
      * Perform bulk actions on the list view.
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Post(

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -13,6 +13,7 @@ namespace App\Models;
 
 use App\DataMapper\CompanySettings;
 use App\Models\Presenters\VendorPresenter;
+use App\Services\Vendor\VendorService;
 use App\Utils\Traits\AppSetup;
 use App\Utils\Traits\GeneratesCounter;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -29,17 +30,18 @@ use Laracasts\Presenter\PresentableTrait;
  * @property int $user_id
  * @property int|null $assigned_user_id
  * @property int $company_id
- * @property string|null $currency_id
+ * @property int|null $currency_id
  * @property string|null $name
  * @property string|null $address1
  * @property string|null $address2
  * @property string|null $city
  * @property string|null $state
  * @property string|null $postal_code
- * @property string|null $country_id
+ * @property int|null $country_id
  * @property string|null $phone
  * @property string|null $private_notes
  * @property string|null $website
+ * @property string|null $routing_id
  * @property bool $is_deleted
  * @property string|null $vat_number
  * @property string|null $transaction_name
@@ -51,7 +53,7 @@ use Laracasts\Presenter\PresentableTrait;
  * @property string|null $vendor_hash
  * @property string|null $public_notes
  * @property string|null $id_number
- * @property string|null $language_id
+ * @property int|null $language_id
  * @property int|null $last_login
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Activity> $activities
  * @property-read int|null $activities_count
@@ -113,6 +115,7 @@ class Vendor extends BaseModel
         'custom_value4',
         'number',
         'language_id',
+        'classification',
     ];
 
     protected $casts = [
@@ -163,21 +166,28 @@ class Vendor extends BaseModel
         return $this->hasMany(Activity::class);
     }
 
+    public function getCurrencyCode(): string
+    {
+        if ($this->currency()) {
+            return $this->currency()->code;
+        }
+
+        return 'USD';
+    }
+
     public function currency()
     {
-        $currencies = Cache::get('currencies');
-
-        if (! $currencies) {
-            $this->buildCache(true);
-        }
+        
+        /** @var \Illuminate\Support\Collection<\App\Models\Currency> */
+        $currencies = app('currencies');
 
         if (! $this->currency_id) {
             return $this->company->currency();
         }
 
-        return $currencies->filter(function ($item) {
+        return $currencies->first(function ($item) {
             return $item->id == $this->currency_id;
-        })->first();
+        });
     }
 
     public function timezone()
@@ -203,7 +213,7 @@ class Vendor extends BaseModel
         return ctrans('texts.vendor');
     }
 
-    public function setCompanyDefaults($data, $entity_name) :array
+    public function setCompanyDefaults($data, $entity_name): array
     {
         $defaults = [];
 
@@ -243,7 +253,7 @@ class Vendor extends BaseModel
         return '';
     }
 
-    public function getMergedSettings() :object
+    public function getMergedSettings(): object
     {
         return $this->company->settings;
     }
@@ -273,5 +283,15 @@ class Vendor extends BaseModel
     public function date_format(): string
     {
         return $this->company->date_format();
+    }
+
+    public function backup_path(): string
+    {
+        return $this->company->company_key.'/'.$this->vendor_hash.'/backups';
+    }
+
+    public function service()
+    {
+        return new VendorService($this);
     }
 }

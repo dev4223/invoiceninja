@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -66,7 +66,7 @@ class RecurringQuoteController extends BaseController
      *
      * @param RecurringQuoteFilters $filters  The filters
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -113,7 +113,7 @@ class RecurringQuoteController extends BaseController
      *
      * @param CreateRecurringQuoteRequest $request  The request
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -161,7 +161,7 @@ class RecurringQuoteController extends BaseController
      *
      * @param StoreRecurringQuoteRequest $request  The request
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Post(
@@ -210,7 +210,7 @@ class RecurringQuoteController extends BaseController
      * @param ShowRecurringQuoteRequest $request  The request
      * @param RecurringQuote $recurring_quote  The RecurringQuote
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -265,7 +265,7 @@ class RecurringQuoteController extends BaseController
      * @param EditRecurringQuoteRequest $request  The request
      * @param RecurringQuote $recurring_quote  The RecurringQuote
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -320,7 +320,7 @@ class RecurringQuoteController extends BaseController
      * @param UpdateRecurringQuoteRequest $request  The request
      * @param RecurringQuote $recurring_quote  The RecurringQuote
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Put(
@@ -435,7 +435,7 @@ class RecurringQuoteController extends BaseController
     /**
      * Perform bulk actions on the list view.
      *
-     * @return \Illuminate\Support\Collection
+     * @return \Illuminate\Http\Response|\Illuminate\Http\JsonResponse
      *
      *
      * @OA\Post(
@@ -578,8 +578,8 @@ class RecurringQuoteController extends BaseController
     {
         switch ($action) {
             case 'clone_to_recurring_quote':
-          //      $recurring_invoice = CloneRecurringQuoteFactory::create($recurring_invoice, auth()->user()->id);
-          //      return $this->itemResponse($recurring_invoice);
+                //      $recurring_invoice = CloneRecurringQuoteFactory::create($recurring_invoice, auth()->user()->id);
+                //      return $this->itemResponse($recurring_invoice);
                 break;
             case 'clone_to_quote':
                 // $quote = CloneRecurringQuoteToQuoteFactory::create($recurring_invoice, auth()->user()->id);

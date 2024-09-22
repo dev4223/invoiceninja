@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -15,13 +15,12 @@ use App\Events\Payment\PaymentWasRefunded;
 use App\Events\Payment\PaymentWasVoided;
 use App\Services\Ledger\LedgerService;
 use App\Services\Payment\PaymentService;
-use App\Utils\Ninja; 
+use App\Utils\Ninja;
 use App\Utils\Number;
 use App\Utils\Traits\Inviteable;
 use App\Utils\Traits\MakesDates;
 use App\Utils\Traits\MakesHash;
 use App\Utils\Traits\Payment\Refundable;
-use Awobaz\Compoships\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -30,6 +29,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int $id
  * @property int $company_id
  * @property int $client_id
+ * @property int $category_id
  * @property int|null $project_id
  * @property int|null $vendor_id
  * @property int|null $user_id
@@ -58,6 +58,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int|null $exchange_currency_id
  * @property \App\Models\Paymentable $paymentable
  * @property object|null $meta
+ * @property array|null $refund_meta
  * @property string|null $custom_value1
  * @property string|null $custom_value2
  * @property string|null $custom_value3
@@ -101,45 +102,45 @@ class Payment extends BaseModel
     use Refundable;
     use Inviteable;
 
-    const STATUS_PENDING = 1;
+    public const STATUS_PENDING = 1;
 
-    const STATUS_CANCELLED = 2;
+    public const STATUS_CANCELLED = 2;
 
-    const STATUS_FAILED = 3;
+    public const STATUS_FAILED = 3;
 
-    const STATUS_COMPLETED = 4;
+    public const STATUS_COMPLETED = 4;
 
-    const STATUS_PARTIALLY_REFUNDED = 5;
+    public const STATUS_PARTIALLY_REFUNDED = 5;
 
-    const STATUS_REFUNDED = 6;
+    public const STATUS_REFUNDED = 6;
 
-    const TYPE_CREDIT_CARD = 1;
+    public const TYPE_CREDIT_CARD = 1;
 
-    const TYPE_BANK_TRANSFER = 2;
+    public const TYPE_BANK_TRANSFER = 2;
 
-    const TYPE_PAYPAL = 3;
+    public const TYPE_PAYPAL = 3;
 
-    const TYPE_CRYPTO = 4;
+    public const TYPE_CRYPTO = 4;
 
-    const TYPE_DWOLLA = 5;
+    public const TYPE_DWOLLA = 5;
 
-    const TYPE_CUSTOM1 = 6;
+    public const TYPE_CUSTOM1 = 6;
 
-    const TYPE_ALIPAY = 7;
+    public const TYPE_ALIPAY = 7;
 
-    const TYPE_SOFORT = 8;
+    public const TYPE_SOFORT = 8;
 
-    const TYPE_SEPA = 9;
+    public const TYPE_SEPA = 9;
 
-    const TYPE_GOCARDLESS = 10;
+    public const TYPE_GOCARDLESS = 10;
 
-    const TYPE_APPLE_PAY = 11;
+    public const TYPE_APPLE_PAY = 11;
 
-    const TYPE_CUSTOM2 = 12;
+    public const TYPE_CUSTOM2 = 12;
 
-    const TYPE_CUSTOM3 = 13;
+    public const TYPE_CUSTOM3 = 13;
 
-    const TYPE_TOKEN = 'token';
+    public const TYPE_TOKEN = 'token';
 
     protected $fillable = [
         'assigned_user_id',
@@ -151,12 +152,13 @@ class Payment extends BaseModel
         'number',
         'exchange_currency_id',
         'exchange_rate',
-        // 'is_manual',
         'private_notes',
         'custom_value1',
         'custom_value2',
         'custom_value3',
         'custom_value4',
+        'category_id',
+        'idempotency_key',
     ];
 
     protected $casts = [
@@ -167,6 +169,7 @@ class Payment extends BaseModel
         'deleted_at' => 'timestamp',
         'is_deleted' => 'bool',
         'meta' => 'object',
+        'refund_meta' => 'array',
     ];
 
     protected $with = [
@@ -220,7 +223,7 @@ class Payment extends BaseModel
      */
     public function invoices(): \Illuminate\Database\Eloquent\Relations\MorphToMany
     {
-        return $this->morphedByMany(Invoice::class, 'paymentable')->withTrashed()->withPivot('amount', 'refunded')->withTimestamps();
+        return $this->morphedByMany(Invoice::class, 'paymentable')->withTrashed()->withPivot('amount', 'refunded', 'deleted_at')->withTimestamps();
     }
 
     /**
@@ -228,7 +231,7 @@ class Payment extends BaseModel
      */
     public function credits(): \Illuminate\Database\Eloquent\Relations\MorphToMany
     {
-        return $this->morphedByMany(Credit::class, 'paymentable')->withTrashed()->withPivot('amount', 'refunded')->withTimestamps();
+        return $this->morphedByMany(Credit::class, 'paymentable')->withTrashed()->withPivot('amount', 'refunded', 'deleted_at')->withTimestamps();
     }
 
     /**
@@ -251,7 +254,7 @@ class Payment extends BaseModel
 
     public function transaction(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
-        return $this->belongsTo(BankTransaction::class);
+        return $this->belongsTo(BankTransaction::class)->withTrashed();
     }
 
     public function exchange_currency(): \Illuminate\Database\Eloquent\Relations\BelongsTo
@@ -311,9 +314,9 @@ class Payment extends BaseModel
         return $this->createClientDate($this->date, $this->client->timezone()->name)->format($date_format->format);
     }
 
-    public static function badgeForStatus(int $status): string
+    public function badgeForStatus(): string
     {
-        switch ($status) {
+        switch ($this->status_id) {
             case self::STATUS_PENDING:
                 return '<h6><span class="badge badge-secondary">'.ctrans('texts.payment_status_1').'</span></h6>';
             case self::STATUS_CANCELLED:
@@ -321,6 +324,11 @@ class Payment extends BaseModel
             case self::STATUS_FAILED:
                 return '<h6><span class="badge badge-danger">'.ctrans('texts.payment_status_3').'</span></h6>';
             case self::STATUS_COMPLETED:
+
+                if($this->amount > $this->applied) {
+                    return '<h6><span class="badge badge-info">' . ctrans('texts.partially_unapplied') . '</span></h6>';
+                }
+
                 return '<h6><span class="badge badge-info">'.ctrans('texts.payment_status_4').'</span></h6>';
             case self::STATUS_PARTIALLY_REFUNDED:
                 return '<h6><span class="badge badge-success">'.ctrans('texts.payment_status_5').'</span></h6>';
@@ -361,7 +369,25 @@ class Payment extends BaseModel
         return new PaymentService($this);
     }
 
-    public function refund(array $data) :self
+    /**
+     * $data = [
+            'id' => $payment->id,
+            'amount' => 10,
+            'invoices' => [
+                [
+                    'invoice_id' => $invoice->id,
+                    'amount' => 10,
+                ],
+            ],
+            'date' => '2020/12/12',
+            'gateway_refund' => false,
+            'email_receipt' => false,
+        ];
+     *
+     * @param array $data
+     * @return self
+     */
+    public function refund(array $data): self
     {
         return $this->service()->refundPayment($data);
     }
@@ -369,7 +395,7 @@ class Payment extends BaseModel
     /**
      * @return float
      */
-    public function getCompletedAmount() :float
+    public function getCompletedAmount(): float
     {
         return $this->amount - $this->refunded;
     }
@@ -434,13 +460,8 @@ class Payment extends BaseModel
         event(new PaymentWasVoided($this, $this->company, Ninja::eventVars(auth()->user() ? auth()->user()->id : null)));
     }
 
-    public function getLink() :string
+    public function getLink(): string
     {
-        // if (Ninja::isHosted()) {
-        //     $domain = isset($this->company->portal_domain) ? $this->company->portal_domain : $this->company->domain();
-        // } else {
-        //     $domain = config('ninja.app_url');
-        // }
 
         if (Ninja::isHosted()) {
             $domain = $this->company->domain();
@@ -476,4 +497,11 @@ class Payment extends BaseModel
         return $use_react_url ? config('ninja.react_url')."/#/payments/{$this->hashed_id}/edit" : config('ninja.app_url');
     }
 
+    public function setRefundMeta(array $data)
+    {
+        $tmp_meta = $this->refund_meta ?? [];
+        $tmp_meta[] = $data;
+
+        $this->refund_meta = $tmp_meta;
+    }
 }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -34,20 +34,22 @@ class RecurringInvoiceFilters extends QueryFilters
         }
 
         return  $this->builder->where(function ($query) use ($filter) {
-              $query->where('date', 'like', '%'.$filter.'%')
-                    ->orWhere('amount', 'like', '%'.$filter.'%')
-                    ->orWhere('custom_value1', 'like', '%'.$filter.'%')
-                    ->orWhere('custom_value2', 'like', '%'.$filter.'%')
-                    ->orWhere('custom_value3', 'like', '%'.$filter.'%')
-                    ->orWhere('custom_value4', 'like', '%'.$filter.'%')
-                    ->orWhereHas('client', function ($q) use ($filter) {
-                        $q->where('name', 'like', '%'.$filter.'%');
-                    })
-                    ->orWhereHas('client.contacts', function ($q) use ($filter) {
-                              $q->where('first_name', 'like', '%'.$filter.'%')
-                                ->orWhere('last_name', 'like', '%'.$filter.'%')
-                                ->orWhere('email', 'like', '%'.$filter.'%');
-                          });
+            $query->where('date', 'like', '%'.$filter.'%')
+                  ->orWhere('amount', 'like', '%'.$filter.'%')
+                  ->orWhere('number', 'like', '%'.$filter.'%')
+                  ->orWhere('custom_value1', 'like', '%'.$filter.'%')
+                  ->orWhere('custom_value2', 'like', '%'.$filter.'%')
+                  ->orWhere('custom_value3', 'like', '%'.$filter.'%')
+                  ->orWhere('custom_value4', 'like', '%'.$filter.'%')
+                  ->orWhereHas('client', function ($q) use ($filter) {
+                      $q->where('name', 'like', '%'.$filter.'%');
+                  })
+                  ->orWhereHas('client.contacts', function ($q) use ($filter) {
+                      $q->where('first_name', 'like', '%'.$filter.'%')
+                        ->orWhere('last_name', 'like', '%'.$filter.'%')
+                        ->orWhere('email', 'like', '%'.$filter.'%');
+                  })
+                  ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(line_items, '$[*].notes')) LIKE ?", ['%'.$filter.'%']);
         });
     }
 
@@ -114,20 +116,33 @@ class RecurringInvoiceFilters extends QueryFilters
      */
     public function sort(string $sort = ''): Builder
     {
+
         $sort_col = explode('|', $sort);
 
         if (!is_array($sort_col) || count($sort_col) != 2) {
             return $this->builder;
         }
 
+        $dir = ($sort_col[1] == 'asc') ? 'asc' : 'desc';
 
         if ($sort_col[0] == 'client_id') {
             return $this->builder->orderBy(\App\Models\Client::select('name')
-                    ->whereColumn('clients.id', 'recurring_invoices.client_id'), $sort_col[1]);
+                    ->whereColumn('clients.id', 'recurring_invoices.client_id'), $dir);
         }
 
+        if($sort_col[0] == 'number') {
+            return $this->builder->orderByRaw("REGEXP_REPLACE(number,'[^0-9]+','')+0 " . $dir);
+        }
 
-        return $this->builder->orderBy($sort_col[0], $sort_col[1]);
+        if($sort_col[0] == 'status_id'){
+            return $this->builder->orderBy('status_id', $dir)->orderBy('last_sent_date', $dir);
+        }
+
+        if($sort_col[0] == 'next_send_datetime') {
+            $sort_col[0] = 'next_send_date';
+        }
+
+        return $this->builder->orderBy($sort_col[0], $dir);
     }
 
     /**
@@ -152,9 +167,10 @@ class RecurringInvoiceFilters extends QueryFilters
             return $this->builder;
         }
 
+        /** @var array $key_parameters */
         $key_parameters = explode(',', $value);
 
-        if (count($key_parameters)) {
+        if (count($key_parameters) > 0) {
             return $this->builder->where(function ($query) use ($key_parameters) {
                 foreach ($key_parameters as $key) {
                     $query->orWhereJsonContains('line_items', ['product_key' => $key]);
@@ -173,6 +189,7 @@ class RecurringInvoiceFilters extends QueryFilters
      */
     public function next_send_between(string $range = ''): Builder
     {
+        /** @var array $parts */
         $parts = explode('|', $range);
 
         if (!isset($parts[0]) || !isset($parts[1])) {

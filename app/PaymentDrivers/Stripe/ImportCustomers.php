@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -62,12 +62,6 @@ class ImportCustomers
                 $this->addCustomer($customer);
             }
 
-            //handle
-            // if(is_array($customers->data) && end($customers->data) && array_key_exists('id', end($customers->data)))
-            //     $starting_after = end($customers->data)['id'];
-            // else
-            //     break;
-
             $starting_after = isset(end($customers->data)['id']) ? end($customers->data)['id'] : false;
 
             if (!$starting_after) {
@@ -112,7 +106,7 @@ class ImportCustomers
             $client->address2 = $customer->address->line2 ? $customer->address->line2 : '';
             $client->city = $customer->address->city ? $customer->address->city : '';
             $client->state = $customer->address->state ? $customer->address->state : '';
-            $client->phone = $customer->address->phone ? $customer->phone : '';
+            $client->phone = $customer->phone ?? '';
 
             if ($customer->address->country) {
                 $country = Country::query()->where('iso_3166_2', $customer->address->country)->first();
@@ -214,7 +208,7 @@ class ImportCustomers
                 if (! $cgt) {
                     nlog('customer '.$searchResults->data[0]->id.' does not exist.');
 
-                    $this->update_payment_methods->updateMethods($searchResults->data[0], $client);
+                    $this->update_payment_methods->updateMethods($searchResults->data[0], $client); //@phpstan-ignore-line
                 }
             }
         }

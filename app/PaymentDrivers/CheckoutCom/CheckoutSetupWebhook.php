@@ -4,39 +4,36 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\PaymentDrivers\CheckoutCom;
 
-use App\Models\Payment;
-use App\Models\SystemLog;
 use App\Libraries\MultiDB;
-use App\Models\GatewayType;
-use App\Models\PaymentHash;
-use App\Models\PaymentType;
-use Illuminate\Bus\Queueable;
 use App\Models\CompanyGateway;
-use App\Jobs\Util\SystemLogger;
-use Checkout\CheckoutApiException;
-use Illuminate\Queue\SerializesModels;
-use App\PaymentDrivers\Stripe\Utilities;
-use Illuminate\Queue\InteractsWithQueue;
-use App\PaymentDrivers\CheckoutCom\Webhook;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Checkout\CheckoutAuthorizationException;
-use Checkout\Workflows\CreateWorkflowRequest;
 use App\PaymentDrivers\CheckoutComPaymentDriver;
+use App\PaymentDrivers\Stripe\Utilities;
+use Checkout\CheckoutApiException;
+use Checkout\CheckoutAuthorizationException;
 use Checkout\Workflows\Actions\WebhookSignature;
 use Checkout\Workflows\Actions\WebhookWorkflowActionRequest;
 use Checkout\Workflows\Conditions\EventWorkflowConditionRequest;
+use Checkout\Workflows\CreateWorkflowRequest;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
 
 class CheckoutSetupWebhook implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, Utilities;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
+    use Utilities;
 
     public $tries = 1;
 
@@ -45,7 +42,7 @@ class CheckoutSetupWebhook implements ShouldQueue
     private string $authentication_webhook_name = 'Invoice_Ninja_3DS_Workflow';
 
     public CheckoutComPaymentDriver $checkout;
-    
+
     public function __construct(private string $company_key, private int $company_gateway_id)
     {
     }
@@ -68,8 +65,9 @@ class CheckoutSetupWebhook implements ShouldQueue
             return $workflow['name'] == $this->authentication_webhook_name;
         });
 
-        if($wf)
+        if($wf) {
             return;
+        }
 
         $this->createAuthenticationWorkflow();
     }
@@ -90,7 +88,7 @@ class CheckoutSetupWebhook implements ShouldQueue
         $actionRequest = new WebhookWorkflowActionRequest();
         $actionRequest->url = $this->checkout->company_gateway->webhookUrl();
         $actionRequest->signature = $signature;
-        
+
         $eventWorkflowConditionRequest = new EventWorkflowConditionRequest();
         $eventWorkflowConditionRequest->events = [
             "gateway" => ["payment_approved"],
@@ -105,7 +103,7 @@ class CheckoutSetupWebhook implements ShouldQueue
 
         try {
             $response = $this->checkout->gateway->getWorkflowsClient()->createWorkflow($request);
-            
+
         } catch (CheckoutApiException $e) {
             // API error
             $error_details = $e->error_details;

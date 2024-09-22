@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -200,7 +200,7 @@ trait Refundable
 
     private function createActivity(array $data, int $credit_id)
     {
-        $fields = new stdClass;
+        $fields = new stdClass();
         $activity_repo = new ActivityRepository();
 
         $fields->payment_id = $this->id;
@@ -208,6 +208,7 @@ trait Refundable
         $fields->company_id = $this->company_id;
         $fields->activity_type_id = Activity::REFUNDED_PAYMENT;
         $fields->credit_id = $credit_id;
+        $fields->client_id = $this->client_id;
 
         if (isset($data['invoices'])) {
             foreach ($data['invoices'] as $invoice) {
@@ -220,7 +221,7 @@ trait Refundable
         }
     }
 
-    private function buildCreditNote(array $data) :?Credit
+    private function buildCreditNote(array $data): ?Credit
     {
         $credit_note = CreditFactory::create($this->company_id, $this->user_id);
         $credit_note->assigned_user_id = isset($this->assigned_user_id) ?: null;

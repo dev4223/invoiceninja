@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Cache;
  */
 class EmailStats
 {
-    const EMAIL = 'email_';
+    public const EMAIL = 'email_';
 
     /**
      * Increments the counter for emails sent

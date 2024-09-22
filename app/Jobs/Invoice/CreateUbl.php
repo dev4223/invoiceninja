@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -34,11 +34,14 @@ use Illuminate\Queue\SerializesModels;
 
 class CreateUbl implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
-    const INVOICE_TYPE_STANDARD = 380;
+    public const INVOICE_TYPE_STANDARD = 380;
 
-    const INVOICE_TYPE_CREDIT = 381;
+    public const INVOICE_TYPE_CREDIT = 381;
 
     public $invoice;
 
@@ -49,7 +52,6 @@ class CreateUbl implements ShouldQueue
 
     /**
      * Execute the job
-     * @return ?string
      */
     public function handle()
     {
@@ -61,7 +63,7 @@ class CreateUbl implements ShouldQueue
         // invoice
         $ubl_invoice->setId($invoice->number);
         $ubl_invoice->setIssueDate(date_create($invoice->date));
-        $ubl_invoice->setInvoiceTypeCode($invoice->amount < 0 ? self::INVOICE_TYPE_CREDIT : self::INVOICE_TYPE_STANDARD);
+        $ubl_invoice->setInvoiceTypeCode($invoice->amount < 0 ? (string)self::INVOICE_TYPE_CREDIT : (string)self::INVOICE_TYPE_STANDARD);
 
         $supplier_party = $this->createParty($company, $invoice->user);
         $ubl_invoice->setAccountingSupplierParty($supplier_party);
@@ -100,6 +102,7 @@ class CreateUbl implements ShouldQueue
 
         $ubl_invoice->setLegalMonetaryTotal((new LegalMonetaryTotal())
             //->setLineExtensionAmount()
+            ->setTaxInclusiveAmount($invoice->balance)
             ->setTaxExclusiveAmount($taxable)
             ->setPayableAmount($invoice->balance));
 
@@ -189,7 +192,7 @@ class CreateUbl implements ShouldQueue
     /**
      * @param $item
      * @param $invoice_total
-     * @return float|int
+     * @return float
      */
     private function getItemTaxable($item, $invoice_total)
     {

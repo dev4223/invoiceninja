@@ -4,26 +4,22 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\PurchaseOrder;
 
-use App\Models\PurchaseOrder;
+use App\Models\Vendor;
 use App\Models\Webhook;
+use App\Models\PurchaseOrder;
 
 class MarkSent
 {
-    private $vendor;
-
-    private $purchase_order;
-
-    public function __construct($vendor, $purchase_order)
+    
+    public function __construct(public Vendor $vendor, public PurchaseOrder $purchase_order)
     {
-        $this->vendor = $vendor;
-        $this->purchase_order = $purchase_order;
     }
 
     public function run()

@@ -85,7 +85,7 @@ class CurrenciesSeeder extends Seeder
             ['id' => 60, 'name' => 'Taiwan New Dollar', 'code' => 'TWD', 'symbol' => 'NT$', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
             ['id' => 61, 'name' => 'Dominican Peso', 'code' => 'DOP', 'symbol' => 'RD$', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
             ['id' => 62, 'name' => 'Chilean Peso', 'code' => 'CLP', 'symbol' => '$', 'precision' => '0', 'thousand_separator' => '.', 'decimal_separator' => ','],
-            ['id' => 63, 'name' => 'Icelandic Króna', 'code' => 'ISK', 'symbol' => 'kr', 'precision' => '2', 'thousand_separator' => '.', 'decimal_separator' => ',', 'swap_currency_symbol' => true],
+            ['id' => 63, 'name' => 'Icelandic Króna', 'code' => 'ISK', 'symbol' => 'kr', 'precision' => '0', 'thousand_separator' => '.', 'decimal_separator' => ',', 'swap_currency_symbol' => true],
             ['id' => 64, 'name' => 'Papua New Guinean Kina', 'code' => 'PGK', 'symbol' => 'K', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
             ['id' => 65, 'name' => 'Jordanian Dinar', 'code' => 'JOD', 'symbol' => '', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
             ['id' => 66, 'name' => 'Myanmar Kyat', 'code' => 'MMK', 'symbol' => 'K', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
@@ -101,7 +101,7 @@ class CurrenciesSeeder extends Seeder
             ['id' => 76, 'name' => 'Surinamese Dollar', 'code' => 'SRD', 'symbol' => 'SRD', 'precision' => '2', 'thousand_separator' => '.', 'decimal_separator' => ','],
             ['id' => 77, 'name' => 'Bahraini Dinar', 'code' => 'BHD', 'symbol' => 'BD ', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
             ['id' => 78, 'name' => 'Venezuelan Bolivars', 'code' => 'VES', 'symbol' => 'Bs.', 'precision' => '2', 'thousand_separator' => '.', 'decimal_separator' => ','],
-            ['id' => 79, 'name' => 'South Korean Won', 'code' => 'KRW', 'symbol' => 'W ', 'precision' => '2', 'thousand_separator' => '.', 'decimal_separator' => ','],
+            ['id' => 79, 'name' => 'South Korean Won', 'code' => 'KRW', 'symbol' => 'W ', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
             ['id' => 80, 'name' => 'Moroccan Dirham', 'code' => 'MAD', 'symbol' => 'MAD ', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
             ['id' => 81, 'name' => 'Jamaican Dollar', 'code' => 'JMD', 'symbol' => '$', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
             ['id' => 82, 'name' => 'Angolan Kwanza', 'code' => 'AOA', 'symbol' => 'Kz', 'precision' => '2', 'thousand_separator' => '.', 'decimal_separator' => ','],
@@ -111,7 +111,7 @@ class CurrenciesSeeder extends Seeder
             ['id' => 86, 'name' => 'CFP Franc', 'code' => 'XPF', 'symbol' => '', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'], // precision should be zero
             ['id' => 87, 'name' => 'Mauritian Rupee', 'code' => 'MUR', 'symbol' => 'Rs', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
             ['id' => 88, 'name' => 'Cape Verdean Escudo', 'code' => 'CVE', 'symbol' => '', 'precision' => '2', 'thousand_separator' => '.', 'decimal_separator' => '$'],
-            ['id' => 89, 'name' => 'Kuwaiti Dinar', 'code' => 'KWD', 'symbol' => 'KD', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
+            ['id' => 89, 'name' => 'Kuwaiti Dinar', 'code' => 'KWD', 'symbol' => 'KD', 'precision' => '3', 'thousand_separator' => ',', 'decimal_separator' => '.'],
             ['id' => 90, 'name' => 'Algerian Dinar', 'code' => 'DZD', 'symbol' => 'DA', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
             ['id' => 91, 'name' => 'Macedonian Denar', 'code' => 'MKD', 'symbol' => 'ден', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
             ['id' => 92, 'name' => 'Fijian Dollar', 'code' => 'FJD', 'symbol' => 'FJ$', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
@@ -141,6 +141,11 @@ class CurrenciesSeeder extends Seeder
             ['id' => 116, 'name' => 'Silver Troy Ounce', 'code' => 'XAG', 'symbol' => 'XAG', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
             ['id' => 117, 'name' => 'Gold Troy Ounce', 'code' => 'XAU', 'symbol' => 'XAU', 'precision' => '3', 'thousand_separator' => ',', 'decimal_separator' => '.'],
             ['id' => 118, 'name' => 'Nicaraguan Córdoba', 'code' => 'NIO', 'symbol' => 'C$', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
+            ['id' => 119, 'name' => 'Malagasy ariary', 'code' => 'MGA', 'symbol' => 'Ar', 'precision' => '0', 'thousand_separator' => ',', 'decimal_separator' => '.'],
+            ['id' => 120, 'name' => "Tongan Pa anga", 'code' => 'TOP', 'symbol' => 'T$', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
+            ['id' => 121, 'name' => "Lao kip", 'code' => 'LAK', 'symbol' => '₭', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
+            ['id' => 122, 'name' => "Bhutan Ngultrum", 'code' => 'BTN', 'symbol' => 'Nu', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
+            ['id' => 123, 'name' => "Mauritanian Ouguiya", 'code' => 'MRU', 'symbol' => 'UM', 'precision' => '2', 'thousand_separator' => ',', 'decimal_separator' => '.'],
         ];
 
         foreach ($currencies as $currency) {

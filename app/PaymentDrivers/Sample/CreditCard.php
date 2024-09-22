@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -71,7 +71,7 @@ class CreditCard
         // $error_code = property_exists($response, 'approval_message') ? $response->approval_message : 'Undefined code';
         $error = '';
         $error_code = '';
-        
+
         $data = [
             'response' => $response,
             'error' => $error,

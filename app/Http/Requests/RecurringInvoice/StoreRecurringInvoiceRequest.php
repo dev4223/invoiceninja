@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -29,7 +29,7 @@ class StoreRecurringInvoiceRequest extends Request
      *
      * @return bool
      */
-    public function authorize() : bool
+    public function authorize(): bool
     {
 
         /** @var \App\Models\User auth()->user() */
@@ -46,27 +46,30 @@ class StoreRecurringInvoiceRequest extends Request
         $rules = [];
 
         if ($this->file('documents') && is_array($this->file('documents'))) {
-            $rules['documents.*'] = $this->file_validation;
+            $rules['documents.*'] = $this->fileValidation();
         } elseif ($this->file('documents')) {
-            $rules['documents'] = $this->file_validation;
+            $rules['documents'] = $this->fileValidation();
+        } else {
+            $rules['documents'] = 'bail|sometimes|array';
         }
 
         if ($this->file('file') && is_array($this->file('file'))) {
-            $rules['file.*'] = $this->file_validation;
+            $rules['file.*'] = $this->fileValidation();
         } elseif ($this->file('file')) {
-            $rules['file'] = $this->file_validation;
+            $rules['file'] = $this->fileValidation();
         }
 
         $rules['client_id'] = 'required|exists:clients,id,company_id,'.$user->company()->id;
 
-        $rules['invitations.*.client_contact_id'] = 'distinct';
+        $rules['invitations'] = 'sometimes|bail|array';
+        $rules['invitations.*.client_contact_id'] = 'bail|required|distinct';
 
         $rules['frequency_id'] = 'required|integer|digits_between:1,12';
 
         $rules['project_id'] = ['bail', 'sometimes', new ValidProjectForClient($this->all())];
 
         $rules['number'] = new UniqueRecurringInvoiceNumberRule($this->all());
-        
+
         $rules['tax_rate1'] = 'bail|sometimes|numeric';
         $rules['tax_rate2'] = 'bail|sometimes|numeric';
         $rules['tax_rate3'] = 'bail|sometimes|numeric';
@@ -75,6 +78,9 @@ class StoreRecurringInvoiceRequest extends Request
         $rules['tax_name3'] = 'bail|sometimes|string|nullable';
         $rules['due_date_days'] = 'bail|sometimes|string';
         $rules['exchange_rate'] = 'bail|sometimes|numeric';
+        $rules['next_send_date'] = 'bail|required|date|after:yesterday';
+
+        $rules['amount'] = ['sometimes', 'bail', 'numeric', 'max:99999999999999'];
 
         return $rules;
     }
@@ -82,6 +88,8 @@ class StoreRecurringInvoiceRequest extends Request
     public function prepareForValidation()
     {
         $input = $this->all();
+        $input['amount'] = 0;
+        $input['balance'] = 0;
 
         if (array_key_exists('due_date_days', $input) && is_null($input['due_date_days'])) {
             $input['due_date_days'] = 'terms';
@@ -140,6 +148,7 @@ class StoreRecurringInvoiceRequest extends Request
         }
 
         $input['line_items'] = isset($input['line_items']) ? $this->cleanItems($input['line_items']) : [];
+        $input['amount'] = $this->entityTotalAmount($input['line_items']);
 
         if (isset($input['auto_bill'])) {
             $input['auto_bill_enabled'] = $this->setAutoBillFlag($input['auto_bill']);

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,9 +12,10 @@
 namespace App\Services\Recurring;
 
 use App\Utils\Ninja;
-use App\Jobs\Util\UnlinkFile;
+use App\Models\Subscription;
 use App\Models\RecurringQuote;
 use Illuminate\Support\Carbon;
+use App\Utils\Traits\MakesHash;
 use App\Models\RecurringExpense;
 use App\Models\RecurringInvoice;
 use Illuminate\Support\Facades\Storage;
@@ -22,12 +23,14 @@ use App\Jobs\RecurringInvoice\SendRecurring;
 
 class RecurringService
 {
+    use MakesHash;
+
     public function __construct(public RecurringInvoice | RecurringExpense | RecurringQuote $recurring_entity)
     {
     }
 
     //set schedules - update next_send_dates
-    
+
     /**
      * Stops a recurring invoice
      *
@@ -54,13 +57,13 @@ class RecurringService
         if ($this->recurring_entity->remaining_cycles == 0 || $this->recurring_entity->is_deleted) {
             return $this;
         }
-    
+
         if ($this->recurring_entity->trashed()) {
             $this->recurring_entity->restore();
         }
 
         $this->setStatus(RecurringInvoice::STATUS_ACTIVE);
-        
+
         return $this;
     }
 
@@ -94,7 +97,7 @@ class RecurringService
             //30-06-2023
             try {
                 Storage::disk(config('filesystems.default'))->delete($this->recurring_entity->client->recurring_invoice_filepath($invitation) . $this->recurring_entity->numberFormatter().'.pdf');
-                    Storage::disk('public')->delete($this->recurring_entity->client->recurring_invoice_filepath($invitation) . $this->recurring_entity->numberFormatter().'.pdf');
+                Storage::disk('public')->delete($this->recurring_entity->client->recurring_invoice_filepath($invitation) . $this->recurring_entity->numberFormatter().'.pdf');
                 if (Ninja::isHosted()) {
                 }
             } catch (\Exception $e) {
@@ -106,7 +109,7 @@ class RecurringService
 
         return $this;
     }
-    
+
     public function triggeredActions($request)
     {
         if ($request->has('start') && $request->input('start') == 'true') {
@@ -116,7 +119,7 @@ class RecurringService
         if ($request->has('stop') && $request->input('stop') == 'true') {
             $this->stop();
         }
-        
+
         if ($request->has('send_now') && $request->input('send_now') == 'true' && $this->recurring_entity->invoices()->count() == 0) {
             $this->sendNow();
 
@@ -151,7 +154,7 @@ class RecurringService
     public function increasePrice(float $percentage)
     {
         (new IncreasePrice($this->recurring_entity, $percentage))->run();
-        
+
         return $this;
     }
 
@@ -161,7 +164,20 @@ class RecurringService
 
         return $this;
     }
-    
+
+    public function setPaymentLink(string $subscription_id): self
+    {
+
+        $sub_id = $this->decodePrimaryKey($subscription_id);
+
+        if(Subscription::withTrashed()->where('id', $sub_id)->where('company_id', $this->recurring_entity->company_id)->exists()) {
+            $this->recurring_entity->subscription_id = $sub_id;
+        }
+
+        return $this;
+
+    }
+
     public function save()
     {
         $this->recurring_entity->saveQuietly();

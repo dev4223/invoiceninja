@@ -9,6 +9,16 @@
 
 @endpush
 
+@section('header')
+    @if($errors->any())
+        <div class="alert alert-failure mb-4">
+            @foreach($errors->all() as $error)
+            <p>{{ $error }}</p>
+            @endforeach
+        </div>
+    @endif
+@endsection
+
 @section('body')
 
     @if($invoice->isPayable() && $client->getSetting('custom_message_unpaid_invoice'))
@@ -33,6 +43,11 @@
             <input type="hidden" name="hash" value="{{ $hash }}">
             <input type="hidden" name="payable_invoices[0][amount]" value="{{ $invoice->partial > 0 ?  \App\Utils\Number::formatValue($invoice->partial, $invoice->client->currency()) : \App\Utils\Number::formatValue($invoice->balance, $invoice->client->currency()) }}">
             <input type="hidden" name="payable_invoices[0][invoice_id]" value="{{ $invoice->hashed_id }}">
+            <input type="hidden" name="contact_first_name" value="{{ auth()->guard('contact')->user()->first_name }}">
+            <input type="hidden" name="contact_last_name" value="{{ auth()->guard('contact')->user()->last_name }}">
+            <input type="hidden" name="contact_email" value="{{ auth()->guard('contact')->user()->email }}">
+            <input type="hidden" name="client_city" value="{{ auth()->guard('contact')->user()->client->city }}">
+            <input type="hidden" name="client_postal_code" value="{{ auth()->guard('contact')->user()->client->postal_code }}">
 
             <div class="bg-white shadow sm:rounded-lg mb-4" translate>
                 <div class="px-4 py-5 sm:p-6">
@@ -42,17 +57,6 @@
                                 {{ ctrans('texts.invoice_number_placeholder', ['invoice' => $invoice->number])}}
                                 - {{ ctrans('texts.unpaid') }}
                             </h3>
-
-                            @if($key)
-                            <div class="btn hidden md:block" data-clipboard-text="{{url("client/invoice/{$key}")}}" aria-label="Copied!">
-                                <div class="flex text-sm leading-6 font-medium text-gray-500">
-                                    <p class="mr-2">{{url("client/invoice/{$key}")}}</p>
-                                    <p><img class="h-5 w-5" src="{{ asset('assets/clippy.svg') }}" alt="Copy to clipboard"></p>
-                                </div>
-                            </div>
-                            @endif
-
-
                         </div>
                         <div class="mt-5 sm:mt-0 sm:ml-6 flex justify-end">
                             <div class="inline-flex rounded-md shadow-sm">
@@ -79,15 +83,6 @@
                             {{ ctrans('texts.invoice_number_placeholder', ['invoice' => $invoice->number])}}
                             - {{ \App\Models\Invoice::stringStatus($invoice->status_id) }}
                         </h3>
-
-                            @if($key)
-                            <div class="btn hidden md:block" data-clipboard-text="{{url("client/invoice/{$key}")}}" aria-label="Copied!">
-                                <div class="flex text-sm leading-6 font-medium text-gray-500">
-                                    <p class="pr-10">{{url("client/invoice/{$key}")}}</p>
-                                    <p><img class="h-5 w-5" src="{{ asset('assets/clippy.svg') }}" alt="Copy to clipboard"></p>
-                                </div>
-                            </div>
-                            @endif
                     </div>
                 </div>
             </div>
@@ -95,26 +90,28 @@
     @endif
 
     @include('portal.ninja2020.components.entity-documents', ['entity' => $invoice])
-    @livewire('pdf-slot', ['entity' => $invoice, 'invitation' => $invitation, 'db' => $invitation->company->db])
+    @livewire('pdf-slot', ['entity' => $invoice, 'invitation' => $invitation, 'db' => $invoice->company->db])
 
 @endsection
 
 @section('footer')
+    @include('portal.ninja2020.invoices.includes.required-fields')
     @include('portal.ninja2020.invoices.includes.signature')
-    @include('portal.ninja2020.invoices.includes.terms', ['entities' => [$invoice], 'entity_type' => ctrans('texts.invoice')])
+    @include('portal.ninja2020.invoices.includes.terms', ['entities' => [$invoice], 'variables' => $variables, 'entity_type' => ctrans('texts.invoice')])
 @endsection
 
 @push('head')
-    <script src="{{ asset('js/clients/invoices/payment.js') }}" defer></script>
-    <script src="{{ asset('vendor/clipboard.min.js') }}" defer></script>
+    @vite('resources/js/clients/invoices/payment.js')
 
     <script type="text/javascript">
 
-    document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', () => {
 
-        var clipboard = new ClipboardJS('.btn');
+            @if($key)
+                window.history.pushState({}, "", "{{ url("client/invoice/{$key}") }}");
+            @endif
 
-    });
+        });
 
     </script>
 @endpush

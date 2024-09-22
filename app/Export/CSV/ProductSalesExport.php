@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -25,6 +25,7 @@ class ProductSalesExport extends BaseExport
 {
     public string $date_key = 'created_at';
 
+    /** @var Collection<\App\Models\Product> $products*/
     protected Collection $products;
 
     public Writer $csv;
@@ -37,6 +38,7 @@ class ProductSalesExport extends BaseExport
         'product_key' => 'product_key',
         'notes' => 'notes',
         'quantity' => 'quantity',
+        'currency' => 'currency',
         'cost' => 'price',
         'price' => 'cost',
         'markup' => 'markup',
@@ -64,11 +66,11 @@ class ProductSalesExport extends BaseExport
         'custom_value4' => 'custom_value4',
     ];
 
-    private array $decorate_keys = [
-        'client',
-        'currency',
-        'date',
-    ];
+    // private array $decorate_keys = [
+    //     'client',
+    //     'currency',
+    //     'date',
+    // ];
 
     public function __construct(Company $company, array $input)
     {
@@ -76,6 +78,28 @@ class ProductSalesExport extends BaseExport
         $this->input = $input;
         $this->sales = collect();
     }
+
+    public function filterByProducts($query)
+    {
+
+        $product_keys = &$this->input['product_key'];
+
+        if ($product_keys && !empty($this->input['product_key'])) {
+
+            $keys = explode(",", $product_keys);
+            $query->where(function ($q) use ($keys) {
+
+                foreach($keys as $key) {
+                    $q->orWhereJsonContains('line_items', ['product_key' => $key]);
+                }
+
+            });
+
+        }
+
+        return $query;
+    }
+
 
     public function run()
     {
@@ -86,9 +110,10 @@ class ProductSalesExport extends BaseExport
         $t->replace(Ninja::transformTranslations($this->company->settings));
 
         $this->products = Product::query()->where('company_id', $this->company->id)->withTrashed()->get();
-        
+
         //load the CSV document from a string
         $this->csv = Writer::createFromString();
+        \League\Csv\CharsetConverter::addTo($this->csv, 'UTF-8', 'UTF-8');
 
         if (count($this->input['report_keys']) == 0) {
             $this->input['report_keys'] = array_values($this->entity_keys);
@@ -97,25 +122,49 @@ class ProductSalesExport extends BaseExport
         //insert the header
         $query = Invoice::query()
                         ->withTrashed()
+                        ->whereHas('client', function ($q) {
+                            $q->where('is_deleted', false);
+                        })
                         ->where('company_id', $this->company->id)
                         ->where('is_deleted', 0)
                         ->whereIn('status_id', [Invoice::STATUS_SENT, Invoice::STATUS_PARTIAL, Invoice::STATUS_PAID]);
 
-        $query = $this->addDateRange($query);
+        $query = $this->addDateRange($query, 'invoices');
 
         $query = $this->filterByClients($query);
 
+        $query = $this->filterByProducts($query);
+
         $this->csv->insertOne($this->buildHeader());
 
+        $product_keys = &$this->input['product_key'];
+
+        if($product_keys) {
+            $product_keys = explode(",", $product_keys);
+        }
+
         $query->cursor()
-              ->each(function ($invoice) {
+              ->each(function ($invoice) use ($product_keys) {
                   foreach ($invoice->line_items as $item) {
-                      $this->csv->insertOne($this->buildRow($invoice, $item));
+
+                      if($product_keys) {
+                          if(in_array($item->product_key, $product_keys)) {
+                              $this->csv->insertOne($this->buildRow($invoice, $item));
+                          }
+                      } else {
+                          $this->csv->insertOne($this->buildRow($invoice, $item));
+                      }
+
                   }
               });
 
-        
-        $grouped = $this->sales->groupBy('product_key')->map(function ($key, $value) {
+
+        $grouped = $this->sales->groupBy('product_key')->map(function ($key, $value) use ($product_keys) {
+
+            if($product_keys && !in_array($value, $product_keys)) {
+                return false;
+            }
+
             $data =  [
                 'product' => $value,
                 'quantity' => $key->sum('quantity'),
@@ -133,7 +182,11 @@ class ProductSalesExport extends BaseExport
             ];
 
             return $data;
+
+        })->reject(function ($value) {
+            return $value === false;
         });
+        ;
 
         $this->csv->insertOne([]);
         $this->csv->insertOne([]);
@@ -142,9 +195,9 @@ class ProductSalesExport extends BaseExport
         $this->csv->insertOne([ctrans('texts.clients'), ctrans('texts.type'), ctrans('texts.start_date'), ctrans('texts.end_date')]);
         $this->csv->insertOne([$this->client_description, ctrans('texts.product_sales'), $this->start_date, $this->end_date]);
         $this->csv->insertOne([]);
-        
 
-        if ($grouped->count() >=1) {
+
+        if ($grouped->count() >= 1) {
             $header = [];
 
             foreach ($grouped->first() as $key => $value) {
@@ -160,9 +213,10 @@ class ProductSalesExport extends BaseExport
         return $this->csv->toString();
     }
 
-    private function buildRow($invoice, $invoice_item) :array
+    private function buildRow($invoice, $invoice_item): array
     {
         $transformed_entity = (array)$invoice_item;
+        $transformed_entity['price'] = ($invoice_item->product_cost ?? 1) * ($invoice->exchange_rate ?? 1) ;
 
         $entity = [];
 
@@ -171,22 +225,24 @@ class ProductSalesExport extends BaseExport
 
             if (array_key_exists($key, $transformed_entity)) {
                 $entity[$keyval] = $transformed_entity[$key];
+            } elseif($key == 'currency') {
+                $entity['currency'] = $invoice->client->currency()->code;
             } else {
                 $entity[$keyval] = '';
             }
         }
         $entity = $this->decorateAdvancedFields($invoice, $entity);
-        
+
         $this->sales->push($entity);
 
         return $entity;
     }
 
-    private function decorateAdvancedFields(Invoice $invoice, $entity) :array
+    private function decorateAdvancedFields(Invoice $invoice, $entity): array
     {
-        $product = $this->getProduct($entity['product_key']);
 
-        $entity['cost'] = $product->cost ?? 0;
+        //$product = $this->getProduct($entity['product_key']);
+        // $entity['cost'] = $product->cost ?? 0;
         /** @var float $unit_cost */
         $unit_cost = $entity['cost'] == 0 ? 1 : $entity['cost'];
 
@@ -200,7 +256,7 @@ class ProductSalesExport extends BaseExport
 
         $entity['net_total'] = $entity['price'] - $entity['discount'];
         $entity['profit'] = $entity['price'] - $entity['discount'] - $entity['cost'];
-        
+
         if (strlen($entity['tax_name1']) > 1) {
             $entity['tax_name1'] = $entity['tax_name1'] . ' [' . $entity['tax_rate1'] . '%]';
             $entity['tax_amount1'] = $this->calculateTax($invoice, $entity['line_total'], $entity['tax_rate1']);
@@ -214,7 +270,7 @@ class ProductSalesExport extends BaseExport
         } else {
             $entity['tax_amount2'] = 0;
         }
-        
+
         if (strlen($entity['tax_name3']) > 1) {
             $entity['tax_name3'] = $entity['tax_name3'] . ' [' . $entity['tax_rate3'] . '%]';
             $entity['tax_amount3'] = $this->calculateTax($invoice, $entity['line_total'], $entity['tax_rate3']);
@@ -224,7 +280,7 @@ class ProductSalesExport extends BaseExport
 
         return $entity;
     }
-        
+
     /**
      * calculateTax
      *
@@ -244,7 +300,7 @@ class ProductSalesExport extends BaseExport
         }
     }
 
-    
+
 
     /**
      * calculateDiscount
@@ -253,7 +309,7 @@ class ProductSalesExport extends BaseExport
      * @param  mixed $entity
      * @return float
      */
-    private function calculateDiscount(Invoice $invoice, $entity) :float
+    private function calculateDiscount(Invoice $invoice, $entity): float
     {
         if ($entity['discount'] == 0) {
             return 0;
@@ -267,15 +323,15 @@ class ProductSalesExport extends BaseExport
 
         return 0;
     }
-    
+
     /**
      * getProduct
      *
      * @param  string $product_key
-     * @return Product
+     * @return ?\Illuminate\Database\Eloquent\Model
      */
-    private function getProduct(string $product_key) :?Product
-    {
-        return $this->products->firstWhere('product_key', $product_key);
-    }
+    // private function getProduct(string $product_key)
+    // {
+    //     return $this->products->firstWhere('product_key', $product_key);
+    // }
 }

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -82,7 +82,7 @@ class DesignController extends BaseController
      *       ),
      *     )
      * @param DesignFilters $filters
-     * @return Response|mixed
+     * @return Response| \Illuminate\Http\JsonResponse|mixed
      */
     public function index(DesignFilters $filters)
     {
@@ -96,7 +96,7 @@ class DesignController extends BaseController
      *
      * @param ShowDesignRequest $request
      * @param Design $design
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -150,7 +150,7 @@ class DesignController extends BaseController
      *
      * @param EditDesignRequest $request
      * @param Design $design
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -204,7 +204,7 @@ class DesignController extends BaseController
      *
      * @param UpdateDesignRequest $request
      * @param Design $design
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -265,7 +265,7 @@ class DesignController extends BaseController
      * Show the form for creating a new resource.
      *
      * @param CreateDesignRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -301,7 +301,10 @@ class DesignController extends BaseController
      */
     public function create(CreateDesignRequest $request)
     {
-        $design = DesignFactory::create(auth()->user()->company()->id, auth()->user()->id);
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        $design = DesignFactory::create($user->company()->id, $user->id);
 
         return $this->itemResponse($design);
     }
@@ -310,7 +313,7 @@ class DesignController extends BaseController
      * Store a newly created resource in storage.
      *
      * @param StoreDesignRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -346,7 +349,11 @@ class DesignController extends BaseController
      */
     public function store(StoreDesignRequest $request)
     {
-        $design = DesignFactory::create(auth()->user()->company()->id, auth()->user()->id);
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        $design = DesignFactory::create($user->company()->id, $user->id);
+
         $design->fill($request->all());
         $design->save();
 
@@ -408,7 +415,7 @@ class DesignController extends BaseController
      *
      * @param DestroyDesignRequest $request
      * @param Design $design
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @throws \Exception
@@ -466,7 +473,7 @@ class DesignController extends BaseController
     /**
      * Perform bulk actions on the list view.
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Post(

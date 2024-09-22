@@ -4,21 +4,22 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Quote;
 
-use App\Utils\Ninja;
-use App\Models\Quote;
-use App\Jobs\Util\UnlinkFile;
-use App\Utils\Traits\MakesHash;
-use App\Exceptions\QuoteConversion;
-use App\Jobs\Entity\CreateEntityPdf;
-use App\Repositories\QuoteRepository;
 use App\Events\Quote\QuoteWasApproved;
+use App\Exceptions\QuoteConversion;
+use App\Jobs\EDocument\CreateEDocument;
+use App\Models\Project;
+use App\Models\Quote;
+use App\Repositories\QuoteRepository;
+use App\Services\Quote\UpdateReminder;
+use App\Utils\Ninja;
+use App\Utils\Traits\MakesHash;
 use Illuminate\Support\Facades\Storage;
 
 class QuoteService
@@ -41,7 +42,14 @@ class QuoteService
         return $this;
     }
 
-    public function convert() :self
+    public function convertToProject(): Project
+    {
+        $project = (new ConvertQuoteToProject($this->quote))->run();
+
+        return $project;
+    }
+
+    public function convert(): self
     {
         if ($this->quote->invoice_id) {
             throw new QuoteConversion();
@@ -66,7 +74,17 @@ class QuoteService
         return (new GetQuotePdf($this->quote, $contact))->run();
     }
 
-    public function sendEmail($contact = null) :self
+    public function getEQuote($contact = null)
+    {
+        return (new CreateEDocument($this->quote))->handle();
+    }
+
+    public function getEDocument($contact = null)
+    {
+        return $this->getEQuote($contact);
+    }
+
+    public function sendEmail($contact = null): self
     {
         $send_email = new SendEmail($this->quote, null, $contact);
 
@@ -79,7 +97,7 @@ class QuoteService
      * Applies the invoice number.
      * @return $this InvoiceService object
      */
-    public function applyNumber() :self
+    public function applyNumber(): self
     {
         $apply_number = new ApplyNumber($this->quote->client);
 
@@ -88,21 +106,21 @@ class QuoteService
         return $this;
     }
 
-    public function markSent() :self
+    public function markSent(): self
     {
         $this->quote = (new MarkSent($this->quote->client, $this->quote))->run();
 
         return $this;
     }
 
-    public function setStatus($status) :self
+    public function setStatus($status): self
     {
         $this->quote->status_id = $status;
 
         return $this;
     }
 
-    public function approve($contact = null) :self
+    public function approve($contact = null): self
     {
         $this->setStatus(Quote::STATUS_APPROVED)->save();
 
@@ -116,7 +134,6 @@ class QuoteService
             $this->invoice
                  ->service()
                  ->markSent()
-                 ->deletePdf()
                  ->save();
         }
 
@@ -125,34 +142,9 @@ class QuoteService
         return $this;
     }
 
-    /**
-     * Sometimes we need to refresh the
-     * PDF when it is updated etc.
-     *
-     * @return QuoteService
-     */
-    public function touchPdf($force = false)
-    {
-        try {
-            if ($force) {
-                $this->quote->invitations->each(function ($invitation) {
-                    (new CreateEntityPdf($invitation))->handle();
-                });
 
-                return $this;
-            }
 
-            $this->quote->invitations->each(function ($invitation) {
-                CreateEntityPdf::dispatch($invitation);
-            });
-        } catch (\Exception $e) {
-            nlog('failed creating invoices in Touch PDF');
-        }
-
-        return $this;
-    }
-
-    public function approveWithNoCoversion($contact = null) :self
+    public function approveWithNoCoversion($contact = null): self
     {
         $this->setStatus(Quote::STATUS_APPROVED)->save();
 
@@ -174,7 +166,7 @@ class QuoteService
         return $this->invoice;
     }
 
-    public function isConvertable() :bool
+    public function isConvertable(): bool
     {
         if ($this->quote->invoice_id) {
             return false;
@@ -245,12 +237,75 @@ class QuoteService
 
         return $this;
     }
+    public function deleteEQuote()
+    {
+        $this->quote->load('invitations');
+
+        $this->quote->invitations->each(function ($invitation) {
+            try {
+                // if (Storage::disk(config('filesystems.default'))->exists($this->invoice->client->e_invoice_filepath($invitation).$this->invoice->getFileName("xml"))) {
+                Storage::disk(config('filesystems.default'))->delete($this->quote->client->e_document_filepath($invitation).$this->quote->getFileName("xml"));
+                // }
+
+                // if (Ninja::isHosted() && Storage::disk('public')->exists($this->invoice->client->e_invoice_filepath($invitation).$this->invoice->getFileName("xml"))) {
+                if (Ninja::isHosted()) {
+                    Storage::disk('public')->delete($this->quote->client->e_document_filepath($invitation).$this->quote->getFileName("xml"));
+                }
+            } catch (\Exception $e) {
+                nlog($e->getMessage());
+            }
+        });
+
+        return $this;
+    }
+
+    public function setReminder($settings = null)
+    {
+        $this->quote = (new UpdateReminder($this->quote, $settings))->run();
+
+        return $this;
+    }
+
+
+    /*When a reminder is sent we want to touch the dates they were sent*/
+    public function touchReminder(string $reminder_template)
+    {
+        nrlog(now()->format('Y-m-d h:i:s') . " INV #{$this->quote->number} : Touching Reminder => {$reminder_template}");
+        switch ($reminder_template) {
+            case 'reminder1':
+                $this->quote->reminder1_sent = now();
+                $this->quote->reminder_last_sent = now();
+                $this->quote->last_sent_date = now();
+                break;
+            case 'reminder2':
+                $this->quote->reminder2_sent = now();
+                $this->quote->reminder_last_sent = now();
+                $this->quote->last_sent_date = now();
+                break;
+            case 'reminder3':
+                $this->quote->reminder3_sent = now();
+                $this->quote->reminder_last_sent = now();
+                $this->quote->last_sent_date = now();
+                break;
+            case 'endless_reminder':
+                $this->quote->reminder_last_sent = now();
+                $this->invoice->last_sent_date = now();
+                break;
+            default:
+                $this->quote->reminder1_sent = now();
+                $this->quote->reminder_last_sent = now();
+                $this->quote->last_sent_date = now();
+                break;
+        }
+
+        return $this;
+    }
 
     /**
      * Saves the quote.
      * @return Quote|null
      */
-    public function save() : ?Quote
+    public function save(): ?Quote
     {
         $this->quote->saveQuietly();
 

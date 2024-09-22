@@ -4,40 +4,39 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers\ClientPortal;
 
-use App\Utils\Ninja;
-use App\Utils\Number;
-use App\Models\Invoice;
-use Illuminate\View\View;
-use Illuminate\Http\Request;
-use App\Models\QuoteInvitation;
-use App\Utils\Traits\MakesHash;
-use App\Models\CreditInvitation;
-use App\Utils\Traits\MakesDates;
-use App\Models\InvoiceInvitation;
-use App\Http\Controllers\Controller;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Contracts\View\Factory;
-use App\Models\PurchaseOrderInvitation;
-use Illuminate\Support\Facades\Storage;
 use App\Events\Invoice\InvoiceWasViewed;
 use App\Events\Misc\InvitationWasViewed;
-use App\Models\RecurringInvoiceInvitation;
-use App\Jobs\Vendor\CreatePurchaseOrderPdf;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\ClientPortal\Invoices\ProcessInvoicesInBulkRequest;
 use App\Http\Requests\ClientPortal\Invoices\ShowInvoiceRequest;
 use App\Http\Requests\ClientPortal\Invoices\ShowInvoicesRequest;
-use App\Http\Requests\ClientPortal\Invoices\ProcessInvoicesInBulkRequest;
+use App\Models\CreditInvitation;
+use App\Models\Invoice;
+use App\Models\InvoiceInvitation;
+use App\Models\QuoteInvitation;
+use App\Models\RecurringInvoiceInvitation;
+use App\Utils\HtmlEngine;
+use App\Utils\Ninja;
+use App\Utils\Number;
+use App\Utils\Traits\MakesDates;
+use App\Utils\Traits\MakesHash;
+use Illuminate\Contracts\View\Factory;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\View\View;
 
 class InvoiceController extends Controller
 {
-    use MakesHash, MakesDates;
+    use MakesHash;
+    use MakesDates;
 
     /**
      * Display list of invoices.
@@ -70,11 +69,14 @@ class InvoiceController extends Controller
             event(new InvoiceWasViewed($invitation, $invoice->company, Ninja::eventVars()));
         }
 
+        $variables = ($invitation && auth()->guard('contact')->user()->client->getSetting('show_accept_invoice_terms')) ? (new HtmlEngine($invitation))->generateLabelsAndValues() : false;
+
         $data = [
-            'invoice' => $invoice,
+            'invoice' => $invoice->service()->removeUnpaidGatewayFees()->save(),
             'invitation' => $invitation ?: $invoice->invitations->first(),
             'key' => $invitation ? $invitation->key : false,
             'hash' => $hash,
+            'variables' => $variables,
         ];
 
         if ($request->query('mode') === 'fullscreen') {
@@ -87,21 +89,28 @@ class InvoiceController extends Controller
     public function showBlob($hash)
     {
         $data = Cache::get($hash);
+
+        if(!$data) {
+            usleep(200000);
+            $data = Cache::get($hash);
+        }
+
         $invitation = false;
-        
-        match($data['entity_type']){
+
+        match($data['entity_type'] ?? 'invoice') {
             'invoice' => $invitation = InvoiceInvitation::withTrashed()->find($data['invitation_id']),
             'quote' => $invitation = QuoteInvitation::withTrashed()->find($data['invitation_id']),
             'credit' => $invitation = CreditInvitation::withTrashed()->find($data['invitation_id']),
             'recurring_invoice' => $invitation = RecurringInvoiceInvitation::withTrashed()->find($data['invitation_id']),
+            default => $invitation = false,
         };
 
         if (! $invitation) {
             return redirect('/');
         }
 
-        $file = (new \App\Jobs\Entity\CreateRawPdf($invitation, $invitation->company->db))->handle();
-        
+        $file = (new \App\Jobs\Entity\CreateRawPdf($invitation))->handle();
+
         $headers = ['Content-Type' => 'application/pdf'];
         return response()->make($file, 200, $headers);
 
@@ -176,6 +185,16 @@ class InvoiceController extends Controller
                 ->with('message', ctrans('texts.no_payable_invoices_selected'));
         }
 
+        //ensure all stale fees are removed.
+        $invoices->each(function ($invoice) {
+            $invoice->service()
+                    ->markSent()
+                    ->removeUnpaidGatewayFees()
+                    ->save();
+        });
+
+        $invoices = $invoices->fresh();
+
         //iterate and sum the payable amounts either partial or balance
         $total = 0;
         foreach ($invoices as $invoice) {
@@ -188,7 +207,6 @@ class InvoiceController extends Controller
 
         //format data
         $invoices->map(function ($invoice) {
-            $invoice->service()->removeUnpaidGatewayFees();
             $invoice->balance = $invoice->balance > 0 ? Number::formatValue($invoice->balance, $invoice->client->currency()) : 0;
             $invoice->partial = $invoice->partial > 0 ? Number::formatValue($invoice->partial, $invoice->client->currency()) : 0;
 
@@ -202,13 +220,21 @@ class InvoiceController extends Controller
 
         //if there is only one payment method -> lets return straight to the payment page
 
+        $settings = auth()->guard('contact')->user()->client->getMergedSettings();
+        $variables = false;
+
+        if(($invitation = $invoices->first()->invitations()->first() ?? false) && $settings->show_accept_invoice_terms) {
+            $variables = (new HtmlEngine($invitation))->generateLabelsAndValues();
+        }
+
         $data = [
-            'settings' => auth()->guard('contact')->user()->client->getMergedSettings(),
+            'settings' => $settings,
             'invoices' => $invoices,
             'formatted_total' => $formatted_total,
             'payment_methods' => $payment_methods,
             'hashed_ids' => $invoices->pluck('hashed_id'),
             'total' =>  $total,
+            'variables' => $variables,
         ];
 
         return $this->render('invoices.payment', $data);
@@ -237,11 +263,9 @@ class InvoiceController extends Controller
         if ($invoices->count() == 1) {
             $invoice = $invoices->first();
 
-            $file = $invoice->service()->getInvoicePdf(auth()->guard('contact')->user());
-
-            return response()->streamDownload(function () use ($file) {
-                echo Storage::get($file);
-            }, basename($file), ['Content-Type' => 'application/pdf']);
+            return response()->streamDownload(function () use ($invoice) {
+                echo $invoice->service()->getInvoicePdf(auth()->guard('contact')->user());
+            }, $invoice->getFileName(), ['Content-Type' => 'application/pdf']);
         }
 
         return $this->buildZip($invoices);
@@ -254,7 +278,7 @@ class InvoiceController extends Controller
         try {
 
             foreach ($invoices as $invoice) {
-                            
+
                 if ($invoice->client->getSetting('enable_e_invoice')) {
                     $xml = $invoice->service()->getEInvoice();
                     $zipFile->addFromString($invoice->getFileName("xml"), $xml);

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -26,9 +26,9 @@ class ClientContactRepository extends BaseRepository
 
     private bool $set_send_email_on_contact = false;
 
-    public function save(array $data, Client $client) : void
+    public function save(array $data, Client $client): void
     {
-        //06-09-2022 sometimes users pass a contact object instead of a nested array, this sequence handles this scenario
+
         if (isset($data['contacts']) && (count($data['contacts']) !== count($data['contacts'], COUNT_RECURSIVE))) {
             $contacts = collect($data['contacts']);
         } elseif (isset($data['contacts'])) {
@@ -82,10 +82,17 @@ class ClientContactRepository extends BaseRepository
 
             $update_contact->fill($contact);
 
-            if (array_key_exists('password', $contact) && strlen($contact['password']) > 1) {
+            if (array_key_exists('password', $contact) && strlen($contact['password']) > 1 && strlen($update_contact->email) > 3) { //updating on a blank contact email will cause large table scanning
                 $update_contact->password = Hash::make($contact['password']);
 
-                $client->company->client_contacts()->where('email', $update_contact->email)->update(['password' => $update_contact->password]);
+                ClientContact::withTrashed()
+                            ->where('company_id', $client->company_id)
+                            ->where('client_id', $client->id)
+                            ->where('email', $update_contact->email)->cursor()
+                                    ->each(function ($saveable_contact) use ($update_contact) {
+                                        $saveable_contact->password = $update_contact->password;
+                                        $saveable_contact->save();
+                                    });
             }
 
             if (array_key_exists('email', $contact)) {

@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -74,7 +74,7 @@ class MolliePaymentDriver extends BaseDriver
         GatewayType::IDEAL => IDEAL::class,
     ];
 
-    const SYSTEM_LOG_TYPE = SystemLog::TYPE_MOLLIE;
+    public const SYSTEM_LOG_TYPE = SystemLog::TYPE_MOLLIE;
 
     public function init(): self
     {
@@ -156,7 +156,7 @@ class MolliePaymentDriver extends BaseDriver
                 return [
                     'transaction_reference' => $refund->id,
                     'transaction_response' => json_encode($refund),
-                    'success' => $refund->status === 'refunded' ? true : false,
+                    'success' => $refund->status === 'refunded' ? true : false, //@phpstan-ignore-line
                     'description' => $refund->description,
                     'code' => 200,
                 ];
@@ -419,5 +419,20 @@ class MolliePaymentDriver extends BaseDriver
     public function convertToMollieAmount($amount): string
     {
         return \number_format((float) $amount, 2, '.', '');
+    }
+
+    public function auth(): bool
+    {
+        $this->init();
+
+        try {
+            $p = $this->gateway->payments->page();
+            return true;
+        } catch(\Exception $e) {
+
+        }
+
+        return false;
+
     }
 }

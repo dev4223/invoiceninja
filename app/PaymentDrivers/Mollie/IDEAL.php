@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -40,7 +40,7 @@ class IDEAL implements MethodInterface
      * Show the authorization page for iDEAL.
      *
      * @param array $data
-     * @return \Illuminate\View\View         
+     * @return \Illuminate\View\View
      */
     public function authorizeView(array $data): View
     {
@@ -51,7 +51,7 @@ class IDEAL implements MethodInterface
      * Handle the authorization for iDEAL.
      *
      * @param Request $request
-     * @return RedirectResponse
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function authorizeResponse(Request $request): RedirectResponse
     {
@@ -62,7 +62,7 @@ class IDEAL implements MethodInterface
      * Show the payment page for iDEAL.
      *
      * @param array $data
-     * @return Redirector|RedirectResponse
+     * @return \Illuminate\Http\RedirectResponseor|RedirectResponse
      */
     public function paymentView(array $data)
     {
@@ -171,7 +171,7 @@ class IDEAL implements MethodInterface
      *
      * @param string $status
      * @param ResourcesPayment $payment
-     * @return RedirectResponse
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function processSuccessfulPayment(\Mollie\Api\Resources\Payment $payment, string $status = 'paid'): RedirectResponse
     {
@@ -203,7 +203,7 @@ class IDEAL implements MethodInterface
      * Handle 'open' payment status for IDEAL.
      *
      * @param ResourcesPayment $payment
-     * @return RedirectResponse
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function processOpenPayment(\Mollie\Api\Resources\Payment $payment): RedirectResponse
     {

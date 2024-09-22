@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -17,8 +17,8 @@ use App\Utils\Traits\MakesHash;
 use App\Jobs\Entity\CreateRawPdf;
 use App\Jobs\Util\WebhookHandler;
 use App\Models\Traits\Excludable;
+use App\Services\PdfMaker\PdfMerge;
 use Illuminate\Database\Eloquent\Model;
-use App\Jobs\Vendor\CreatePurchaseOrderPdf;
 use App\Utils\Traits\UserSessionAttributes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\ModelNotFoundException as ModelNotFoundException;
@@ -37,7 +37,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException as ModelNotFoundExceptio
  * @property int $assigned_user_id
  * @method BaseModel service()
  * @property \App\Models\Company $company
- * @method static BaseModel find($value) 
+ * @method static BaseModel find($value)
  * @method static \Illuminate\Database\Eloquent\Builder|BaseModel<static> company()
  * @method static \Illuminate\Database\Eloquent\Builder|BaseModel|Illuminate\Database\Eloquent\Relations\BelongsTo|\Awobaz\Compoships\Database\Eloquent\Relations\BelongsTo|\App\Models\Company company()
  * @method static \Illuminate\Database\Eloquent\Builder|BaseModel|Illuminate\Database\Eloquent\Relations\HasMany|BaseModel orderBy()
@@ -68,7 +68,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException as ModelNotFoundExceptio
  * @method static \Illuminate\Database\Eloquent\Builder|BaseModel|\Illuminate\Database\Query\Builder withoutTrashed()
  * @mixin \Eloquent
  * @mixin \Illuminate\Database\Eloquent\Builder
- * 
+ *
  * @property \Illuminate\Support\Collection $tax_map
  * @property array $total_tax_map
  */
@@ -78,6 +78,8 @@ class BaseModel extends Model
     use UserSessionAttributes;
     use HasFactory;
     use Excludable;
+
+    public int $max_attachment_size = 3000000;
 
     protected $appends = [
         'hashed_id',
@@ -98,29 +100,25 @@ class BaseModel extends Model
 
     public function dateMutator($value)
     {
-        if (! empty($value)) {
-            return (new Carbon($value))->format('Y-m-d');
-        }
-
-        return $value;
+        return (new Carbon($value))->format('Y-m-d');
     }
 
-    public function __call($method, $params)
-    {
-        $entity = strtolower(class_basename($this));
+    // public function __call($method, $params)
+    // {
+    //     $entity = strtolower(class_basename($this));
 
-        if ($entity) {
-            $configPath = "modules.relations.$entity.$method";
+    //     if ($entity) {
+    //         $configPath = "modules.relations.$entity.$method";
 
-            if (config()->has($configPath)) {
-                $function = config()->get($configPath);
+    //         if (config()->has($configPath)) {
+    //             $function = config()->get($configPath);
 
-                return call_user_func_array([$this, $function[0]], $function[1]);
-            }
-        }
+    //             return call_user_func_array([$this, $function[0]], $function[1]);
+    //         }
+    //     }
 
-        return parent::__call($method, $params);
-    }
+    //     return parent::__call($method, $params);
+    // }
 
     /**
     * @param  \Illuminate\Database\Eloquent\Builder  $query
@@ -131,7 +129,7 @@ class BaseModel extends Model
         /** @var \App\Models\User $user */
         $user = auth()->user();
 
-        $query->where('company_id', $user->companyId());
+        $query->where("{$query->getQuery()->from}.company_id", $user->companyId());
 
         return $query;
     }
@@ -214,7 +212,7 @@ class BaseModel extends Model
      * Retrieve the model for a bound value.
      *
      * @param mixed $value
-     * @param null $field
+     * @param mixed $field
      * @return Model|null
      */
     public function resolveRouteBinding($value, $field = null)
@@ -237,10 +235,25 @@ class BaseModel extends Model
         return $this->numberFormatter().'.'.$extension;
     }
 
-     /**
-     * @param string $extension
-     * @return string
-     */
+    public function getDeliveryNoteName($extension = 'pdf')
+    {
+
+        $number =  ctrans("texts.delivery_note"). "_" . $this->numberFormatter().'.'.$extension;
+
+        $formatted_number =  mb_ereg_replace("([^\w\s\d\-_~,;\[\]\(\).])", '', $number);
+
+        $formatted_number = mb_ereg_replace("([\.]{2,})", '', $formatted_number);
+
+        $formatted_number = preg_replace('/\s+/', '_', $formatted_number);
+
+        return \Illuminate\Support\Str::ascii($formatted_number);
+
+    }
+
+    /**
+    * @param string $extension
+    * @return string
+    */
     public function getEFileName($extension = 'pdf')
     {
         return ctrans("texts.e_invoice"). "_" . $this->numberFormatter().'.'.$extension;
@@ -256,7 +269,7 @@ class BaseModel extends Model
 
         $formatted_number = preg_replace('/\s+/', '_', $formatted_number);
 
-        return $formatted_number;
+        return \Illuminate\Support\Str::ascii($formatted_number);
     }
 
     public function translate_entity()
@@ -277,9 +290,9 @@ class BaseModel extends Model
         $subscriptions = Webhook::where('company_id', $this->company_id)
                                  ->where('event_id', $event_id)
                                  ->exists();
-                            
+
         if ($subscriptions) {
-            WebhookHandler::dispatch($event_id, $this, $this->company, $additional_data);
+            WebhookHandler::dispatch($event_id, $this->withoutRelations(), $this->company, $additional_data);
         }
     }
 
@@ -303,10 +316,71 @@ class BaseModel extends Model
             throw new \Exception('Hard fail, could not create an invitation.');
         }
 
-        if($this instanceof \App\Models\PurchaseOrder) 
-            return "data:application/pdf;base64,".base64_encode((new CreatePurchaseOrderPdf($invitation, $invitation->company->db))->rawPdf());
-        
-        return "data:application/pdf;base64,".base64_encode((new CreateRawPdf($invitation, $invitation->company->db))->handle());
+        return "data:application/pdf;base64,".base64_encode((new CreateRawPdf($invitation))->handle());
 
+    }
+
+    /**
+     * Takes a entity prop as first argument
+     * along with an array of variables and performs
+     * a string replace on the prop.
+     *
+     * @param string $field
+     * @param array $variables
+     * @return string
+     */
+    public function parseHtmlVariables(string $field, array $variables): string
+    {
+        if(!$this->{$field}) {
+            return '';
+        }
+
+        $section = strtr($this->{$field}, $variables['labels']);
+
+        return strtr($section, $variables['values']);
+
+    }
+
+    /**
+     * Merged PDFs associated with the entity / company
+     * into a single document
+     *
+     * @param  string $pdf
+     * @return mixed
+     */
+    public function documentMerge(string $pdf): mixed
+    {
+        $files = collect([$pdf]);
+
+        $entity_docs = $this->documents()
+        ->where('is_public', true)
+        ->get()
+        ->filter(function ($document) {
+            return $document->size < $this->max_attachment_size && stripos($document->name, ".pdf") !== false;
+        })->map(function ($d) {
+            return $d->getFile();
+        });
+
+        $files->push($entity_docs);
+
+        $company_docs = $this->company->documents()
+        ->where('is_public', true)
+        ->get()
+        ->filter(function ($document) {
+            return $document->size < $this->max_attachment_size && stripos($document->name, ".pdf") !== false;
+        })->map(function ($d) {
+            return $d->getFile();
+        });
+
+        $files->push($company_docs);
+
+        try{
+            $pdf = (new PdfMerge($files->flatten()->toArray()))->run();
+        }
+        catch(\Exception $e){
+            nlog("Exception:: BaseModel:: PdfMerge::" . $e->getMessage());
+        }
+
+        return $pdf;
     }
 }

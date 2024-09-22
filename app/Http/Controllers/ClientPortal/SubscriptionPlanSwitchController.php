@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -54,6 +54,6 @@ class SubscriptionPlanSwitchController extends Controller
 
     public function not_availabe()
     {
-        abort(404, 'ewwo');
+        abort(404, 'Not Available');
     }
 }

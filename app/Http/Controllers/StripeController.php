@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -67,7 +67,7 @@ class StripeController extends BaseController
                                 ->whereIn('gateway_key', $this->stripe_keys)
                                 ->first();
 
-            return $company_gateway->driver(new Client)->verifyConnect();
+            return $company_gateway->driver(new Client())->verifyConnect();
         }
 
         return response()->json(['message' => 'Unauthorized'], 403);

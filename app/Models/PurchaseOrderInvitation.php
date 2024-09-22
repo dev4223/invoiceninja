@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -15,7 +15,6 @@ use App\Utils\Ninja;
 use App\Utils\Traits\Inviteable;
 use App\Utils\Traits\MakesDates;
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
@@ -98,6 +97,11 @@ class PurchaseOrderInvitation extends BaseModel
         return self::class;
     }
 
+    public function getEntityString(): string
+    {
+        return 'purchase_order';
+    }
+
     public function entityType()
     {
         return PurchaseOrder::class;
@@ -139,7 +143,7 @@ class PurchaseOrderInvitation extends BaseModel
         $this->save();
     }
 
-    public function getPortalLink() :string
+    public function getPortalLink(): string
     {
         if (Ninja::isHosted()) {
             $domain = $this->company->domain();
@@ -160,7 +164,7 @@ class PurchaseOrderInvitation extends BaseModel
         }
     }
 
-    public function getLink() :string
+    public function getLink(): string
     {
         $entity_type = Str::snake(class_basename($this->entityType()));
 
@@ -183,7 +187,7 @@ class PurchaseOrderInvitation extends BaseModel
         }
     }
 
-    public function getAdminLink($use_react_link = false) :string
+    public function getAdminLink($use_react_link = false): string
     {
         return $use_react_link ? $this->getReactLink() : $this->getLink().'?silent=true';
     }
@@ -194,5 +198,5 @@ class PurchaseOrderInvitation extends BaseModel
 
         return config('ninja.react_url')."/#/{$entity_type}s/{$this->{$entity_type}->hashed_id}/edit";
     }
-    
+
 }

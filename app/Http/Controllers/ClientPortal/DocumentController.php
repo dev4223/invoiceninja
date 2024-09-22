@@ -5,23 +5,24 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers\ClientPortal;
 
-use App\Http\Controllers\Controller;
-use App\Http\Requests\ClientPortal\Documents\ShowDocumentRequest;
-use App\Http\Requests\Document\DownloadMultipleDocumentsRequest;
-use App\Libraries\MultiDB;
-use App\Models\Document;
 use App\Utils\TempFile;
+use App\Models\Document;
+use Illuminate\View\View;
+use App\Libraries\MultiDB;
 use App\Utils\Traits\MakesHash;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\View\View;
+use App\Http\Requests\Document\DownloadMultipleDocumentsRequest;
+use App\Http\Requests\ClientPortal\Documents\ShowDocumentRequest;
 
 class DocumentController extends Controller
 {
@@ -67,6 +68,30 @@ class DocumentController extends Controller
 
         return Storage::disk($document->disk)->download($document->url, $document->name, $headers);
     }
+
+    public function hashDownload(string $hash)
+    {
+
+        $hash = Cache::pull($hash);
+
+        if(!$hash) {
+            abort(404);
+        }
+
+        MultiDB::setDb($hash['db']);
+
+        /** @var \App\Models\Document $document **/
+        $document = Document::where('hash', $hash['doc_hash'])->firstOrFail();
+
+        $headers = ['Cache-Control:' => 'no-cache'];
+
+        if (request()->input('inline') == 'true') {
+            $headers = array_merge($headers, ['Content-Disposition' => 'inline']);
+        }
+
+        return Storage::disk($document->disk)->download($document->url, $document->name, $headers);
+    }
+
 
     public function downloadMultiple(DownloadMultipleDocumentsRequest $request)
     {

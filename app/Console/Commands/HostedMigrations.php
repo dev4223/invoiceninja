@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -62,7 +62,6 @@ class HostedMigrations extends Command
      */
     public function handle()
     {
-        $this->buildCache();
 
         if (! MultiDB::userFindAndSetDb($this->option('email'))) {
             $this->info('Could not find a user with that email address');

@@ -4,23 +4,22 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Mail\Ninja;
 
-use App\Models\User;
 use App\Models\Company;
+use App\Models\User;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Headers;
 use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Mail\Mailables\Headers;
 
 class StripeConnectFailed extends Mailable
 {
-
     /**
      * Create a new message instance.
      *
@@ -39,8 +38,8 @@ class StripeConnectFailed extends Mailable
     {
         return new Envelope(
             subject: "Stripe Connect not configured, please login and connect.",
-            from: "maildelivery@invoicing.co",
-            to: $this->user->email,
+            from: config('ninja.contact.email'),
+            to: $this->user->email, //@phpstan-ignore-line
         );
     }
 
@@ -51,7 +50,7 @@ class StripeConnectFailed extends Mailable
      */
     public function content()
     {
-        
+
         return new Content(
             view: 'email.admin.stripe_connect_failed',
             text: 'email.admin.stripe_connect_failed_text',
@@ -97,7 +96,7 @@ class StripeConnectFailed extends Mailable
     {
         return [];
     }
- 
+
     /**
      * Get the message headers.
      *

@@ -4,19 +4,19 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Requests\Payment;
 
+use App\Exceptions\DuplicatePaymentException;
 use App\Http\Requests\Request;
 use App\Http\ValidationRules\Credit\CreditsSumRule;
 use App\Http\ValidationRules\Credit\ValidCreditsRules;
 use App\Http\ValidationRules\Payment\ValidInvoicesRules;
 use App\Http\ValidationRules\PaymentAmountsBalanceRule;
-use App\Http\ValidationRules\ValidCreditsPresentRule;
 use App\Http\ValidationRules\ValidPayableInvoicesRule;
 use App\Models\Payment;
 use App\Utils\Traits\MakesHash;
@@ -31,20 +31,67 @@ class StorePaymentRequest extends Request
      *
      * @return bool
      */
-    public function authorize() : bool
+    public function authorize(): bool
     {
-        return auth()->user()->can('create', Payment::class);
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        return $user->can('create', Payment::class);
     }
+
+    public function rules()
+    {
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        $rules = [
+            'client_id' => ['bail','required',Rule::exists('clients', 'id')->where('company_id', $user->company()->id)->where('is_deleted', 0)],
+            'invoices' => ['bail', 'sometimes', 'nullable', 'array', new ValidPayableInvoicesRule()],
+            'invoices.*.amount' => ['bail','required'],
+            'invoices.*.invoice_id' => ['bail','required','distinct', new ValidInvoicesRules($this->all()),Rule::exists('invoices', 'id')->where('company_id', $user->company()->id)->where('client_id', $this->client_id)],
+            'credits.*.credit_id' => ['bail','required','distinct', new ValidCreditsRules($this->all()),Rule::exists('credits', 'id')->where('company_id', $user->company()->id)->where('client_id', $this->client_id)],
+            'credits.*.amount' => ['bail','required', new CreditsSumRule($this->all())],
+            'amount' => ['bail', 'numeric', new PaymentAmountsBalanceRule(), 'max:99999999999999'],
+            'number' => ['bail', 'nullable',  Rule::unique('payments')->where('company_id', $user->company()->id)],
+            'idempotency_key' => ['nullable', 'bail', 'string','max:64', Rule::unique('payments')->where('company_id', $user->company()->id)],
+        ];
+
+        if ($this->file('documents') && is_array($this->file('documents'))) {
+            $rules['documents.*'] = $this->fileValidation();
+        } elseif ($this->file('documents')) {
+            $rules['documents'] = $this->fileValidation();
+        } else {
+            $rules['documents'] = 'bail|sometimes|array';
+        }
+
+        if ($this->file('file') && is_array($this->file('file'))) {
+            $rules['file.*'] = $this->fileValidation();
+        } elseif ($this->file('file')) {
+            $rules['file'] = $this->fileValidation();
+        }
+
+        return $rules;
+    }
+
 
     public function prepareForValidation()
     {
+
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        if(\Illuminate\Support\Facades\Cache::has($this->ip()."|".$this->input('amount', 0)."|".$this->input('client_id', '')."|".$user->company()->company_key))
+            throw new DuplicatePaymentException('Duplicate request.', 429);
+
+        \Illuminate\Support\Facades\Cache::put(($this->ip()."|".$this->input('amount', 0)."|".$this->input('client_id', '')."|".$user->company()->company_key), true, 1);
+        
         $input = $this->all();
 
         $invoices_total = 0;
         $credits_total = 0;
 
         if (isset($input['client_id']) && is_string($input['client_id'])) {
-            $input['client_id'] = $this->decodePrimaryKey($input['client_id']);
+            $input['client_id'] = $this->decodePrimaryKey($input['client_id'], true);
         }
 
         if (array_key_exists('assigned_user_id', $input) && is_string($input['assigned_user_id'])) {
@@ -53,7 +100,7 @@ class StorePaymentRequest extends Request
 
         if (isset($input['invoices']) && is_array($input['invoices']) !== false) {
             foreach ($input['invoices'] as $key => $value) {
-                if (is_string($value['invoice_id'])) {
+                if (isset($value['invoice_id']) && is_string($value['invoice_id'])) {
                     $input['invoices'][$key]['invoice_id'] = $this->decodePrimaryKey($value['invoice_id']);
                 }
 
@@ -69,9 +116,8 @@ class StorePaymentRequest extends Request
 
         if (isset($input['credits']) && is_array($input['credits']) !== false) {
             foreach ($input['credits'] as $key => $value) {
-                if (array_key_exists('credit_id', $input['credits'][$key])) {
+                if (isset($value['credit_id']) && is_string($value['credit_id'])) {
                     $input['credits'][$key]['credit_id'] = $this->decodePrimaryKey($value['credit_id']);
-
                     $credits_total += $value['amount'];
                 }
             }
@@ -86,42 +132,15 @@ class StorePaymentRequest extends Request
         }
 
         if (! isset($input['date'])) {
-            $input['date'] = now()->addSeconds(auth()->user()->company()->timezone()->utc_offset)->format('Y-m-d');
+            $input['date'] = now()->addSeconds($user->company()->utc_offset())->format('Y-m-d');
+        }
+
+        if (! isset($input['idempotency_key'])) {
+            $input['idempotency_key'] = substr(time()."{$input['date']}{$input['amount']}{$credits_total}{$this->client_id}{$user->company()->company_key}", 0, 64);
         }
 
         $this->replace($input);
     }
 
-    public function rules()
-    {
-        $rules = [
-            'amount' => ['numeric', 'bail', new PaymentAmountsBalanceRule(), new ValidCreditsPresentRule($this->all())],
-            // 'client_id' => 'bail|required|exists:clients,id',
-            'client_id' => 'bail|required|exists:clients,id,company_id,'.auth()->user()->company()->id.',is_deleted,0',
-            'invoices.*.invoice_id' => 'bail|required|distinct|exists:invoices,id',
-            'invoices.*.amount' => 'bail|required',
-            'invoices.*.invoice_id' => new ValidInvoicesRules($this->all()),
-            'credits.*.credit_id' => 'bail|required|exists:credits,id',
-            'credits.*.credit_id' => new ValidCreditsRules($this->all()),
-            'credits.*.amount' => ['bail','required', new CreditsSumRule($this->all())],
-            'invoices' => new ValidPayableInvoicesRule(),
-            'number' => ['nullable', 'bail', Rule::unique('payments')->where('company_id', auth()->user()->company()->id)],
-            'idempotency_key' => ['nullable', 'bail', 'string','max:64', Rule::unique('payments')->where('company_id', auth()->user()->company()->id)],
 
-        ];
-
-        if ($this->file('documents') && is_array($this->file('documents'))) {
-            $rules['documents.*'] = $this->file_validation;
-        } elseif ($this->file('documents')) {
-            $rules['documents'] = $this->file_validation;
-        }
-
-        if ($this->file('file') && is_array($this->file('file'))) {
-            $rules['file.*'] = $this->file_validation;
-        } elseif ($this->file('file')) {
-            $rules['file'] = $this->file_validation;
-        }
-        
-        return $rules;
-    }
 }

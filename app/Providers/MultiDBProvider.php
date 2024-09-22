@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -33,6 +33,7 @@ class MultiDBProvider extends ServiceProvider
      */
     public function register()
     {
+
         $this->app['events']->listen(
             JobProcessing::class,
             function ($event) {

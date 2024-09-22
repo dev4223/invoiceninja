@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -94,7 +94,6 @@ use App\Events\Misc\InvitationWasViewed;
 use App\Events\Payment\PaymentWasVoided;
 use App\Events\Vendor\VendorWasArchived;
 use App\Events\Vendor\VendorWasRestored;
-use App\Events\Account\StripeConnectFailure;
 use App\Listeners\Mail\MailSentListener;
 use App\Observers\ClientContactObserver;
 use App\Observers\PurchaseOrderObserver;
@@ -125,12 +124,12 @@ use App\Events\Document\DocumentWasCreated;
 use App\Events\Document\DocumentWasDeleted;
 use App\Events\Document\DocumentWasUpdated;
 use App\Events\Invoice\InvoiceWasCancelled;
-use App\Listeners\Invoice\CreateInvoicePdf;
 use App\Listeners\Quote\QuoteEmailActivity;
 use App\Listeners\User\CreatedUserActivity;
 use App\Listeners\User\DeletedUserActivity;
 use App\Listeners\User\UpdatedUserActivity;
 use App\Listeners\User\UpdateUserLastLogin;
+use App\Events\Account\StripeConnectFailure;
 use App\Events\Document\DocumentWasArchived;
 use App\Events\Document\DocumentWasRestored;
 use App\Events\Invoice\InvoiceWasMarkedSent;
@@ -138,6 +137,8 @@ use App\Events\Vendor\VendorContactLoggedIn;
 use App\Listeners\Quote\QuoteViewedActivity;
 use App\Listeners\User\ArchivedUserActivity;
 use App\Listeners\User\RestoredUserActivity;
+use App\Events\Quote\QuoteReminderWasEmailed;
+use App\Events\Statement\StatementWasEmailed;
 use App\Listeners\Quote\QuoteApprovedWebhook;
 use App\Listeners\Quote\QuoteDeletedActivity;
 use App\Listeners\Credit\CreditViewedActivity;
@@ -199,8 +200,6 @@ use App\Listeners\Invoice\InvoiceRestoredActivity;
 use App\Listeners\Invoice\InvoiceReversedActivity;
 use App\Listeners\Payment\PaymentRestoredActivity;
 use App\Listeners\Quote\QuoteApprovedNotification;
-use SocialiteProviders\Apple\AppleExtendSocialite;
-use SocialiteProviders\Manager\SocialiteWasCalled;
 use App\Events\Subscription\SubscriptionWasCreated;
 use App\Events\Subscription\SubscriptionWasDeleted;
 use App\Events\Subscription\SubscriptionWasUpdated;
@@ -211,6 +210,7 @@ use App\Listeners\Activity\PaymentRefundedActivity;
 use App\Listeners\Credit\CreditCreatedNotification;
 use App\Listeners\Credit\CreditEmailedNotification;
 use App\Listeners\Invoice\InvoiceCancelledActivity;
+use App\Listeners\Quote\QuoteReminderEmailActivity;
 use App\Events\PurchaseOrder\PurchaseOrderWasViewed;
 use App\Events\Subscription\SubscriptionWasArchived;
 use App\Events\Subscription\SubscriptionWasRestored;
@@ -221,10 +221,10 @@ use App\Events\PurchaseOrder\PurchaseOrderWasUpdated;
 use App\Listeners\Invoice\InvoiceCreatedNotification;
 use App\Listeners\Invoice\InvoiceEmailedNotification;
 use App\Listeners\Invoice\InvoiceEmailFailedActivity;
+use App\Listeners\Statement\StatementEmailedActivity;
 use App\Events\PurchaseOrder\PurchaseOrderWasAccepted;
 use App\Events\PurchaseOrder\PurchaseOrderWasArchived;
 use App\Events\PurchaseOrder\PurchaseOrderWasRestored;
-use App\Listeners\Payment\PaymentEmailFailureActivity;
 use App\Listeners\Vendor\UpdateVendorContactLastLogin;
 use App\Events\RecurringQuote\RecurringQuoteWasCreated;
 use App\Events\RecurringQuote\RecurringQuoteWasDeleted;
@@ -239,7 +239,6 @@ use App\Events\RecurringQuote\RecurringQuoteWasRestored;
 use App\Listeners\Activity\SubscriptionArchivedActivity;
 use App\Listeners\Activity\SubscriptionRestoredActivity;
 use App\Listeners\Invoice\InvoiceFailedEmailNotification;
-use SocialiteProviders\Microsoft\MicrosoftExtendSocialite;
 use App\Events\RecurringExpense\RecurringExpenseWasCreated;
 use App\Events\RecurringExpense\RecurringExpenseWasDeleted;
 use App\Events\RecurringExpense\RecurringExpenseWasUpdated;
@@ -285,6 +284,13 @@ class EventServiceProvider extends ServiceProvider
      *
      */
     protected $listen = [
+
+        // RequestSending::class => [
+        //     LogRequestSending::class,
+        // ],
+        // ResponseReceived::class => [
+        //     LogResponseReceived::class,
+        // ],
         AccountCreated::class => [
         ],
         MessageSending::class => [
@@ -378,7 +384,6 @@ class EventServiceProvider extends ServiceProvider
         ],
         CreditWasUpdated::class => [
             UpdatedCreditActivity::class,
-            CreateInvoicePdf::class,
         ],
         CreditWasEmailedAndFailed::class => [
         ],
@@ -459,7 +464,6 @@ class EventServiceProvider extends ServiceProvider
         ],
         InvoiceWasReversed::class => [
             InvoiceReversedActivity::class,
-            CreateInvoicePdf::class,
         ],
         InvoiceWasCancelled::class => [
             InvoiceCancelledActivity::class,
@@ -515,7 +519,6 @@ class EventServiceProvider extends ServiceProvider
         ],
         QuoteWasUpdated::class => [
             QuoteUpdatedActivity::class,
-            CreateInvoicePdf::class,
         ],
         QuoteWasEmailed::class => [
             QuoteEmailActivity::class,
@@ -532,6 +535,10 @@ class EventServiceProvider extends ServiceProvider
         ],
         QuoteWasRestored::class => [
             QuoteRestoredActivity::class,
+        ],
+        QuoteReminderWasEmailed::class =>[
+            QuoteReminderEmailActivity::class,
+            // QuoteEmailedNotification::class,
         ],
         RecurringExpenseWasCreated::class => [
             CreatedRecurringExpenseActivity::class,
@@ -577,6 +584,9 @@ class EventServiceProvider extends ServiceProvider
         ],
         RecurringInvoiceWasRestored::class => [
             RecurringInvoiceRestoredActivity::class,
+        ],
+        StatementWasEmailed::class => [
+            StatementEmailedActivity::class,
         ],
         TaskWasCreated::class => [
             CreatedTaskActivity::class,

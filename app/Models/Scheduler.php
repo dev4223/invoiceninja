@@ -4,16 +4,13 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
 
-use App\Models\Company;
-use App\Models\BaseModel;
-use App\Models\RecurringInvoice;
 use App\Services\Scheduler\SchedulerService;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -55,7 +52,7 @@ class Scheduler extends BaseModel
 {
     use SoftDeletes;
     use Filterable;
-    
+
     protected $fillable = [
         'name',
         'frequency_id',
@@ -94,7 +91,7 @@ class Scheduler extends BaseModel
     {
         return $this->belongsTo(Company::class);
     }
-    
+
     public function user()
     {
         return $this->belongsTo(User::class);
@@ -105,7 +102,7 @@ class Scheduler extends BaseModel
      *
      * @return int
      */
-    public function remainingCycles() : int
+    public function remainingCycles(): int
     {
         if ($this->remaining_cycles == 0) {
             return 0;
@@ -115,7 +112,7 @@ class Scheduler extends BaseModel
             return $this->remaining_cycles - 1;
         }
     }
-    
+
     public function calculateNextRun()
     {
         if (! $this->next_run) {
@@ -167,7 +164,6 @@ class Scheduler extends BaseModel
             default:
                 $next_run =  null;
         }
-
 
         $this->next_run_client = $next_run ?: null;
         $this->next_run = $next_run ? $next_run->copy()->addSeconds($offset) : null;

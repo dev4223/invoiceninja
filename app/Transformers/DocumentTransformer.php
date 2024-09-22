@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -20,9 +20,9 @@ class DocumentTransformer extends EntityTransformer
 
     protected $serializer;
 
-    protected $defaultIncludes = [];
+    protected array $defaultIncludes = [];
 
-    protected $availableIncludes = [];
+    protected array $availableIncludes = [];
 
     public function __construct($serializer = null)
     {
@@ -52,6 +52,7 @@ class DocumentTransformer extends EntityTransformer
             'created_at' => (int) $document->created_at,
             'is_deleted' => (bool) false,
             'is_public' => (bool) $document->is_public,
+            'link' => (string) $document->link(),
         ];
     }
 }

@@ -30,15 +30,6 @@
                             {{ ctrans('texts.purchase_order_number_placeholder', ['purchase_order' => $purchase_order->number])}}
                             - {{ \App\Models\PurchaseOrder::stringStatus($purchase_order->status_id) }}
                         </h3>
-
-                            @if($key)
-                            <div class="btn hidden md:block" data-clipboard-text="{{url("vendor/purchase_order/{$key}")}}" aria-label="Copied!">
-                                <div class="flex text-sm leading-6 font-medium text-gray-500">
-                                    <p class="pr-10">{{url("vendor/purchase_order/{$key}")}}</p>
-                                    <p><img class="h-5 w-5" src="{{ asset('assets/clippy.svg') }}" alt="Copy to clipboard"></p>
-                                </div>
-                            </div>
-                            @endif
                     </div>
                 </div>
             </div>
@@ -46,24 +37,25 @@
     @endif
 
     @include('portal.ninja2020.components.entity-documents', ['entity' => $purchase_order])
-    @livewire('pdf-slot', ['entity' => $purchase_order, 'invitation' => $invitation, 'db' => $invitation->company->db])
+    @livewire('pdf-slot', ['entity' => $purchase_order, 'invitation' => $invitation, 'db' => $purchase_order->company->db])
 
 @endsection
 
 @section('footer')
-    @include('portal.ninja2020.invoices.includes.terms', ['entities' => [$purchase_order], 'entity_type' => ctrans('texts.purchase_order')])
+    @include('portal.ninja2020.invoices.includes.terms', ['entities' => [$purchase_order], 'variables' => $variables, 'entity_type' => ctrans('texts.purchase_order')])
     @include('portal.ninja2020.invoices.includes.signature')
 @endsection
 
 @push('head')
-    <script src="{{ asset('js/clients/purchase_orders/accept.js') }}" defer></script>
-    <script src="{{ asset('vendor/clipboard.min.js') }}"  defer></script>
+    @vite('resources/js/clients/purchase_orders/accept.js')
 
     <script type="text/javascript">
 
         document.addEventListener('DOMContentLoaded', () => {
 
-            var clipboard = new ClipboardJS('.btn');
+            @if($key)
+                window.history.pushState({}, "", "{{ url("vendor/purchase_order/{$key}") }}");
+            @endif
 
         });
 

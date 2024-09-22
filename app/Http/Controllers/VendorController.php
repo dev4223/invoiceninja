@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -96,7 +96,7 @@ class VendorController extends BaseController
      *       ),
      *     )
      * @param VendorFilters $filters
-     * @return Response|mixed
+     * @return Response| \Illuminate\Http\JsonResponse|mixed
      */
     public function index(VendorFilters $filters)
     {
@@ -110,7 +110,7 @@ class VendorController extends BaseController
      *
      * @param ShowVendorRequest $request
      * @param Vendor $vendor
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -164,7 +164,7 @@ class VendorController extends BaseController
      *
      * @param EditVendorRequest $request
      * @param Vendor $vendor
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -218,7 +218,7 @@ class VendorController extends BaseController
      *
      * @param UpdateVendorRequest $request
      * @param Vendor $vendor
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -284,7 +284,7 @@ class VendorController extends BaseController
      * Show the form for creating a new resource.
      *
      * @param CreateVendorRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -320,7 +320,11 @@ class VendorController extends BaseController
      */
     public function create(CreateVendorRequest $request)
     {
-        $vendor = VendorFactory::create(auth()->user()->company()->id, auth()->user()->id);
+
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        $vendor = VendorFactory::create($user->company()->id, auth()->user()->id);
 
         return $this->itemResponse($vendor);
     }
@@ -329,7 +333,7 @@ class VendorController extends BaseController
      * Store a newly created resource in storage.
      *
      * @param StoreVendorRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -365,7 +369,11 @@ class VendorController extends BaseController
      */
     public function store(StoreVendorRequest $request)
     {
-        $vendor = $this->vendor_repo->save($request->all(), VendorFactory::create(auth()->user()->company()->id, auth()->user()->id));
+
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        $vendor = $this->vendor_repo->save($request->all(), VendorFactory::create($user->company()->id, auth()->user()->id));
 
         $vendor->load('contacts', 'primary_contact');
 
@@ -383,7 +391,7 @@ class VendorController extends BaseController
      *
      * @param DestroyVendorRequest $request
      * @param Vendor $vendor
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @throws \Exception
@@ -438,7 +446,7 @@ class VendorController extends BaseController
     /**
      * Perform bulk actions on the list view.
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Post(
@@ -492,8 +500,11 @@ class VendorController extends BaseController
         $ids = request()->input('ids');
         $vendors = Vendor::withTrashed()->find($this->transformKeys($ids));
 
-        $vendors->each(function ($vendor, $key) use ($action) {
-            if (auth()->user()->can('edit', $vendor)) {
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        $vendors->each(function ($vendor, $key) use ($action, $user) {
+            if ($user->can('edit', $vendor)) {
                 $this->vendor_repo->{$action}($vendor);
             }
         });
@@ -516,7 +527,7 @@ class VendorController extends BaseController
      *
      * @param UploadVendorRequest $request
      * @param Vendor $vendor
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -17,7 +17,6 @@ use App\Models\Paymentable;
 use App\Services\AbstractService;
 use App\Utils\Ninja;
 use App\Utils\Traits\GeneratesCounter;
-use Illuminate\Support\Facades\DB;
 
 class HandleRestore extends AbstractService
 {
@@ -52,6 +51,7 @@ class HandleRestore extends AbstractService
         //adjust ledger balance
         $this->invoice->ledger()->updateInvoiceBalance($this->invoice->balance, "Restored invoice {$this->invoice->number}")->save();
 
+        //@todo
         $this->invoice->client
                       ->service()
                       ->updateBalanceAndPaidToDate($this->invoice->balance, $this->invoice->paid_to_date)
@@ -81,8 +81,6 @@ class HandleRestore extends AbstractService
             Paymentable::query()
             ->withTrashed()
             ->where('payment_id', $payment->id)
-            // ->where('paymentable_type', '=', 'invoices')
-            // ->where('paymentable_id', $this->invoice->id)
             ->update(['deleted_at' => null]);
         });
 
@@ -96,18 +94,14 @@ class HandleRestore extends AbstractService
             $this->adjustment_amount += $payment->paymentables
                                                 ->where('paymentable_type', '=', 'invoices')
                                                 ->where('paymentable_id', $this->invoice->id)
-                                                ->sum(DB::raw('amount'));
-
-            $this->adjustment_amount += $payment->paymentables
-                                                ->where('paymentable_type', '=', 'invoices')
-                                                ->where('paymentable_id', $this->invoice->id)
-                                                ->sum(DB::raw('refunded'));
+                                                ->sum('amount');
 
             //14/07/2023 - do not include credits in the payment amount
             $this->adjustment_amount -= $payment->paymentables
                                             ->where('paymentable_type', '=', 'App\Models\Credit')
-                                            ->sum(DB::raw('amount'));
+                                            ->sum('amount');
 
+            nlog("Adjustment amount: {$this->adjustment_amount}");
         }
 
         $this->total_payments = $this->invoice->payments->sum('amount') - $this->invoice->payments->sum('refunded');
@@ -121,25 +115,27 @@ class HandleRestore extends AbstractService
 
         if ($this->adjustment_amount == $this->total_payments) {
             $this->invoice->payments()->update(['payments.deleted_at' => null, 'payments.is_deleted' => false]);
+        } else {
+            $this->invoice->net_payments()->update(['payments.deleted_at' => null, 'payments.is_deleted' => false]);
         }
 
         //adjust payments down by the amount applied to the invoice payment.
 
-        $this->invoice->payments->fresh()->each(function ($payment) {
+        $this->invoice->net_payments()->each(function ($payment) {
             $payment_adjustment = $payment->paymentables
                                             ->where('paymentable_type', '=', 'invoices')
                                             ->where('paymentable_id', $this->invoice->id)
-                                            ->sum(DB::raw('amount'));
+                                            ->sum('amount');
 
             $payment_adjustment -= $payment->paymentables
                                             ->where('paymentable_type', '=', 'invoices')
                                             ->where('paymentable_id', $this->invoice->id)
-                                            ->sum(DB::raw('refunded'));
+                                            ->sum('refunded');
 
             $payment_adjustment -= $payment->paymentables
                         ->where('paymentable_type', '=', 'App\Models\Credit')
-                        ->sum(DB::raw('amount'));
- 
+                        ->sum('amount');
+
             $payment->amount += $payment_adjustment;
             $payment->applied += $payment_adjustment;
             $payment->is_deleted = false;
@@ -147,7 +143,7 @@ class HandleRestore extends AbstractService
             $payment->saveQuietly();
 
         });
-        
+
         return $this;
     }
 

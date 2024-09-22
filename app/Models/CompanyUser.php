@@ -4,17 +4,16 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Relations\Pivot;
-use Awobaz\Compoships\Exceptions\InvalidUsageException;
 use Awobaz\Compoships\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\Pivot;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * App\Models\CompanyUser
@@ -149,7 +148,7 @@ class CompanyUser extends Pivot
     /**
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public function user() 
+    public function user()
     {
         return $this->belongsTo(User::class)->withTrashed();
     }
@@ -179,7 +178,7 @@ class CompanyUser extends Pivot
     }
 
     /**
-     * @return HasMany  
+     * @return HasMany
      */
     public function tokens()
     {
@@ -195,7 +194,7 @@ class CompanyUser extends Pivot
 
         return $query;
     }
-    
+
     /**
      * Determines if the notifications should be React or Flutter links
      *

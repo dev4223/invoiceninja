@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -99,11 +99,11 @@ class AuthorizeCustomer
                 $client = $client_gateway_token->client;
             } elseif ($client_contact = ClientContact::where('company_id', $company->id)->where('email', $profile['email'])->first()) {
                 $client = $client_contact->client;
-            // nlog("found client through contact");
+                // nlog("found client through contact");
             } else {
                 // nlog("creating client");
 
-                $first_payment_profile = $profile['payment_profiles'][0];
+                $first_payment_profile = &$profile['payment_profiles'][0];
 
                 if (! $first_payment_profile) {
                     continue;
@@ -139,9 +139,9 @@ class AuthorizeCustomer
                         continue;
                     }
 
-//                    $expiry = $payment_profile->getPayment()->getCreditCard()->getExpirationDate();
+                    //                    $expiry = $payment_profile->getPayment()->getCreditCard()->getExpirationDate();
 
-                    $payment_meta = new \stdClass;
+                    $payment_meta = new \stdClass();
                     $payment_meta->exp_month = 'xx';
                     $payment_meta->exp_year = 'xx';
                     $payment_meta->brand = (string) $payment_profile->getPayment()->getCreditCard()->getCardType();
@@ -161,11 +161,13 @@ class AuthorizeCustomer
 
     private function getCountryCode($country_code)
     {
-        $countries = Cache::get('countries');
+        
+        /** @var \Illuminate\Support\Collection<\App\Models\Country> */
+        $countries = app('countries');
 
-        $country = $countries->filter(function ($item) use ($country_code) {
+        $country = $countries->first(function ($item) use ($country_code) {
             return $item->iso_3166_2 == $country_code || $item->iso_3166_3 == $country_code;
-        })->first();
+        });
 
         return (string) $country->id;
     }

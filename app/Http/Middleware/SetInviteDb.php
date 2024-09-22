@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -30,7 +30,7 @@ class SetInviteDb
     {
         $error = [
             'message' => 'I could not find the database for this object.',
-            'errors' => new stdClass,
+            'errors' => new stdClass(),
         ];
         /*
          * Use the host name to set the active DB

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -49,12 +49,12 @@ class QuoteObserver
         if ($quote->getOriginal('deleted_at') && !$quote->deleted_at) {
             $event = Webhook::EVENT_RESTORE_QUOTE;
         }
-        
+
         if ($quote->is_deleted) {
             $event = Webhook::EVENT_DELETE_QUOTE;
         }
-        
-        
+
+
         $subscriptions = Webhook::where('company_id', $quote->company_id)
                                     ->where('event_id', $event)
                                     ->exists();

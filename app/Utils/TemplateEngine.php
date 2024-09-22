@@ -5,36 +5,34 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Utils;
 
-use DB;
-use App\Models\Quote;
-use App\Models\Client;
-use App\Models\Credit;
-use App\Models\Vendor;
-use App\Models\Invoice;
-use App\Models\Payment;
-use Illuminate\Support\Str;
-use App\Models\ClientContact;
-use App\Models\PurchaseOrder;
-use App\Models\VendorContact;
-use App\Models\QuoteInvitation;
-use App\Utils\Traits\MakesHash;
-use App\Models\RecurringInvoice;
-use App\Models\InvoiceInvitation;
-use Illuminate\Support\Facades\App;
-use App\Utils\Traits\MakesInvoiceHtml;
-use App\Mail\Engine\PaymentEmailEngine;
-use App\Models\PurchaseOrderInvitation;
-use App\Utils\Traits\MakesTemplateData;
 use App\DataMapper\EmailTemplateDefaults;
-use League\CommonMark\CommonMarkConverter;
+use App\Mail\Engine\PaymentEmailEngine;
+use App\Models\Client;
+use App\Models\ClientContact;
+use App\Models\Invoice;
+use App\Models\InvoiceInvitation;
+use App\Models\Payment;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderInvitation;
+use App\Models\Quote;
+use App\Models\QuoteInvitation;
+use App\Models\Vendor;
+use App\Models\VendorContact;
 use App\Services\PdfMaker\Designs\Utilities\DesignHelpers;
+use App\Utils\Traits\MakesHash;
+use App\Utils\Traits\MakesInvoiceHtml;
+use App\Utils\Traits\MakesTemplateData;
+use DB;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Str;
+use League\CommonMark\CommonMarkConverter;
 
 class TemplateEngine
 {
@@ -106,11 +104,10 @@ class TemplateEngine
         } elseif (stripos($this->template, 'purchase') !== false && $purchase_order = PurchaseOrder::query()->whereHas('invitations')->withTrashed()->company()->first()) {
             $this->entity = 'purchase_order';
             $this->entity_obj = $purchase_order;
-        }elseif (stripos($this->template, 'payment') !== false && $payment = Payment::query()->withTrashed()->company()->first()) {
+        } elseif (stripos($this->template, 'payment') !== false && $payment = Payment::query()->withTrashed()->company()->first()) {
             $this->entity = 'payment';
             $this->entity_obj = $payment;
-        } 
-        elseif ($invoice = Invoice::query()->whereHas('invitations')->withTrashed()->company()->first()) {
+        } elseif ($invoice = Invoice::query()->whereHas('invitations')->withTrashed()->company()->first()) {
             /** @var \App\Models\Invoice $invoice */
             $this->entity_obj = $invoice;
         } else {
@@ -243,8 +240,10 @@ class TemplateEngine
         } else {
             $data['signature'] = $this->settings->email_signature;
             $data['settings'] = $this->settings;
-            $data['whitelabel'] = $this->entity_obj ? $this->entity_obj->company->account->isPaid() : true;
-            $data['company'] = $this->entity_obj ? $this->entity_obj->company : '';
+            // $data['whitelabel'] = $this->entity_obj ? $this->entity_obj->company->account->isPaid() : true;
+            // $data['company'] = $this->entity_obj ? $this->entity_obj->company : '';            
+            $data['whitelabel'] = $this->entity_obj->company->account->isPaid();
+            $data['company'] = $this->entity_obj->company;
             $data['settings'] = $this->settings;
         }
 
@@ -258,7 +257,7 @@ class TemplateEngine
 
             /*If no custom design exists, send back a blank!*/
             if (strlen($wrapper) > 1) {
-                $wrapper = $this->renderView($wrapper, $data);
+                // $wrapper = $this->renderView($wrapper, $data);
             } else {
                 $wrapper = '';
             }
@@ -326,7 +325,7 @@ class TemplateEngine
                 'applied' => 10,
                 'refunded' => 5,
             ]);
-            
+
             $this->entity_obj = $payment;
 
             /** @var \App\Models\Invoice $invoice */
@@ -380,7 +379,7 @@ class TemplateEngine
                 'company_id' => $user->company()->id,
                 'client_id' => $client->id,
             ]);
-            
+
             $this->entity_obj = $quote;
 
             $invitation = QuoteInvitation::factory()->create([
@@ -406,14 +405,14 @@ class TemplateEngine
                 'is_primary' => 1,
                 'send_email' => true,
             ]);
-            
+
             /** @var \App\Models\PurchaseOrder $purchase_order **/
             $purchase_order = PurchaseOrder::factory()->create([
                 'user_id' => $user->id,
                 'company_id' => $user->company()->id,
                 'vendor_id' => $vendor->id,
             ]);
-            
+
             $this->entity_obj = $purchase_order;
 
             /** @var \App\Models\PurchaseOrderInvitation $invitation **/

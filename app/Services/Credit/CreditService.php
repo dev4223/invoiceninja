@@ -4,23 +4,22 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Credit;
 
-use App\Utils\Ninja;
+use App\Factory\PaymentFactory;
+use App\Jobs\EDocument\CreateEDocument;
 use App\Models\Credit;
 use App\Models\Payment;
 use App\Models\PaymentType;
-use App\Jobs\Util\UnlinkFile;
-use App\Factory\PaymentFactory;
-use App\Utils\Traits\MakesHash;
-use App\Jobs\Entity\CreateEntityPdf;
 use App\Repositories\CreditRepository;
 use App\Repositories\PaymentRepository;
+use App\Utils\Ninja;
+use App\Utils\Traits\MakesHash;
 use Illuminate\Support\Facades\Storage;
 
 class CreditService
@@ -37,6 +36,16 @@ class CreditService
     public function getCreditPdf($invitation)
     {
         return (new GetCreditPdf($invitation))->run();
+    }
+
+    public function getECredit($contact = null)
+    {
+        return (new CreateEDocument($this->credit))->handle();
+    }
+
+    public function getEDocument($contact = null)
+    {
+        return $this->getECredit($contact);
     }
 
     /**
@@ -121,7 +130,7 @@ class CreditService
         $payment->type_id = PaymentType::CREDIT;
         $payment->is_manual = true;
         $payment->currency_id = $this->credit->client->getSetting('currency_id');
-        $payment->date = now()->addSeconds($this->credit->company->timezone()->utc_offset)->format('Y-m-d');
+        $payment->date = now()->addSeconds($this->credit->company->utc_offset())->format('Y-m-d');
 
         $payment->saveQuietly();
         $payment->number = $payment->client->getNextPaymentNumber($payment->client, $payment);
@@ -154,7 +163,7 @@ class CreditService
     {
         $this->credit = (new ApplyPayment($this->credit, $invoice, $amount, $payment))->run();
 
-        $this->deletePdf();
+        // $this->deletePdf();
 
         return $this;
     }
@@ -176,32 +185,6 @@ class CreditService
     public function updateBalance($adjustment)
     {
         $this->credit->balance -= $adjustment;
-
-        return $this;
-    }
-
-    /**
-     * Sometimes we need to refresh the
-     * PDF when it is updated etc.
-     * @return self
-     */
-    public function touchPdf($force = false)
-    {
-        try {
-            if ($force) {
-                $this->credit->invitations->each(function ($invitation) {
-                    (new CreateEntityPdf($invitation))->handle();
-                });
-
-                return $this;
-            }
-
-            $this->credit->invitations->each(function ($invitation) {
-                CreateEntityPdf::dispatch($invitation);
-            });
-        } catch (\Exception $e) {
-            nlog('failed creating invoices in Touch PDF');
-        }
 
         return $this;
     }
@@ -236,30 +219,30 @@ class CreditService
 
     public function deletePdf()
     {
+        return $this;
+    }
+
+    public function deleteECredit()
+    {
+        $this->credit->load('invitations');
+
         $this->credit->invitations->each(function ($invitation) {
-            // (new UnlinkFile(config('filesystems.default'), $this->credit->client->credit_filepath($invitation).$this->credit->numberFormatter().'.pdf'))->handle();
-            
-            //30-06-2023
             try {
-                // if (Storage::disk(config('filesystems.default'))->exists($this->invoice->client->invoice_filepath($invitation).$this->invoice->numberFormatter().'.pdf')) {
-                Storage::disk(config('filesystems.default'))->delete($this->credit->client->credit_filepath($invitation).$this->credit->numberFormatter().'.pdf');
+                // if (Storage::disk(config('filesystems.default'))->exists($this->invoice->client->e_invoice_filepath($invitation).$this->invoice->getFileName("xml"))) {
+                Storage::disk(config('filesystems.default'))->delete($this->credit->client->e_document_filepath($invitation).$this->credit->getFileName("xml"));
                 // }
 
-                // if (Ninja::isHosted() && Storage::disk('public')->exists($this->invoice->client->invoice_filepath($invitation).$this->invoice->numberFormatter().'.pdf')) {
+                // if (Ninja::isHosted() && Storage::disk('public')->exists($this->invoice->client->e_invoice_filepath($invitation).$this->invoice->getFileName("xml"))) {
                 if (Ninja::isHosted()) {
-                    Storage::disk('public')->delete($this->credit->client->credit_filepath($invitation).$this->credit->numberFormatter().'.pdf');
+                    Storage::disk('public')->delete($this->credit->client->e_document_filepath($invitation).$this->credit->getFileName("xml"));
                 }
             } catch (\Exception $e) {
                 nlog($e->getMessage());
             }
-
-        
-        
         });
 
         return $this;
     }
-
     public function triggeredActions($request)
     {
         $this->credit = (new TriggeredActions($this->credit, $request))->run();
@@ -269,11 +252,14 @@ class CreditService
 
     public function deleteCredit()
     {
+        $paid_to_date = $this->credit->invoice_id ? $this->credit->balance : 0;
+
         $this->credit
-             ->client
-             ->service()
-             ->adjustCreditBalance($this->credit->balance * -1)
-             ->save();
+            ->client
+            ->service()
+            ->updatePaidToDate($paid_to_date)
+            ->adjustCreditBalance($this->credit->balance * -1)
+            ->save();
 
         return $this;
     }
@@ -281,9 +267,13 @@ class CreditService
 
     public function restoreCredit()
     {
+        
+        $paid_to_date = $this->credit->invoice_id ? $this->credit->balance : 0;
+
         $this->credit
              ->client
              ->service()
+             ->updatePaidToDate($paid_to_date * -1)
              ->adjustCreditBalance($this->credit->balance)
              ->save();
 
@@ -294,7 +284,7 @@ class CreditService
      * Saves the credit.
      * @return Credit object
      */
-    public function save() : ?Credit
+    public function save(): ?Credit
     {
         $this->credit->saveQuietly();
 

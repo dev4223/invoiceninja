@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -13,13 +13,14 @@ namespace App\Http\Controllers;
 
 use App\Utils\Statics;
 use Illuminate\Http\Response;
+use InvoiceNinja\EInvoice\Decoder\Schema;
 
 class StaticController extends BaseController
 {
     /**
      * Show the list of Invoices.
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      * @OA\Get(
      *      path="/api/v1/statics",
@@ -55,9 +56,16 @@ class StaticController extends BaseController
 
         /** @var \App\Models\User $user */
         $user = auth()->user();
-        
-        $response = Statics::company($user->company()->getLocale());
 
-        return response()->json($response, 200, ['Content-type'=> 'application/json; charset=utf-8'], JSON_PRETTY_PRINT);
+        $response_data = Statics::company($user->getLocale() ?? $user->company()->getLocale());
+
+        if(request()->has('einvoice')) {
+
+            $schema = new Schema();
+            $response_data['einvoice_schema'] = $schema('Peppol');
+
+        }
+
+        return response()->json($response_data, 200, ['Content-type' => 'application/json; charset=utf-8'], JSON_PRETTY_PRINT);
     }
 }

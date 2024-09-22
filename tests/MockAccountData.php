@@ -57,8 +57,8 @@ use App\Models\VendorContact;
 use App\Utils\Traits\GeneratesCounter;
 use App\Utils\Traits\MakesHash;
 use App\Utils\TruthSource;
-use Illuminate\Foundation\Testing\WithoutEvents;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -71,7 +71,11 @@ trait MockAccountData
 {
     use MakesHash;
     use GeneratesCounter;
-    use WithoutEvents;
+
+    /**
+     * @var
+     */
+    public $project;
 
     /**
      * @var
@@ -184,6 +188,11 @@ trait MockAccountData
      */
     public $scheduler;
 
+    /**
+     * @var
+     */
+    public $purchase_order;
+
     public $contact;
     
     public $product;
@@ -193,31 +202,6 @@ trait MockAccountData
     public function makeTestData()
     {
         config(['database.default' => config('ninja.db.default')]);
-
-        /* Warm up the cache !*/
-        $cached_tables = config('ninja.cached_tables');
-
-        $this->artisan('db:seed --force');
-
-        foreach ($cached_tables as $name => $class) {
-            // check that the table exists in case the migration is pending
-            if (! Schema::hasTable((new $class())->getTable())) {
-                continue;
-            }
-            if ($name == 'payment_terms') {
-                $orderBy = 'num_days';
-            } elseif ($name == 'fonts') {
-                $orderBy = 'sort_order';
-            } elseif (in_array($name, ['currencies', 'industries', 'languages', 'countries', 'banks'])) {
-                $orderBy = 'name';
-            } else {
-                $orderBy = 'id';
-            }
-            $tableData = $class::orderBy($orderBy)->get();
-            if ($tableData->count()) {
-                Cache::forever($name, $tableData);
-            }
-        }
 
         $this->faker = \Faker\Factory::create();
         $fake_email = $this->faker->email();
@@ -263,6 +247,9 @@ trait MockAccountData
         $this->company->save();
 
         $this->account->default_company_id = $this->company->id;
+        $this->account->plan = 'pro';
+        $this->account->plan_expires = now()->addMonth();
+        $this->account->plan_term = "month";
         $this->account->save();
 
         $user = User::whereEmail($fake_email)->first();
@@ -574,6 +561,8 @@ trait MockAccountData
         $this->purchase_order->tax_rate2 = 0;
         $this->purchase_order->tax_rate3 = 0;
 
+        $this->purchase_order->line_items = InvoiceItemFactory::generate(5);
+
         $this->purchase_order->uses_inclusive_taxes = false;
         $this->purchase_order->save();
 
@@ -584,14 +573,9 @@ trait MockAccountData
             'purchase_order_id' => $this->purchase_order->id,
         ]);
 
-        $purchase_order_invitations = PurchaseOrderInvitation::whereCompanyId($this->purchase_order->company_id)
-            ->wherePurchaseOrderId($this->purchase_order->id);
-
-        $this->purchase_order->setRelation('invitations', $purchase_order_invitations);
-
         $this->purchase_order->service()->markSent();
 
-        $this->purchase_order->setRelation('client', $this->client);
+        $this->purchase_order->setRelation('vendor', $this->vendor);
         $this->purchase_order->setRelation('company', $this->company);
 
         $this->purchase_order->save();
@@ -719,7 +703,6 @@ trait MockAccountData
         $this->invoice->save();
 
         $this->invoice->ledger()->updateInvoiceBalance($this->invoice->amount);
-        // UpdateCompanyLedgerWithInvoice::dispatchNow($this->invoice, $this->invoice->amount, $this->invoice->company);
 
         $user_id = $this->invoice->user_id;
 
@@ -798,7 +781,7 @@ trait MockAccountData
 
         if (config('ninja.testvars.stripe')) {
             $data = [];
-            $data[1]['min_limit'] = 234;
+            $data[1]['min_limit'] = 22;
             $data[1]['max_limit'] = 65317;
             $data[1]['fee_amount'] = 0.00;
             $data[1]['fee_percent'] = 0.000;
@@ -865,4 +848,5 @@ trait MockAccountData
 
         return $line_items;
     }
+
 }

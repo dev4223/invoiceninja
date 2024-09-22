@@ -17,6 +17,12 @@
     <input type="hidden" name="is_recurring" value="{{ isset($is_recurring) ? $is_recurring : false }}">
     <input type="hidden" name="frequency_id" value="{{ isset($frequency_id) ? $frequency_id : false }}">
     <input type="hidden" name="remaining_cycles" value="{{ isset($remaining_cycles) ? $remaining_cycles : false }}">
+    <input type="hidden" name="contact_first_name" value="{{ auth()->guard('contact')->user()->first_name }}">
+    <input type="hidden" name="contact_last_name" value="{{ auth()->guard('contact')->user()->last_name }}">
+    <input type="hidden" name="contact_email" value="{{ auth()->guard('contact')->user()->email }}">
+
+    <input type="hidden" name="client_city" value="{{ auth()->guard('contact')->user()->client->city }}">
+    <input type="hidden" name="client_postal_code" value="{{ auth()->guard('contact')->user()->client->postal_code }}">
 
     <div class="container mx-auto">
         <div class="grid grid-cols-6 gap-4">
@@ -64,7 +70,7 @@
                                     {{ ctrans('texts.public_notes') }}
                                 </dt>
                                 <dd class="mt-1 text-sm leading-5 text-gray-900 sm:mt-0 sm:col-span-2">
-                                    {{ $invoice->public_notes }}
+                                    {!! html_entity_decode($invoice->public_notes) !!}
                                 </dd>
                                 @else
                                 <dt class="text-sm font-medium leading-5 text-gray-500">
@@ -150,11 +156,12 @@
     </div>
 </form>
 
-@include('portal.ninja2020.invoices.includes.terms', ['entities' => $invoices, 'entity_type' => ctrans('texts.invoice')])
+@include('portal.ninja2020.invoices.includes.required-fields')
+@include('portal.ninja2020.invoices.includes.terms', ['entities' => $invoices, 'variables' => $variables, 'entity_type' => ctrans('texts.invoice')])
 @include('portal.ninja2020.invoices.includes.signature')
 
 @endsection
 
 @push('footer')
-    <script src="{{ asset('js/clients/invoices/payment.js') }}"></script>
+    @vite('resources/js/clients/invoices/payment.js')
 @endpush

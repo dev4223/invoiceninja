@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -40,7 +40,7 @@ class RegisterRequest extends FormRequest
         $rules = [];
 
         foreach ($this->company()->client_registration_fields as $field) {
-            if ($field['visible']) {
+            if ($field['visible'] ?? true) {
                 $rules[$field['key']] = $field['required'] ? ['bail','required'] : ['sometimes'];
             }
         }

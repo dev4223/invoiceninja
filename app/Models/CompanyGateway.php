@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -47,12 +47,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property bool $require_custom_value2
  * @property bool $require_custom_value3
  * @property bool $require_custom_value4
+ * @property bool $always_show_required_fields
  * @property-read int|null $client_gateway_tokens_count
  * @property-read \App\Models\Company $company
  * @property-read \App\Models\Gateway $gateway
  * @property-read mixed $hashed_id
  * @method getConfigField(string $field)
- * @method static \Illuminate\Database\Eloquent\Builder|BaseModel company()
  * @method static \Illuminate\Database\Eloquent\Builder|CompanyGateway filter(\App\Filters\QueryFilters $filters)
  * @method static \Illuminate\Database\Eloquent\Builder|CompanyGateway newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|CompanyGateway newQuery()
@@ -62,14 +62,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @method static \Illuminate\Database\Eloquent\Builder|CompanyGateway withTrashed()
  * @method static \Illuminate\Database\Eloquent\Builder|CompanyGateway withoutTrashed()
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ClientGatewayToken> $client_gateway_tokens
- * @method static CompanyGateway find($value) 
+ * @method static CompanyGateway find($value)
  * @mixin \Eloquent
  */
 class CompanyGateway extends BaseModel
 {
     use SoftDeletes;
     use Filterable;
-    
+
     public const GATEWAY_CREDIT = 10000000;
 
     protected $casts = [
@@ -77,6 +77,7 @@ class CompanyGateway extends BaseModel
         'updated_at' => 'timestamp',
         'created_at' => 'timestamp',
         'deleted_at' => 'timestamp',
+        'always_show_required_fields' => 'bool',
     ];
 
     protected $with = [
@@ -107,6 +108,7 @@ class CompanyGateway extends BaseModel
         'custom_value4',
         'token_billing',
         'label',
+        'always_show_required_fields',
     ];
 
     public static $credit_cards = [
@@ -116,7 +118,6 @@ class CompanyGateway extends BaseModel
             8 => ['card' => 'images/credit_cards/Test-Diners-Icon.png', 'text' => 'Diners'],
             16 => ['card' => 'images/credit_cards/Test-Discover-Icon.png', 'text' => 'Discover'],
         ];
-
 
     // const TYPE_PAYPAL = 300;
     // const TYPE_STRIPE = 301;
@@ -132,6 +133,8 @@ class CompanyGateway extends BaseModel
     // const TYPE_MOLLIE = 312;
     // const TYPE_EWAY = 313;
     // const TYPE_FORTE = 314;
+    // const PAYPAL_PPCP = 323;
+    // const SQUARE = 320;
 
     public $gateway_consts = [
         '38f2c48af60c7dd69e04248cbb24c36e' => 300,
@@ -144,15 +147,23 @@ class CompanyGateway extends BaseModel
         '8fdeed552015b3c7b44ed6c8ebd9e992' => 309,
         'd6814fc83f45d2935e7777071e629ef9' => 310,
         'bbd736b3254b0aabed6ad7fda1298c88' => 311,
-        '1bd651fb213ca0c9d66ae3c336dc77e7' => 312,
+        '1bd651fb213ca0c9d66ae3c336dc77e8' => 312,
         '944c20175bbe6b9972c05bcfe294c2c7' => 313,
         'kivcvjexxvdiyqtj3mju5d6yhpeht2xs' => 314,
         '65faab2ab6e3223dbe848b1686490baz' => 320,
-        'b9886f9257f0c6ee7c302f1c74475f6c' => 321,
+        'b9886f9257f0c6ee7c302f1c74475f6c' => 321, //GoCardless
         'hxd6gwg3ekb9tb3v9lptgx1mqyg69zu9' => 322,
+        '80af24a6a691230bbec33e930ab40666' => 323,
+        'vpyfbmdrkqcicpkjqdusgjfluebftuva' => 324, //BTPay
+        '91be24c7b792230bced33e930ac61676' => 325,
     ];
 
     protected $touches = [];
+
+    public function isPayPal()
+    {
+        return in_array($this->gateway_key, ['80af24a6a691230bbec33e930ab40666','80af24a6a691230bbec33e930ab40665']);
+    }
 
     public function getEntityType()
     {
@@ -208,7 +219,7 @@ class CompanyGateway extends BaseModel
         if (class_exists($class)) {
             return $class;
         }
-        
+
         return false;
 
         // throw new \Exception("Payment Driver does not exist");
@@ -221,7 +232,7 @@ class CompanyGateway extends BaseModel
     {
         $this->config = encrypt(json_encode($config));
     }
-    
+
     /**
      * setConfigField
      *
@@ -328,7 +339,7 @@ class CompanyGateway extends BaseModel
      *
      * @return bool whether the gateway is in testmode or not.
      */
-    public function isTestMode() :bool
+    public function isTestMode(): bool
     {
         $config = $this->getConfig();
 
@@ -348,7 +359,7 @@ class CompanyGateway extends BaseModel
      * Only works for STRIPE and PAYMILL.
      * @return string The Publishable key
      */
-    public function getPublishableKey() :string
+    public function getPublishableKey(): string
     {
         return $this->getConfigField('publishableKey');
     }
@@ -374,7 +385,7 @@ class CompanyGateway extends BaseModel
      * @param int $gateway_type_id
      * @return string           The fee amount formatted in the client currency
      */
-    public function calcGatewayFeeLabel($amount, Client $client, $gateway_type_id = GatewayType::CREDIT_CARD) :string
+    public function calcGatewayFeeLabel($amount, Client $client, $gateway_type_id = GatewayType::CREDIT_CARD): string
     {
         $label = ' ';
 
@@ -383,11 +394,11 @@ class CompanyGateway extends BaseModel
         if ($fee > 0) {
             $fees_and_limits = $this->fees_and_limits->{$gateway_type_id};
 
-            if (strlen($fees_and_limits->fee_percent) >=1) {
+            if (strlen($fees_and_limits->fee_percent) >= 1) {
                 $label .= $fees_and_limits->fee_percent . '%';
             }
 
-            if (strlen($fees_and_limits->fee_amount) >=1 && $fees_and_limits->fee_amount > 0) {
+            if (strlen($fees_and_limits->fee_amount) >= 1 && $fees_and_limits->fee_amount > 0) {
                 if (strlen($label) > 1) {
                     $label .= ' + ' . Number::formatMoney($fees_and_limits->fee_amount, $client);
                 } else {
@@ -411,7 +422,7 @@ class CompanyGateway extends BaseModel
         $fee = 0;
 
 
-        if ($fees_and_limits->adjust_fee_percent) {
+        if ($fees_and_limits->adjust_fee_percent ?? false) {
             $adjusted_fee = 0;
 
             if ($fees_and_limits->fee_amount) {
@@ -421,9 +432,9 @@ class CompanyGateway extends BaseModel
             }
 
             if ($fees_and_limits->fee_percent) {
-                $divisor = 1 - ($fees_and_limits->fee_percent/100);
+                $divisor = 1 - ($fees_and_limits->fee_percent / 100);
 
-                $gross_amount = round($adjusted_fee/$divisor, 2);
+                $gross_amount = round($adjusted_fee / $divisor, 2);
                 $fee = $gross_amount - $amount;
             }
         } else {
@@ -440,7 +451,7 @@ class CompanyGateway extends BaseModel
                 //elseif ($fees_and_limits->adjust_fee_percent) {
                 //   $fee += round(($amount / (1 - $fees_and_limits->fee_percent / 100) - $amount), 2);
                 //} else {
-                        
+
                 //}
             }
         }

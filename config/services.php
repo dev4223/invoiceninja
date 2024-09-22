@@ -12,7 +12,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | This file is for storing the credentials for third party services such
-    | as Mailgun, Postmark, AWS and more. This file provides the de facto
+    | as Mailgun, Brevo, Postmark, AWS and more. This file provides the de facto
     | location for this type of information, allowing packages to have
     | a conventional file to locate the various service credentials.
     |
@@ -22,13 +22,29 @@ return [
         'domain' => env('MAILGUN_DOMAIN', ''),
         'secret' => env('MAILGUN_SECRET', ''),
         'endpoint' => env('MAILGUN_ENDPOINT', 'api.mailgun.net'),
+        'webhook_signing_key' => env('MAILGUN_WEBHOOK_SIGNING_KEY', ''),
         'scheme' => 'https',
+        'from' => [
+            'address' => env('MAILGUN_FROM_ADDRESS', ''),
+            'name' => env('MAILGUN_FROM_NAME', ''),
+        ],
+    ],
+
+    'brevo' => [
+        'key' => env('BREVO_SECRET', ''),
     ],
 
     'postmark' => [
         'token' => env('POSTMARK_SECRET', ''),
     ],
 
+    'postmark-outlook' => [
+        'token' => env('POSTMARK_OUTLOOK_SECRET',''),
+        'from' => [
+            'address' => env('POSTMARK_OUTLOOK_FROM_ADDRESS', '')
+        ],
+    ],
+    
     'microsoft' => [
         'client_id' => env('MICROSOFT_CLIENT_ID'),
         'client_secret' => env('MICROSOFT_CLIENT_SECRET'),
@@ -55,8 +71,8 @@ return [
     ],
 
     'stripe' => [
-        'model'  => App\Models\User::class,
-        'key'    => env('STRIPE_KEY'),
+        'model' => App\Models\User::class,
+        'key' => env('STRIPE_KEY'),
         'secret' => env('STRIPE_SECRET'),
     ],
 
@@ -101,4 +117,8 @@ return [
             'key' => env('ZIP_TAX_KEY', false),
         ],
     ],
+    'chorus' => [
+        'client_id' => env('CHORUS_CLIENT_ID', false),
+        'secret' => env('CHORUS_SECRET', false),
+    ]
 ];

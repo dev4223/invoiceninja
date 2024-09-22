@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
 
 class RecurringExpenseToExpenseFactory
 {
-    public static function create(RecurringExpense $recurring_expense) :Expense
+    public static function create(RecurringExpense $recurring_expense): Expense
     {
         $expense = new Expense();
         $expense->user_id = $recurring_expense->user_id;
@@ -65,6 +65,7 @@ class RecurringExpenseToExpenseFactory
         $expense->tax_amount3 = $recurring_expense->tax_amount3 ?: 0;
         $expense->uses_inclusive_taxes = $recurring_expense->uses_inclusive_taxes;
         $expense->calculate_tax_by_amount = $recurring_expense->calculate_tax_by_amount;
+        $expense->invoice_currency_id = $recurring_expense->invoice_currency_id;
 
         return $expense;
     }
@@ -81,11 +82,15 @@ class RecurringExpenseToExpenseFactory
         } else {
             $locale = $recurring_expense->company->locale();
 
-            $date_formats = Cache::get('date_formats');
+            //@deprecated
+            // $date_formats = Cache::get('date_formats');
 
-            $date_format = $date_formats->filter(function ($item) use ($recurring_expense) {
+            /** @var \Illuminate\Support\Collection<\App\Models\DateFormat> */
+            $date_formats = app('date_formats');
+
+            $date_format = $date_formats->first(function ($item) use ($recurring_expense) {
                 return $item->id == $recurring_expense->company->settings->date_format_id;
-            })->first()->format;
+            })->format;
         }
 
         Carbon::setLocale($locale);
@@ -143,7 +148,7 @@ class RecurringExpenseToExpenseFactory
                 continue;
             }
 
-            if (Str::contains($match, '|')) {
+            // if (Str::contains($match, '|')) {
                 $parts = explode('|', $match); // [ '[MONTH', 'MONTH+2]' ]
 
                 $left = substr($parts[0], 1); // 'MONTH'
@@ -170,7 +175,7 @@ class RecurringExpenseToExpenseFactory
 
                     $_value = explode($_operation, $right); // [MONTHYEAR, 4]
 
-                    $_right = Carbon::createFromDate(now()->year, now()->month)->addMonths($_value[1])->translatedFormat('F Y');
+                    $_right = Carbon::createFromDate(now()->year, now()->month)->addMonths($_value[1])->translatedFormat('F Y'); //@phpstan-ignore-line
                 }
 
                 $replacement = sprintf('%s to %s', $_left, $_right);
@@ -181,7 +186,7 @@ class RecurringExpenseToExpenseFactory
                     $value,
                     1
                 );
-            }
+            // }
         }
 
         // Second case with more common calculations.
@@ -244,13 +249,13 @@ class RecurringExpenseToExpenseFactory
 
                 if ($matches->keys()->first() == ':MONTHYEAR') {
 
-                    $final_date = now()->addMonths($output-now()->month);
+                    $final_date = now()->addMonths($output - now()->month);
 
                     $output =    \sprintf(
-                            '%s %s',
-                            $final_date->translatedFormat('F'),
-                            $final_date->year,
-                        );
+                        '%s %s',
+                        $final_date->translatedFormat('F'),
+                        $final_date->year,
+                    );
                 }
 
                 $value = preg_replace(

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -28,7 +28,10 @@ use stdClass;
 
 class UserEmailChanged implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     public $settings;
 
@@ -39,7 +42,7 @@ class UserEmailChanged implements ShouldQueue
      * @param \stdClass $old_user
      * @param \App\Models\Company $company
      */
-    public function __construct(protected User $new_user, protected \stdClass $old_user, protected Company $company)
+    public function __construct(protected User $new_user, protected \stdClass $old_user, protected Company $company, protected bool $is_react = false)
     {
         $this->settings = $this->company->settings;
     }
@@ -55,7 +58,7 @@ class UserEmailChanged implements ShouldQueue
         App::setLocale($this->company->getLocale());
 
         /*Build the object*/
-        $mail_obj = new stdClass;
+        $mail_obj = new stdClass();
         $mail_obj->subject = ctrans('texts.email_address_changed');
         $mail_obj->markdown = 'email.admin.generic';
         $mail_obj->from = [$this->company->owner()->email, $this->company->owner()->present()->name()];
@@ -64,7 +67,7 @@ class UserEmailChanged implements ShouldQueue
 
         //Send email via a Mailable class
 
-        $nmo = new NinjaMailerObject;
+        $nmo = new NinjaMailerObject();
         $nmo->mailable = new UserNotificationMailer($mail_obj);
         $nmo->settings = $this->settings;
         $nmo->company = $this->company;
@@ -72,7 +75,7 @@ class UserEmailChanged implements ShouldQueue
 
         NinjaMailerJob::dispatch($nmo, true);
 
-        $this->new_user->service()->invite($this->company);
+        $this->new_user->service()->invite($this->company, $this->is_react);
     }
 
     private function getData()
@@ -91,6 +94,7 @@ class UserEmailChanged implements ShouldQueue
             'logo' => $this->company->present()->logo(),
             'settings' => $this->settings,
             'whitelabel' => $this->company->account->isPaid() ? true : false,
+            'template' => $this->company->account->isPremium() ? 'email.template.admin_premium' : 'email.template.admin',
         ];
     }
 }

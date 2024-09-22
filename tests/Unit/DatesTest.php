@@ -31,6 +31,29 @@ class DatesTest extends TestCase
         // $this->makeTestData();
     }
 
+    public function testDateNotGreaterThanMonthsEnd()
+    {
+        $this->travelTo(now()->createFromDate(2024, 6, 20));
+        $date = '2024-05-20';
+        
+        $this->assertTrue(\Carbon\Carbon::parse($date)->endOfMonth()->lte(now()));
+
+        $this->travelBack();
+
+    }
+
+    public function testDatLessThanMonthsEnd()
+    {
+        $this->travelTo(now()->createFromDate(2024, 5, 30));
+        $date = '2024-05-20';
+        
+        $this->assertFalse(\Carbon\Carbon::parse($date)->endOfMonth()->lte(now()));
+
+        $this->travelBack();
+
+    }
+
+    
     public function testLastFinancialYear3()
     {
         $this->travelTo(now()->createFromDate(2020, 6, 30));
@@ -102,8 +125,9 @@ class DatesTest extends TestCase
 
         $fin_year_start = now()->createFromDate(now()->year, $first_month_of_year, 1);
 
-        if(now()->lt($fin_year_start))
+        if(now()->lt($fin_year_start)) {
             $fin_year_start->subYear();
+        }
 
         $fin_year_end = $fin_year_start->copy()->addYear()->subDay();
 
@@ -122,8 +146,9 @@ class DatesTest extends TestCase
 
         $fin_year_start = now()->createFromDate(now()->year, $first_month_of_year, 1);
 
-        if(now()->lt($fin_year_start))
+        if(now()->lt($fin_year_start)) {
             $fin_year_start->subYear();
+        }
 
         $fin_year_end = $fin_year_start->copy()->addYear()->subDay();
 
@@ -142,8 +167,9 @@ class DatesTest extends TestCase
 
         $fin_year_start = now()->createFromDate(now()->year, $first_month_of_year, 1);
 
-        if(now()->lt($fin_year_start))
+        if(now()->lt($fin_year_start)) {
             $fin_year_start->subYear();
+        }
 
         $fin_year_end = $fin_year_start->copy()->addYear()->subDay();
 
@@ -163,8 +189,9 @@ class DatesTest extends TestCase
 
         $fin_year_start = now()->createFromDate(now()->year, $first_month_of_year, 1);
 
-        if(now()->lt($fin_year_start))
+        if(now()->lt($fin_year_start)) {
             $fin_year_start->subYear();
+        }
 
         $fin_year_end = $fin_year_start->copy()->addYear()->subDay();
 
@@ -182,7 +209,7 @@ class DatesTest extends TestCase
         $start_date = Carbon::parse($string_date);
         $current_date = Carbon::parse('2021-06-20');
 
-        $diff_in_days = $start_date->diffInDays($current_date);
+        $diff_in_days = intval(abs($start_date->diffInDays($current_date)));
 
         $this->assertEquals(19, $diff_in_days);
     }
@@ -191,9 +218,9 @@ class DatesTest extends TestCase
     {
         $now = Carbon::parse('2020-01-01');
 
-        $x = now()->diffInDays(now()->addDays(7));
+        $x = intval(abs(now()->diffInDays(now()->addDays(7))));
 
-        $this->assertEquals(7, $x);
+        $this->assertEquals(7, intval(abs($x)));
     }
 
     public function testFourteenDaysFromNow()

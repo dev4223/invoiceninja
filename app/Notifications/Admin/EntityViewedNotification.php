@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,7 +12,6 @@
 namespace App\Notifications\Admin;
 
 use App\Utils\Number;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Messages\SlackMessage;
 use Illuminate\Notifications\Notification;
 
@@ -39,7 +38,7 @@ class EntityViewedNotification extends Notification
     protected $contact;
 
     public $is_system;
-    
+
     public function __construct($invitation, $entity_name, $is_system = false, $settings = null)
     {
         $this->entity_name = $entity_name;
@@ -67,7 +66,7 @@ class EntityViewedNotification extends Notification
      * Get the mail representation of the notification.
      *
      * @param  mixed  $notifiable
-     * 
+     *
      */
     public function toMail($notifiable)
     {
@@ -91,7 +90,7 @@ class EntityViewedNotification extends Notification
         $logo = $this->company->present()->logo();
         $amount = Number::formatMoney($this->entity->amount, $this->entity->client);
 
-        return (new SlackMessage)
+        return (new SlackMessage())
             ->from(ctrans('texts.notification_bot'))
             ->success()
             ->image('https://app.invoiceninja.com/favicon-v2.png')
@@ -137,16 +136,16 @@ class EntityViewedNotification extends Notification
     //     return $data;
     // }
 
-    private function buildSubject()
-    {
-        $subject = ctrans(
-            "texts.notification_{$this->entity_name}_viewed_subject",
-            [
-                'client' => $this->contact->present()->name(),
-                $this->entity_name => $this->entity->number,
-            ]
-        );
+    // private function buildSubject()
+    // {
+    //     $subject = ctrans(
+    //         "texts.notification_{$this->entity_name}_viewed_subject",
+    //         [
+    //             'client' => $this->contact->present()->name(),
+    //             $this->entity_name => $this->entity->number,
+    //         ]
+    //     );
 
-        return $subject;
-    }
+    //     return $subject;
+    // }
 }

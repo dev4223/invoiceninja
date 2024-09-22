@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -87,7 +87,7 @@ class TokenController extends BaseController
      *       ),
      *     )
      * @param TokenFilters $filters
-     * @return Response|mixed
+     * @return Response| \Illuminate\Http\JsonResponse|mixed
      */
     public function index(TokenFilters $filters)
     {
@@ -103,7 +103,7 @@ class TokenController extends BaseController
      *
      * @param ShowTokenRequest $request
      * @param CompanyToken $token
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -157,7 +157,7 @@ class TokenController extends BaseController
      *
      * @param EditTokenRequest $request
      * @param CompanyToken $token
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -213,7 +213,7 @@ class TokenController extends BaseController
      *
      * @param UpdateTokenRequest $request
      * @param CompanyToken $token
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -275,7 +275,7 @@ class TokenController extends BaseController
      * Show the form for creating a new resource.
      *
      * @param CreateTokenRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -311,7 +311,11 @@ class TokenController extends BaseController
      */
     public function create(CreateTokenRequest $request)
     {
-        $token = CompanyTokenFactory::create(auth()->user()->company()->id, auth()->user()->id, auth()->user()->account_id);
+
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        $token = CompanyTokenFactory::create($user->company()->id, auth()->user()->id, auth()->user()->account_id);
 
         return $this->itemResponse($token);
     }
@@ -320,7 +324,7 @@ class TokenController extends BaseController
      * Store a newly created resource in storage.
      *
      * @param StoreTokenRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -356,7 +360,11 @@ class TokenController extends BaseController
      */
     public function store(StoreTokenRequest $request)
     {
-        $company_token = CompanyTokenFactory::create(auth()->user()->company()->id, auth()->user()->id, auth()->user()->account_id);
+
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        $company_token = CompanyTokenFactory::create($user->company()->id, auth()->user()->id, auth()->user()->account_id);
 
         $token = $this->token_repo->save($request->all(), $company_token);
 
@@ -368,7 +376,7 @@ class TokenController extends BaseController
      *
      * @param DestroyTokenRequest $request
      * @param CompanyToken $token
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @throws \Exception
@@ -425,7 +433,7 @@ class TokenController extends BaseController
     /**
      * Perform bulk actions on the list view.
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Post(
@@ -476,13 +484,16 @@ class TokenController extends BaseController
     {
         $this->entity_transformer = CompanyTokenHashedTransformer::class;
 
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
         $action = request()->input('action');
 
         $ids = request()->input('ids');
         $tokens = CompanyToken::withTrashed()->find($this->transformKeys($ids));
 
-        $tokens->each(function ($token, $key) use ($action) {
-            if (auth()->user()->can('edit', $token)) {
+        $tokens->each(function ($token, $key) use ($action, $user) {
+            if ($user->can('edit', $token)) {
                 $this->token_repo->{$action}($token);
             }
         });

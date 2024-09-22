@@ -4,17 +4,17 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Events\Design;
 
-use App\Models\Design;
 use App\Models\Company;
-use Illuminate\Queue\SerializesModels;
+use App\Models\Design;
 use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Queue\SerializesModels;
 
 /**
  * Class DesignWasRestored.
@@ -32,8 +32,8 @@ class DesignWasRestored
      *
      * @return PrivateChannel|array
      */
-     public function broadcastOn()
-     {
+    public function broadcastOn()
+    {
         return [];
-     }
+    }
 }

@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -24,8 +24,9 @@ class PaymentNotificationWebhookController extends Controller
     public function __invoke(PaymentNotificationWebhookRequest $request, string $company_key, string $company_gateway_id, string $client_hash)
     {
         /** @var \App\Models\CompanyGateway $company_gateway */
-
         $company_gateway = CompanyGateway::find($this->decodePrimaryKey($company_gateway_id));
+        
+        /** @var \App\Models\Client $client */
         $client = Client::find($this->decodePrimaryKey($client_hash));
 
         return $company_gateway

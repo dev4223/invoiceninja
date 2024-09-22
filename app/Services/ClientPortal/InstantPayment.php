@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -44,6 +44,17 @@ class InstantPayment
 
     public function run()
     {
+        /** @var \App\Models\ClientContact $cc */
+        $cc = auth()->guard('contact')->user();
+        $cc->first_name = $this->request->contact_first_name;
+        $cc->last_name = $this->request->contact_last_name;
+        $cc->email = $this->request->contact_email;
+        $cc->client->postal_code = strlen($cc->client->postal_code ?? '') > 1 ? $cc->client->postal_code : $this->request->client_postal_code;
+        $cc->client->city = strlen($cc->client->city ?? '') > 1 ? $cc->client->city : $this->request->client_city;
+        $cc->client->shipping_postal_code = strlen($cc->client->shipping_postal_code ?? '') > 1 ? $cc->client->shipping_postal_code :  $cc->client->postal_code;
+        $cc->client->shipping_city = strlen($cc->client->shipping_city ?? '') > 1 ? $cc->client->shipping_city : $cc->client->city;
+        $cc->pushQuietly();
+
         $is_credit_payment = false;
 
         $tokens = [];
@@ -60,6 +71,7 @@ class InstantPayment
          * ['invoice_id' => xxx, 'amount' => 22.00]
          */
         $payable_invoices = collect($this->request->payable_invoices);
+
         $invoices = Invoice::query()->whereIn('id', $this->transformKeys($payable_invoices->pluck('invoice_id')->toArray()))->withTrashed()->get();
 
         $invoices->each(function ($invoice) {
@@ -82,6 +94,8 @@ class InstantPayment
                 ->route('client.invoices.index')
                 ->with(['message' => 'No payable invoices selected.']);
         }
+
+        $invoices = Invoice::query()->whereIn('id', $this->transformKeys($payable_invoices->pluck('invoice_id')->toArray()))->withTrashed()->get();
 
         $client = $invoices->first()->client;
         $settings = $client->getMergedSettings();
@@ -175,10 +189,10 @@ class InstantPayment
         }
 
         if ($this->request->has('signature') && ! is_null($this->request->signature) && ! empty($this->request->signature)) {
-                
+
             $contact_id = auth()->guard('contact')->user() ? auth()->guard('contact')->user()->id : null;
 
-            $invoices->each(function ($invoice) use($contact_id) {
+            $invoices->each(function ($invoice) use ($contact_id) {
                 InjectSignature::dispatch($invoice, $contact_id, $this->request->signature, request()->getClientIp());
             });
         }
@@ -190,11 +204,6 @@ class InstantPayment
         $first_invoice = $invoices->first();
         $credit_totals = in_array($first_invoice->client->getSetting('use_credits_payment'), ['always', 'option']) ? $first_invoice->client->service()->getCreditBalance() : 0;
         $starting_invoice_amount = $first_invoice->balance;
-
-        /* Schedule a job to check the gateway fees for this invoice*/
-        if (Ninja::isHosted()) {
-            CheckGatewayFee::dispatch($first_invoice->id, $client->company->db)->delay(800);
-        }
 
         if ($gateway) {
             $first_invoice->service()->addGatewayFee($gateway, $payment_method_id, $invoice_totals)->save();
@@ -233,13 +242,13 @@ class InstantPayment
             $hash_data['billing_context'] = Cache::get($this->request->query('hash'));
         } elseif ($this->request->hash) {
             $hash_data['billing_context'] = Cache::get($this->request->hash);
-        } elseif ($old_hash = PaymentHash::query()->where('fee_invoice_id', $first_invoice->id)->whereNull('payment_id')->first()) {
+        } elseif ($old_hash = PaymentHash::query()->where('fee_invoice_id', $first_invoice->id)->whereNull('payment_id')->orderBy('id','desc')->first()) {
             if (isset($old_hash->data->billing_context)) {
                 $hash_data['billing_context'] = $old_hash->data->billing_context;
             }
         }
 
-        $payment_hash = new PaymentHash;
+        $payment_hash = new PaymentHash();
         $payment_hash->hash = Str::random(32);
         $payment_hash->data = $hash_data;
         $payment_hash->fee_total = $fee_totals;

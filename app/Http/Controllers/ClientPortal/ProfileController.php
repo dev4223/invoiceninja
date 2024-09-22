@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -38,7 +38,7 @@ class ProfileController extends Controller
      *
      * @param UpdateContactRequest $request
      * @param ClientContact $client_contact
-     * @return RedirectResponse
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function update(UpdateContactRequest $request, ClientContact $client_contact)
     {

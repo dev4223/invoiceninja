@@ -4,22 +4,27 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Chart;
 
-use App\Models\User;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\Expense;
+use App\Models\Invoice;
+use App\Models\Payment;
+use App\Models\Quote;
+use App\Models\Task;
+use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 
 class ChartService
 {
     use ChartQueries;
+    use ChartCalculations;
 
     public function __construct(public Company $company, private User $user, private bool $is_admin)
     {
@@ -29,7 +34,7 @@ class ChartService
      * Returns an array of currencies that have
      * transacted with a company
      */
-    public function getCurrencyCodes() :array
+    public function getCurrencyCodes(): array
     {
         /* Get all the distinct client currencies */
         $currencies = Client::withTrashed()
@@ -57,7 +62,9 @@ class ChartService
         /* Merge and filter by unique */
         $currencies = $currencies->merge($expense_currencies)->unique();
 
-        $cache_currencies = Cache::get('currencies');
+        
+        /** @var \Illuminate\Support\Collection<\App\Models\Currency> */
+        $cache_currencies = app('currencies');
 
         $filtered_currencies = $cache_currencies->whereIn('id', $currencies)->all();
 
@@ -69,9 +76,9 @@ class ChartService
 
         return $final_currencies;
     }
-
+    
     /* Chart Data */
-    public function chart_summary($start_date, $end_date) :array
+    public function chart_summary($start_date, $end_date): array
     {
         $currencies = $this->getCurrencyCodes();
 
@@ -86,6 +93,12 @@ class ChartService
             $data[$key]['expenses'] = $this->getExpenseChartQuery($start_date, $end_date, $key);
         }
 
+
+        $data[999]['invoices'] = $this->getAggregateInvoiceChartQuery($start_date, $end_date);
+        $data[999]['outstanding'] = $this->getAggregateOutstandingChartQuery($start_date, $end_date);
+        $data[999]['payments'] = $this->getAggregatePaymentChartQuery($start_date, $end_date);
+        $data[999]['expenses'] = $this->getAggregateExpenseChartQuery($start_date, $end_date);
+
         return $data;
     }
 
@@ -93,7 +106,7 @@ class ChartService
 
     /* Totals */
 
-    public function totals($start_date, $end_date) :array
+    public function totals($start_date, $end_date): array
     {
         $data = [];
 
@@ -108,23 +121,34 @@ class ChartService
         $invoices = $this->getInvoices($start_date, $end_date);
 
         foreach ($data['currencies'] as $key => $value) {
-           
+
             $invoices_set = array_search($key, array_column($invoices, 'currency_id'));
             $revenue_set = array_search($key, array_column($revenue, 'currency_id'));
             $outstanding_set = array_search($key, array_column($outstanding, 'currency_id'));
             $expenses_set = array_search($key, array_column($expenses, 'currency_id'));
 
-            $data[$key]['invoices'] = $invoices_set !== false ? $invoices[array_search($key, array_column($invoices, 'currency_id'))] : new \stdClass;
-            $data[$key]['revenue'] = $revenue_set !== false ? $revenue[array_search($key, array_column($revenue, 'currency_id'))] : new \stdClass;
-            $data[$key]['outstanding'] = $outstanding_set !== false ? $outstanding[array_search($key, array_column($outstanding, 'currency_id'))] : new \stdClass;
-            $data[$key]['expenses'] = $expenses_set !== false ? $expenses[array_search($key, array_column($expenses, 'currency_id'))] : new \stdClass;
+            $data[$key]['invoices'] = $invoices_set !== false ? $invoices[array_search($key, array_column($invoices, 'currency_id'))] : new \stdClass();
+            $data[$key]['revenue'] = $revenue_set !== false ? $revenue[array_search($key, array_column($revenue, 'currency_id'))] : new \stdClass();
+            $data[$key]['outstanding'] = $outstanding_set !== false ? $outstanding[array_search($key, array_column($outstanding, 'currency_id'))] : new \stdClass();
+            $data[$key]['expenses'] = $expenses_set !== false ? $expenses[array_search($key, array_column($expenses, 'currency_id'))] : new \stdClass();
 
         }
+
+        $aggregate_revenue = $this->getAggregateRevenueQuery($start_date, $end_date);
+        $aggregate_outstanding = $this->getAggregateOutstandingQuery($start_date, $end_date);
+        $aggregate_expenses = $this->getAggregateExpenseQuery($start_date, $end_date);
+        $aggregate_invoices = $this->getAggregateInvoicesQuery($start_date, $end_date);
+
+        $data[999]['invoices'] = $aggregate_invoices !== false ? reset($aggregate_invoices) : new \stdClass();
+        $data[999]['expense'] = $aggregate_expenses !== false ? reset($aggregate_expenses) : new \stdClass();
+        $data[999]['outstanding'] = $aggregate_outstanding !== false ? reset($aggregate_outstanding) : new \stdClass();
+        $data[999]['revenue'] = $aggregate_revenue !== false ? reset($aggregate_revenue) : new \stdClass();
+
 
         return $data;
     }
 
-    public function getInvoices($start_date, $end_date) :array
+    public function getInvoices($start_date, $end_date): array
     {
         $revenue = $this->getInvoicesQuery($start_date, $end_date);
         $revenue = $this->addCurrencyCodes($revenue);
@@ -132,7 +156,7 @@ class ChartService
         return $revenue;
     }
 
-    public function getRevenue($start_date, $end_date) :array
+    public function getRevenue($start_date, $end_date): array
     {
         $revenue = $this->getRevenueQuery($start_date, $end_date);
         $revenue = $this->addCurrencyCodes($revenue);
@@ -140,7 +164,7 @@ class ChartService
         return $revenue;
     }
 
-    public function getOutstanding($start_date, $end_date) :array
+    public function getOutstanding($start_date, $end_date): array
     {
         $outstanding = $this->getOutstandingQuery($start_date, $end_date);
         $outstanding = $this->addCurrencyCodes($outstanding);
@@ -148,7 +172,7 @@ class ChartService
         return $outstanding;
     }
 
-    public function getExpenses($start_date, $end_date) :array
+    public function getExpenses($start_date, $end_date): array
     {
         $expenses = $this->getExpenseQuery($start_date, $end_date);
         $expenses = $this->addCurrencyCodes($expenses);
@@ -160,9 +184,11 @@ class ChartService
 
     /* Helpers */
 
-    private function addCurrencyCodes($data_set) :array
+    private function addCurrencyCodes($data_set): array
     {
-        $currencies = Cache::get('currencies');
+        
+        /** @var \Illuminate\Support\Collection<\App\Models\Currency> */
+        $currencies = app('currencies');
 
         foreach ($data_set as $key => $value) {
             $data_set[$key]->currency_id = str_replace('"', '', $value->currency_id);
@@ -172,7 +198,7 @@ class ChartService
         return $data_set;
     }
 
-    private function getCode($currencies, $currency_id) :string
+    private function getCode($currencies, $currency_id): string
     {
         $currency_id = str_replace('"', '', $currency_id);
 
@@ -186,4 +212,44 @@ class ChartService
 
         return '';
     }
+
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * calculatedField
+     * 
+     * @param  array $data - 
+     * 
+     * field - list of fields for calculation
+     * period - current/previous
+     * calculation - sum/count/avg
+     *
+     * date_range - this_month
+     * or
+     * start_date - end_date
+     */
+    public function getCalculatedField(array $data)
+    {
+        $results = 0;
+
+        match($data['field']){
+            'active_invoices' => $results = $this->getActiveInvoices($data), 
+            'outstanding_invoices' => $results = 0, 
+            'completed_payments' => $results = 0, 
+            'refunded_payments' => $results = 0, 
+            'active_quotes' => $results = 0, 
+            'unapproved_quotes' => $results = 0, 
+            'logged_tasks' => $results = 0, 
+            'invoiced_tasks' => $results = 0, 
+            'paid_tasks' => $results = 0, 
+            'logged_expenses' => $results = 0, 
+            'pending_expenses' => $results = 0, 
+            'invoiced_expenses' => $results = 0, 
+            'invoice_paid_expenses' => $results = 0,
+            default => $results = 0,
+        };
+
+        return $results;
+    }
+
 }

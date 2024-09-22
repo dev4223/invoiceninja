@@ -4,21 +4,21 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
-use App\Models\CompanyUser;
-use Illuminate\Http\Response;
-use App\Transformers\UserTransformer;
-use App\Transformers\CompanyUserTransformer;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
-use App\Http\Requests\CompanyUser\UpdateCompanyUserRequest;
 use App\Http\Requests\CompanyUser\UpdateCompanyUserPreferencesRequest;
+use App\Http\Requests\CompanyUser\UpdateCompanyUserRequest;
+use App\Models\CompanyUser;
+use App\Models\User;
+use App\Transformers\CompanyUserTransformer;
+use App\Transformers\UserTransformer;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Response;
 
 class CompanyUserController extends BaseController
 {
@@ -107,26 +107,30 @@ class CompanyUserController extends BaseController
      *     )
      * @param UpdateCompanyUserRequest $request
      * @param User $user
-     * @return Response|mixed|void
+     * @return Response| \Illuminate\Http\JsonResponse|mixed|void
      */
     public function update(UpdateCompanyUserRequest $request, User $user)
     {
+        /** @var \App\Models\User $auth_user */
+        $auth_user = auth()->user();
+        $company = $auth_user->company();
 
-        $company = auth()->user()->company();
-
-        $company_user = CompanyUser::whereUserId($user->id)->whereCompanyId($company->id)->first();
+        $company_user = CompanyUser::query()->where('user_id', $user->id)->where('company_id', $company->id)->first();
 
         if (! $company_user) {
             throw new ModelNotFoundException(ctrans('texts.company_user_not_found'));
-
-            return;
         }
 
-        if (auth()->user()->isAdmin()) {
+        if ($auth_user->isAdmin()) {
             $company_user->fill($request->input('company_user'));
         } else {
             $company_user->settings = $request->input('company_user')['settings'];
             $company_user->notifications = $request->input('company_user')['notifications'];
+
+            if(isset($request->input('company_user')['react_settings'])) {
+                $company_user->react_settings = $request->input('company_user')['react_settings'];
+            }
+
         }
 
         $company_user->save();
@@ -136,14 +140,16 @@ class CompanyUserController extends BaseController
 
     public function updatePreferences(UpdateCompanyUserPreferencesRequest $request, User $user)
     {
+        /** @var \App\Models\User $auth_user */
+        $auth_user = auth()->user();
+        $company = $auth_user->company();
 
-        $company = auth()->user()->company();
+        $company = $auth_user->company();
 
         $company_user = CompanyUser::whereUserId($user->id)->whereCompanyId($company->id)->first();
 
         if (! $company_user) {
             throw new ModelNotFoundException(ctrans('texts.company_user_not_found'));
-            return;
         }
 
         $this->entity_type = User::class;
@@ -152,7 +158,7 @@ class CompanyUserController extends BaseController
 
         $company_user->react_settings = $request->react_settings;
         $company_user->save();
-        
+
         return $this->itemResponse($user->fresh());
     }
 

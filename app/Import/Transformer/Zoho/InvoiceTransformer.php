@@ -43,11 +43,11 @@ class InvoiceTransformer extends BaseTransformer
             // 'client_id'    => $this->getClient($this->getString($invoice_data, 'Customer ID'), $this->getString($invoice_data, 'Primary Contact EmailID')),
             'client_id'    => $this->harvestClient($invoice_data),
             'number'       => $this->getString($invoice_data, 'Invoice Number'),
-            'date'         => isset($invoice_data['Invoice Date']) ? date('Y-m-d', strtotime($invoice_data['Invoice Date'])) : null,
-            'due_date'     => isset($invoice_data['Due Date']) ? date('Y-m-d', strtotime($invoice_data['Due Date'])) : null,
+            'date'         => isset($invoice_data['Invoice Date']) ? $this->parseDate($invoice_data['Invoice Date']) : null,
+            'due_date'     => isset($invoice_data['Due Date']) ? $this->parseDate($invoice_data['Due Date']) : null,
             'po_number'    => $this->getString($invoice_data, 'PurchaseOrder'),
             'public_notes' => $this->getString($invoice_data, 'Notes'),
-            'currency_id'  => $this->getCurrencyByCode($invoice_data, 'Currency'),
+            // 'currency_id'  => $this->getCurrencyByCode($invoice_data, 'Currency'),
             'amount'       => $this->getFloat($invoice_data, 'Total'),
             'balance'      => $this->getFloat($invoice_data, 'Balance'),
             'status_id'    => $invoiceStatusMap[$status =
@@ -60,7 +60,7 @@ class InvoiceTransformer extends BaseTransformer
         $line_items = [];
         foreach ($line_items_data as $record) {
             $item_notes_key = array_key_exists('Item Description', $record) ? 'Item Description' : 'Item Desc';
-            
+
             $line_items[] = [
                 'product_key'        => $this->getString($record, 'Item Name'),
                 'notes'              => $this->getString($record, $item_notes_key),
@@ -74,7 +74,7 @@ class InvoiceTransformer extends BaseTransformer
 
         if ($transformed['balance'] < $transformed['amount']) {
             $transformed['payments'] = [[
-                'date'   => isset($invoice_data['Last Payment Date']) ? date('Y-m-d', strtotime($invoice_data['Invoice Date'])) : date('Y-m-d'),
+                'date'   => isset($invoice_data['Last Payment Date']) ? $this->parseDate($invoice_data['Invoice Date']) : date('Y-m-d'),
                 'amount' => $transformed['amount'] - $transformed['balance'],
             ]];
         }
@@ -141,7 +141,6 @@ class InvoiceTransformer extends BaseTransformer
                 'postal_code' => $this->getString($invoice_data, 'Billing Code'),
                 'country_id' => $this->getCountryId($this->getString($invoice_data, 'Billing Country')),
             ],
-
             \App\Factory\ClientFactory::create(
                 $this->company->id,
                 $this->company->owner()->id
@@ -149,7 +148,7 @@ class InvoiceTransformer extends BaseTransformer
         );
 
         $client_repository = null;
-                
+
         return $client->id;
 
     }

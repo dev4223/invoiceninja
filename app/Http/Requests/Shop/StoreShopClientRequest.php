@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -32,7 +32,7 @@ class StoreShopClientRequest extends Request
      */
     private $company;
 
-    public function authorize() : bool
+    public function authorize(): bool
     {
         return true;
     }
@@ -155,23 +155,27 @@ class StoreShopClientRequest extends Request
 
     private function getCountryCode($country_code)
     {
-        $countries = Cache::get('countries');
+        
+        /** @var \Illuminate\Support\Collection<\App\Models\Country> */
+        $countries = app('countries');
 
-        $country = $countries->filter(function ($item) use ($country_code) {
+        $country = $countries->first(function ($item) use ($country_code) {
             return $item->iso_3166_2 == $country_code || $item->iso_3166_3 == $country_code;
-        })->first();
+        });
 
-        return (string) $country->id;
+        return $country ? (string) $country->id : '';
     }
 
     private function getCurrencyCode($code)
     {
-        $currencies = Cache::get('currencies');
+        
+        /** @var \Illuminate\Support\Collection<\App\Models\Country> */
+        $currencies = app('currencies');
 
-        $currency = $currencies->filter(function ($item) use ($code) {
+        $currency = $currencies->first(function ($item) use ($code) {
             return $item->code == $code;
-        })->first();
+        });
 
-        return (string) $currency->id;
+        return $currency ? (string) $currency->id : '';
     }
 }

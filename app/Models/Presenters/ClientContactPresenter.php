@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -32,11 +32,27 @@ class ClientContactPresenter extends EntityPresenter
 
     public function first_name()
     {
-        return $this->entity->first_name ?: '';
+        return $this->entity->first_name ?? '';
     }
 
     public function last_name()
     {
-        return $this->entity->last_name ?: '';
+        return $this->entity->last_name ?? '';
     }
+
+    public function search_display()
+    {
+        return $this->name().' <'.$this->entity->email.'>' ?? '';
+    }
+
+    public function phone()
+    {
+        return strlen($this->phone ?? '') > 1 ? $this->phone : '';
+    }
+
+    public function email()
+    {
+        return strlen($this->email ?? '') > 1 ? $this->email : '';
+    }
+
 }

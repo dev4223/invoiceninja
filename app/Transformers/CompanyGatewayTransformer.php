@@ -4,19 +4,19 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Transformers;
 
-use stdClass;
+use App\Models\CompanyGateway;
 use App\Models\Gateway;
 use App\Models\SystemLog;
-use App\Models\CompanyGateway;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use stdClass;
 
 /**
  * Class CompanyGatewayTransformer.
@@ -29,13 +29,13 @@ class CompanyGatewayTransformer extends EntityTransformer
     /**
      * @var array
      */
-    protected $defaultIncludes = [
+    protected array $defaultIncludes = [
     ];
 
     /**
      * @var array
      */
-    protected $availableIncludes = [
+    protected array $availableIncludes = [
         'system_logs',
         'gateway',
     ];
@@ -68,7 +68,7 @@ class CompanyGatewayTransformer extends EntityTransformer
             'show_shipping_address' => (bool) $company_gateway->show_shipping_address, //@deprecated
             'update_details' => (bool) $company_gateway->update_details,
             'config' => (string) $company_gateway->getConfigTransformed(),
-            'fees_and_limits' => $company_gateway->fees_and_limits ?: new stdClass,
+            'fees_and_limits' => $company_gateway->fees_and_limits ?: new stdClass(),
             'updated_at' => (int) $company_gateway->updated_at,
             'archived_at' => (int) $company_gateway->deleted_at,
             'created_at' => (int) $company_gateway->created_at,
@@ -80,6 +80,7 @@ class CompanyGatewayTransformer extends EntityTransformer
             'label' => (string) $company_gateway->label ?: '',
             'token_billing' => (string) $company_gateway->token_billing,
             'test_mode' => (bool) $company_gateway->isTestMode(),
+            'always_show_required_fields' => (bool) $company_gateway->always_show_required_fields,
         ];
     }
 

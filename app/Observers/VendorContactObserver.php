@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -49,7 +49,7 @@ class VendorContactObserver
         $vendor_contact_id = $vendorContact->id;
 
         $vendorContact->purchase_order_invitations()->delete();
-       
+
         PurchaseOrderInvitation::withTrashed()->where('vendor_contact_id', $vendor_contact_id)->cursor()->each(function ($invite) {
             if ($invite->purchase_order()->doesnthave('invitations')) {
                 $invite->purchase_order->service()->createInvitations();

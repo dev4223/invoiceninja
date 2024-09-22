@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -15,7 +15,7 @@ use App\Models\Quote;
 
 class QuoteFactory
 {
-    public static function create(int $company_id, int $user_id) :Quote
+    public static function create(int $company_id, int $user_id): Quote
     {
         $quote = new Quote();
         $quote->status_id = Quote::STATUS_DRAFT;

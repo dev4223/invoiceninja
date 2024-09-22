@@ -20,7 +20,7 @@ class UploadVendorRequest extends Request
      *
      * @return bool
      */
-    public function authorize() : bool
+    public function authorize(): bool
     {
         return auth()->user()->can('edit', $this->vendor);
     }
@@ -30,15 +30,15 @@ class UploadVendorRequest extends Request
         $rules = [];
 
         if ($this->file('documents') && is_array($this->file('documents'))) {
-            $rules['documents.*'] = $this->file_validation;
+            $rules['documents.*'] = $this->fileValidation();
         } elseif ($this->file('documents')) {
-            $rules['documents'] = $this->file_validation;
+            $rules['documents'] = $this->fileValidation();
         }
 
         if ($this->file('file') && is_array($this->file('file'))) {
-            $rules['file.*'] = $this->file_validation;
+            $rules['file.*'] = $this->fileValidation();
         } elseif ($this->file('file')) {
-            $rules['file'] = $this->file_validation;
+            $rules['file'] = $this->fileValidation();
         }
 
         $rules['is_public'] = 'sometimes|boolean';
@@ -50,8 +50,9 @@ class UploadVendorRequest extends Request
     {
         $input = $this->all();
 
-        if(isset($input['is_public'])) 
+        if(isset($input['is_public'])) {
             $input['is_public'] = $this->toBoolean($input['is_public']);
+        }
 
         $this->replace($input);
     }

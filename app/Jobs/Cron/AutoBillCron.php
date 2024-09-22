@@ -4,18 +4,18 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Jobs\Cron;
 
-use App\Models\Invoice;
 use App\Libraries\MultiDB;
+use App\Models\Invoice;
+use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Foundation\Bus\Dispatchable;
 
 class AutoBillCron
 {
@@ -39,7 +39,7 @@ class AutoBillCron
      *
      * @return void
      */
-    public function handle() : void
+    public function handle(): void
     {
         set_time_limit(0);
 
@@ -65,7 +65,7 @@ class AutoBillCron
 
             $auto_bill_partial_invoices->chunk(400, function ($invoices) {
                 foreach ($invoices as $invoice) {
-                    AutoBill::dispatch($invoice->id, false);
+                    AutoBill::dispatch($invoice->id, null);
                 }
 
                 sleep(2);
@@ -87,7 +87,7 @@ class AutoBillCron
 
             $auto_bill_invoices->chunk(400, function ($invoices) {
                 foreach ($invoices as $invoice) {
-                    AutoBill::dispatch($invoice->id, false);
+                    AutoBill::dispatch($invoice->id, null);
                 }
 
                 sleep(2);

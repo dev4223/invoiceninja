@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -79,7 +79,7 @@ class WebhookController extends BaseController
      *       ),
      *     )
      * @param WebhookFilters $filters
-     * @return Response|mixed
+     * @return Response| \Illuminate\Http\JsonResponse|mixed
      */
     public function index(WebhookFilters $filters)
     {
@@ -93,7 +93,7 @@ class WebhookController extends BaseController
      *
      * @param ShowWebhookRequest $request
      * @param Webhook $webhook
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -147,7 +147,7 @@ class WebhookController extends BaseController
      *
      * @param EditWebhookRequest $request
      * @param Webhook $webhook
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Get(
@@ -201,7 +201,7 @@ class WebhookController extends BaseController
      *
      * @param UpdateWebhookRequest $request
      * @param Webhook $webhook
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -262,7 +262,7 @@ class WebhookController extends BaseController
      * Show the form for creating a new resource.
      *
      * @param CreateWebhookRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -312,7 +312,7 @@ class WebhookController extends BaseController
      * Store a newly created resource in storage.
      *
      * @param StoreWebhookRequest $request
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      *
@@ -355,8 +355,11 @@ class WebhookController extends BaseController
             return response()->json('Invalid event', 400);
         }
 
-        $webhook = new Webhook;
-        $webhook->company_id = auth()->user()->company()->id;
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        $webhook = new Webhook();
+        $webhook->company_id = $user->company()->id;
         $webhook->user_id = auth()->user()->id;
         $webhook->event_id = $event_id;
         $webhook->target_url = $target_url;
@@ -375,7 +378,7 @@ class WebhookController extends BaseController
      *
      * @param DestroyWebhookRequest $request
      * @param Webhook $webhook
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @throws \Exception
@@ -430,7 +433,7 @@ class WebhookController extends BaseController
     /**
      * Perform bulk actions on the list view.
      *
-     * @return Response
+     * @return Response| \Illuminate\Http\JsonResponse
      *
      *
      * @OA\Post(
@@ -488,7 +491,7 @@ class WebhookController extends BaseController
         $webhooks->each(function ($webhook, $key) use ($action) {
             /** @var \App\Models\User $user */
             $user = auth()->user();
-            
+
             if ($user->can('edit', $webhook)) {
                 $this->base_repo->{$action}($webhook);
             }
@@ -502,11 +505,11 @@ class WebhookController extends BaseController
         $includes = '';
 
         match ($request->entity) {
-            'invoice' => $includes ='client',
-            'payment' => $includes ='invoices,client',
-            'project' => $includes ='client',
-            'purchase_order' => $includes ='vendor',
-            'quote' => $includes ='client',
+            'invoice' => $includes = 'client',
+            'payment' => $includes = 'invoices,client',
+            'project' => $includes = 'client',
+            'purchase_order' => $includes = 'vendor',
+            'quote' => $includes = 'client',
             default => $includes = ''
         };
 
@@ -517,7 +520,7 @@ class WebhookController extends BaseController
         if (!$entity) {
             return response()->json(['message' => ctrans('texts.record_not_found')], 400);
         }
-        
+
         /** @var \App\Models\User $user */
         $user = auth()->user();
 

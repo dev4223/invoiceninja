@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -20,7 +20,6 @@ use App\Models\Account;
 use App\Models\Company;
 use App\Models\CompanyToken;
 use App\Models\User;
-use App\Repositories\InvoiceRepository;
 use App\Utils\Traits\GeneratesCounter;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Console\Command;
@@ -30,7 +29,8 @@ use Illuminate\Support\Str;
 
 class CreateAccount extends Command
 {
-    use MakesHash, GeneratesCounter;
+    use MakesHash;
+    use GeneratesCounter;
 
     /**
      * @var string
@@ -56,24 +56,30 @@ class CreateAccount extends Command
     {
         $this->info(date('r').' Create Single Account...');
 
-        $this->warmCache();
-
         $this->createAccount();
     }
 
     private function createAccount()
     {
+        $settings = CompanySettings::defaults();
+
+        $settings->name = "Untitled Company";
+        $settings->currency_id = '1';
+        $settings->language_id = '1';
+
         $account = Account::factory()->create();
         $company = Company::factory()->create([
             'account_id' => $account->id,
             'portal_domain' => config('ninja.app_url'),
             'portal_mode' => 'domain',
+            'settings' => $settings,
         ]);
-        
+
         $company->client_registration_fields = ClientRegistrationFields::generate();
         $company->save();
-        
+
         $account->default_company_id = $company->id;
+        $account->set_react_as_default_ap = true;
         $account->save();
 
         $email = $this->option('email') ?? 'admin@example.com';
@@ -90,7 +96,7 @@ class CreateAccount extends Command
             'phone'             => '',
         ]);
 
-        $company_token = new CompanyToken;
+        $company_token = new CompanyToken();
         $company_token->user_id = $user->id;
         $company_token->company_id = $company->id;
         $company_token->account_id = $account->id;
@@ -113,28 +119,6 @@ class CreateAccount extends Command
         (new CreateCompanyTaskStatuses($company, $user))->handle();
         (new VersionCheck())->handle();
 
-        $this->warmCache();
     }
 
-    private function warmCache()
-    {
-        /* Warm up the cache !*/
-        $cached_tables = config('ninja.cached_tables');
-
-        foreach ($cached_tables as $name => $class) {
-            if ($name == 'payment_terms') {
-                $orderBy = 'num_days';
-            } elseif ($name == 'fonts') {
-                $orderBy = 'sort_order';
-            } elseif (in_array($name, ['currencies', 'industries', 'languages', 'countries', 'banks'])) {
-                $orderBy = 'name';
-            } else {
-                $orderBy = 'id';
-            }
-            $tableData = $class::orderBy($orderBy)->get();
-            if ($tableData->count()) {
-                Cache::forever($name, $tableData);
-            }
-        }
-    }
 }

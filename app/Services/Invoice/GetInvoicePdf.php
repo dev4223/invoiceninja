@@ -4,19 +4,17 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\Invoice;
 
-use App\Jobs\Entity\CreateEntityPdf;
-use App\Jobs\Invoice\CreateEInvoice;
+use App\Jobs\Entity\CreateRawPdf;
 use App\Models\ClientContact;
 use App\Models\Invoice;
 use App\Services\AbstractService;
-use Illuminate\Support\Facades\Storage;
 
 class GetInvoicePdf extends AbstractService
 {
@@ -36,19 +34,7 @@ class GetInvoicePdf extends AbstractService
             $invitation = $this->invoice->invitations->first();
         }
 
-        $path = $this->invoice->client->invoice_filepath($invitation);
+        return (new CreateRawPdf($invitation))->handle();
 
-        $file_path = $path.$this->invoice->numberFormatter().'.pdf';
-
-        // $disk = 'public';
-        $disk = config('filesystems.default');
-
-        $file = Storage::disk($disk)->exists($file_path);
-
-        if (! $file) {
-            $file_path = (new CreateEntityPdf($invitation))->handle();
-        }
-        
-        return $file_path;
     }
 }

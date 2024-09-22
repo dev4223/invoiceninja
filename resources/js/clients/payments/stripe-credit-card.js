@@ -39,7 +39,8 @@ class StripeCreditCard {
             hidePostalCode: document.querySelector('meta[name=stripe-require-postal-code]')?.content === "0",
             value: {
                 postalCode: document.querySelector('meta[name=client-postal-code]').content,
-            }
+            },
+            hideIcon: false,
         });
 
         return this;
@@ -231,4 +232,8 @@ let s = new StripeCreditCard(publishableKey, secret, onlyAuthorization, stripeCo
 
 s.handle();
 
+document.addEventListener('livewire:init', () => {
+
 Livewire.on('passed-required-fields-check', () => s.handle());
+
+});

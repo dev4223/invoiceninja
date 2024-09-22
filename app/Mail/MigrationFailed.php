@@ -4,11 +4,10 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
-
 
 namespace App\Mail;
 
@@ -48,7 +47,7 @@ class MigrationFailed extends Mailable
     public function build()
     {
         App::setLocale($this->company->getLocale());
-        
+
         $special_message = '';
 
         if ($this->exception instanceof ClientHostedMigrationException) {

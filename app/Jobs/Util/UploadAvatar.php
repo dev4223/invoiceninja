@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -21,7 +21,10 @@ use Illuminate\Support\Facades\Storage;
 
 class UploadAvatar implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     protected $file;
 
@@ -33,9 +36,9 @@ class UploadAvatar implements ShouldQueue
         $this->directory = $directory;
     }
 
-    public function handle() : ?string
+    public function handle(): ?string
     {
-        $tmp_file = sha1(time()).'.png';
+        $tmp_file = sha1(time()).'.png'; //@phpstan-ignore-line
 
         $im = imagecreatefromstring(file_get_contents($this->file));
         imagealphablending($im, false);

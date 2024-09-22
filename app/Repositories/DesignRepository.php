@@ -4,13 +4,14 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Repositories;
 
+use App\Utils\Ninja;
 use App\Models\Design;
 use Illuminate\Support\Str;
 
@@ -19,7 +20,7 @@ use Illuminate\Support\Str;
  */
 class DesignRepository extends BaseRepository
 {
-    public function delete($design) :Design
+    public function delete($design): Design
     {
         $design->name = $design->name.'_deleted_'.Str::random(5);
 
@@ -46,7 +47,7 @@ class DesignRepository extends BaseRepository
         if ($settings->purchase_order_design_id == $design->hashed_id) {
             $settings->purchase_order_design_id = 'Wpmbk5ezJn';
         }
-        
+
         $company->settings = $settings;
         $company->save();
 
@@ -54,4 +55,20 @@ class DesignRepository extends BaseRepository
 
         return $design;
     }
+
+    /**
+     * @param $entity
+     */
+    public function restore($design)
+    {
+
+        $design->name = str_ireplace("_deleted_", "_restored_", $design->name);
+
+        parent::restore($design);
+                
+        return $design;
+        
+    }
+
+
 }

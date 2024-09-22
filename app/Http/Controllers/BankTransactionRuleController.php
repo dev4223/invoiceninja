@@ -4,33 +4,32 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Http\Controllers;
 
-use App\Utils\Traits\MakesHash;
-use Illuminate\Support\Collection;
-use App\Models\BankTransactionRule;
-use App\Filters\BankTransactionFilters;
 use App\Factory\BankTransactionRuleFactory;
 use App\Filters\BankTransactionRuleFilters;
-use App\Repositories\BankTransactionRuleRepository;
-use App\Transformers\BankTransactionRuleTransformer;
 use App\Http\Requests\BankTransactionRule\BulkBankTransactionRuleRequest;
+use App\Http\Requests\BankTransactionRule\CreateBankTransactionRuleRequest;
+use App\Http\Requests\BankTransactionRule\DestroyBankTransactionRuleRequest;
 use App\Http\Requests\BankTransactionRule\EditBankTransactionRuleRequest;
 use App\Http\Requests\BankTransactionRule\ShowBankTransactionRuleRequest;
 use App\Http\Requests\BankTransactionRule\StoreBankTransactionRuleRequest;
-use App\Http\Requests\BankTransactionRule\CreateBankTransactionRuleRequest;
 use App\Http\Requests\BankTransactionRule\UpdateBankTransactionRuleRequest;
-use App\Http\Requests\BankTransactionRule\DestroyBankTransactionRuleRequest;
+use App\Models\BankTransactionRule;
+use App\Repositories\BankTransactionRuleRepository;
+use App\Services\Bank\BankMatchingService;
+use App\Transformers\BankTransactionRuleTransformer;
+use App\Utils\Traits\MakesHash;
 
 class BankTransactionRuleController extends BaseController
 {
     use MakesHash;
-    
+
     protected $entity_type = BankTransactionRule::class;
 
     protected $entity_transformer = BankTransactionRuleTransformer::class;
@@ -86,7 +85,7 @@ class BankTransactionRuleController extends BaseController
      *       ),
      *     )
      * @param BankTransactionRuleFilters $filters
-     * @return Response|mixed
+     * @return Response| \Illuminate\Http\JsonResponse|mixed
      */
     public function index(BankTransactionRuleFilters $filters)
     {
@@ -100,7 +99,7 @@ class BankTransactionRuleController extends BaseController
      *
      * @param ShowBankTransactionRuleRequest $request
      * @param BankTransactionRule $bank_transaction_rule
-     * @return \Illuminate\Http\JsonResponse
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\Response|\Illuminate\Http\Response
      *
      *
      * @OA\Get(
@@ -155,7 +154,7 @@ class BankTransactionRuleController extends BaseController
      *
      * @param EditBankTransactionRuleRequest $request
      * @param BankTransactionRule $bank_transaction_rule
-     * @return \Illuminate\Http\JsonResponse
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\Response
      *
      *
      * @OA\Get(
@@ -209,7 +208,7 @@ class BankTransactionRuleController extends BaseController
      *
      * @param UpdateBankTransactionRuleRequest $request
      * @param BankTransactionRule $bank_transaction_rule
-     * @return \Illuminate\Http\JsonResponse
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\Response
      *
      *
      *
@@ -256,8 +255,12 @@ class BankTransactionRuleController extends BaseController
      */
     public function update(UpdateBankTransactionRuleRequest $request, BankTransactionRule $bank_transaction_rule)
     {
-        //stubs for updating the model
-        $bank_transaction = $this->bank_transaction_repo->save($request->all(), $bank_transaction_rule);
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        $bank_transaction_rule = $this->bank_transaction_repo->save($request->all(), $bank_transaction_rule);
+
+        BankMatchingService::dispatch($user->company()->id, $user->company()->db);
 
         return $this->itemResponse($bank_transaction_rule->fresh());
     }
@@ -266,7 +269,7 @@ class BankTransactionRuleController extends BaseController
      * Show the form for creating a new resource.
      *
      * @param CreateBankTransactionRuleRequest $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\Response
      *
      *
      *
@@ -304,6 +307,7 @@ class BankTransactionRuleController extends BaseController
     {
         /** @var \App\Models\User $user **/
         $user = auth()->user();
+
         $bank_transaction_rule = BankTransactionRuleFactory::create($user->company()->id, $user->id);
 
         return $this->itemResponse($bank_transaction_rule);
@@ -313,7 +317,7 @@ class BankTransactionRuleController extends BaseController
      * Store a newly created resource in storage.
      *
      * @param StoreBankTransactionRuleRequest $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\Response
      *
      *
      *
@@ -349,11 +353,13 @@ class BankTransactionRuleController extends BaseController
      */
     public function store(StoreBankTransactionRuleRequest $request)
     {
-        
+
         /** @var \App\Models\User $user **/
         $user = auth()->user();
 
         $bank_transaction_rule = $this->bank_transaction_repo->save($request->all(), BankTransactionRuleFactory::create($user->company()->id, $user->id));
+
+        BankMatchingService::dispatch($user->company()->id, $user->company()->db);
 
         return $this->itemResponse($bank_transaction_rule);
     }
@@ -363,7 +369,7 @@ class BankTransactionRuleController extends BaseController
      *
      * @param DestroyBankTransactionRuleRequest $request
      * @param BankTransactionRule $bank_transaction_rule
-     * @return \Illuminate\Http\JsonResponse
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\Response
      *
      *
      * @throws \Exception
@@ -418,7 +424,7 @@ class BankTransactionRuleController extends BaseController
     /**
      * Perform bulk actions on the list view.
      *
-     * @return \Illuminate\Support\Collection
+     * @return \Illuminate\Http\Response|\Illuminate\Http\JsonResponse
      *
      * @OA\Post(
      *      path="/api/v1/bank_transation_rules/bulk",
@@ -469,7 +475,7 @@ class BankTransactionRuleController extends BaseController
         $action = $request->input('action');
 
         $ids = $request->input('ids');
-            
+
         $bank_transaction_rules = BankTransactionRule::withTrashed()
                                                      ->whereIn('id', $this->transformKeys($ids))
                                                      ->company()

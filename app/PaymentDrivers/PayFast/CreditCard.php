@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2023. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -142,7 +142,7 @@ class CreditCard
         $cgt['token'] = $data['token'];
         $cgt['payment_method_id'] = GatewayType::CREDIT_CARD;
 
-        $payment_meta = new \stdClass;
+        $payment_meta = new \stdClass();
         $payment_meta->exp_month = 'xx';
         $payment_meta->exp_year = 'xx';
         $payment_meta->brand = 'CC';
@@ -210,6 +210,8 @@ class CreditCard
     public function paymentResponse(Request $request)
     {
         $response_array = $request->all();
+
+        nlog($request->all());
 
         $state = [
             'server_response' => $request->all(),
