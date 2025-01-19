@@ -15,7 +15,7 @@ Invoice Ninja Version 5 is here! We've taken the best parts of version 4 and add
 - [Hosted](https://www.invoiceninja.com): Our hosted version is a Software as a Service (SaaS) solution. You're up and running in under 5 minutes, with no need to worry about hosting or server infrastructure.
 - [Self-Hosted](https://www.invoiceninja.org): For those who prefer to manage their own hosting and server infrastructure. This version gives you full control and flexibility.
 
-All Pro and Enterprise features from the hosted app are included in the open-source code. We offer a $30 per year white-label license to remove the Invoice Ninja branding from client-facing parts of the app.  
+All Pro and Enterprise features from the hosted app are included in the source-available code. We offer a $30 per year white-label license to remove the Invoice Ninja branding from client-facing parts of the app.  
 
 #### Get social with us
 
@@ -51,7 +51,9 @@ All Pro and Enterprise features from the hosted app are included in the open-sou
 * [Docker File](https://hub.docker.com/r/invoiceninja/invoiceninja/)
 * [Cloudron](https://www.cloudron.io/store/com.invoiceninja.cloudronapp2.html)
 * [Softaculous](https://www.softaculous.com/apps/ecommerce/Invoice_Ninja)
- 
+* [Elestio](https://elest.io/open-source/invoiceninja)
+* [YunoHost](https://apps.yunohost.org/app/invoiceninja5)
+
 ### Recommended Providers
 * [Stripe](https://stripe.com/)
 * [Postmark](https://postmarkapp.com/)

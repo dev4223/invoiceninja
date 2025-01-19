@@ -11,10 +11,13 @@
 
 namespace Tests\Feature;
 
-use App\Models\Expense;
 use Tests\TestCase;
-use App\Models\Invoice;
+use App\Models\Task;
 use App\Models\Quote;
+use App\Models\Client;
+use App\Models\Expense;
+use App\Models\Invoice;
+use App\Models\Project;
 use Tests\MockAccountData;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Database\Eloquent\Model;
@@ -23,8 +26,8 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 
 /**
- * @test
- * @covers App\Http\Controllers\ProjectController
+ * 
+ *  App\Http\Controllers\ProjectController
  */
 class ProjectApiTest extends TestCase
 {
@@ -34,7 +37,7 @@ class ProjectApiTest extends TestCase
 
     protected $faker;
 
-    protected function setUp() :void
+    protected function setUp(): void
     {
         parent::setUp();
 
@@ -46,6 +49,124 @@ class ProjectApiTest extends TestCase
 
         Model::reguard();
     }
+
+    public function testInvoiceProject()
+    {
+
+        $p = Project::factory()->create([
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'client_id' => $this->client->id,
+            'name' => 'Best Project',
+            'task_rate' => 100,
+        ]);
+
+        $t = Task::factory()->create([
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'project_id' => $p->id,
+            'client_id' => $this->client->id,
+            'time_log' => '[[1731391977,1731399177,"item description",true],[1731399178,1731499177,"item description 2", true]]',
+            'description' => 'Top level Task Description',
+        ]);
+
+        $e = Expense::factory()->create([
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'project_id' => $p->id,
+            'amount' => 100,
+            'public_notes' => 'Expensive Business!!',
+            'should_be_invoiced' => true,
+        ]);
+
+        $data = [
+            'action' => 'invoice',
+            'ids' => [$p->hashed_id],
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson("/api/v1/projects/bulk", $data);
+
+        $response->assertStatus(200);
+
+        $arr = $response->json();
+
+    }
+
+    public function testBulkProjectInvoiceValidation()
+    {
+        
+        $p1 = Project::factory()->create([
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'client_id' => $this->client->id,
+        ]);
+
+
+        $c = Client::factory()->create([
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+        ]);
+
+        $p2 = Project::factory()->create([
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'client_id' => $c->id,
+        ]);
+
+
+        $data = [
+            'ids' => [$p1->hashed_id, $p2->hashed_id],
+            'action' => 'invoice',
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson("/api/v1/projects/bulk", $data);
+
+        $response->assertStatus(422);
+
+    }
+
+    public function testBulkProjectInvoiceValidationPasses()
+    {
+        
+        $p1 = Project::factory()->create([
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'client_id' => $this->client->id,
+        ]);
+
+
+        $c = Client::factory()->create([
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+        ]);
+
+        $p2 = Project::factory()->create([
+            'user_id' => $this->user->id,
+            'company_id' => $this->company->id,
+            'client_id' => $c->id,
+        ]);
+
+
+        $data = [
+            'ids' => [$p1->hashed_id],
+            'action' => 'invoice',
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->postJson("/api/v1/projects/bulk", $data);
+
+        $response->assertStatus(200);
+
+    }
+
 
     public function testCreateProjectWithNullTaskRate()
     {
@@ -66,7 +187,7 @@ class ProjectApiTest extends TestCase
         $arr = $response->json();
 
         $this->assertEquals(0, $arr['data']['task_rate']);
-            
+
     }
 
     public function testCreateProjectWithNullTaskRate2()
@@ -109,7 +230,7 @@ class ProjectApiTest extends TestCase
         $arr = $response->json();
 
         $this->assertEquals(10, $arr['data']['task_rate']);
-            
+
     }
 
     public function testCreateProjectWithNullTaskRate5()
@@ -155,7 +276,7 @@ class ProjectApiTest extends TestCase
         $arr = $response->json();
 
         $this->assertEquals(10, $arr['data']['task_rate']);
-            
+
     }
 
     public function testProjectIncludesZeroCount()
@@ -185,7 +306,7 @@ class ProjectApiTest extends TestCase
             'project_id' => $this->project->id,
         ]);
 
-        
+
         $e = Expense::factory()->create([
             'user_id' => $this->user->id,
             'company_id' => $this->company->id,
@@ -193,7 +314,7 @@ class ProjectApiTest extends TestCase
             'project_id' => $this->project->id,
         ]);
 
-        
+
         $q = Quote::factory()->create([
             'user_id' => $this->user->id,
             'company_id' => $this->company->id,

@@ -46,9 +46,22 @@ class BankTransactionRepository extends BaseRepository
         $bts = (new MatchBankTransactions($user->company()->id, $user->company()->db, $data))->handle();
     }
 
+
+    public function delete($entity)
+    {
+        if (!$entity || $entity->is_deleted) {
+            return;
+        }
+
+        $bt = $this->unlink($entity);
+
+       parent::delete($bt);
+
+    }
+
     public function unlink($bt)
     {
-        if($bt->payment()->exists()) {
+        if ($bt->payment()->exists()) {
             $bt->payment->transaction_id = null;
             $bt->payment_id = null;
         }
@@ -69,5 +82,6 @@ class BankTransactionRepository extends BaseRepository
         $bt->ninja_category_id = null;
         $bt->push();
 
+        return $bt->fresh();
     }
 }
