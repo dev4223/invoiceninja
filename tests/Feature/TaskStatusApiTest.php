@@ -11,17 +11,18 @@
 
 namespace Tests\Feature;
 
+use Tests\TestCase;
+use App\Models\Task;
 use App\Models\TaskStatus;
+use Tests\MockAccountData;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Session;
-use Tests\MockAccountData;
-use Tests\TestCase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 
 /**
- * @test
- * @covers App\Http\Controllers\TaskStatusController
+ * 
+ *  App\Http\Controllers\TaskStatusController
  */
 class TaskStatusApiTest extends TestCase
 {
@@ -31,7 +32,7 @@ class TaskStatusApiTest extends TestCase
 
     public $faker;
 
-    protected function setUp() :void
+    protected function setUp(): void
     {
         parent::setUp();
 
@@ -44,22 +45,46 @@ class TaskStatusApiTest extends TestCase
         Model::reguard();
     }
 
+    public function testTaskStatusProperty()
+    {
+        $t = Task::factory()->create([
+            'company_id' => $this->company->id,
+            'user_id' => $this->user->id,
+        ]);
+
+        $this->assertNull($t->status_order);
+
+        $update = [
+            'description' => 'newdescription'
+        ];
+
+        $response = $this->withHeaders([
+            'X-API-SECRET' => config('ninja.api_secret'),
+            'X-API-TOKEN' => $this->token,
+        ])->put('/api/v1/tasks/'.$t->hashed_id, $update);
+
+        $response->assertStatus(200);
+        
+    }
+
     public function testSorting()
     {
-        TaskStatus::factory()->count(5)->create([
+        TaskStatus::query()->where('company_id', $this->company->id)->cursor()->each(function ($ts){
+            $ts->forceDelete();
+        });
+
+        TaskStatus::factory()->count(10)->create([
             'company_id' => $this->company->id,
-            'user_id' => $this->user->id
+            'user_id' => $this->user->id,
+            'status_order' => 99999,
         ]);
-        
-        
+
         $t = TaskStatus::where('company_id', '=', $this->company->id)->orderBy('id', 'desc');
-        
+
         $this->assertEquals(10, $t->count());
         $task_status = $t->first();
 
         $id = $task_status->id;
-        
-        nlog("setting {$id} to index 1");
 
         $data = [
             'status_order' => 1,
@@ -70,10 +95,11 @@ class TaskStatusApiTest extends TestCase
             'X-API-TOKEN' => $this->token,
         ])->put('/api/v1/task_statuses/'.$task_status->hashed_id, $data);
 
-        $t = TaskStatus::where('company_id', '=', $this->company->id)->orderBy('status_order', 'asc')->first();
+
+        $t = TaskStatus::where('company_id', $this->company->id)->orderBy('status_order', 'asc')->first();
 
         $this->assertEquals($id, $t->id);
-        
+
     }
 
     public function testTaskStatusGetFilter()
