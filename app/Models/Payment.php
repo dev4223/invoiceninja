@@ -4,22 +4,23 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
 
-use App\Events\Payment\PaymentWasRefunded;
-use App\Events\Payment\PaymentWasVoided;
-use App\Services\Ledger\LedgerService;
-use App\Services\Payment\PaymentService;
 use App\Utils\Ninja;
 use App\Utils\Number;
-use App\Utils\Traits\Inviteable;
+use App\DataMapper\PaymentSync;
 use App\Utils\Traits\MakesHash;
+use App\Utils\Traits\Inviteable;
+use App\Services\Ledger\LedgerService;
+use App\Events\Payment\PaymentWasVoided;
+use App\Services\Payment\PaymentService;
 use App\Utils\Traits\Payment\Refundable;
+use App\Events\Payment\PaymentWasRefunded;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -64,6 +65,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string|null $custom_value4
  * @property int|null $transaction_id
  * @property string|null $idempotency_key
+ * @property object|null $sync
  * @property-read \App\Models\User|null $assigned_user
  * @property-read \App\Models\Client $client
  * @property-read \App\Models\Company $company
@@ -168,6 +170,7 @@ class Payment extends BaseModel
         'is_deleted' => 'bool',
         'meta' => 'object',
         'refund_meta' => 'array',
+        'sync' => PaymentSync::class,
     ];
 
     protected $with = [
@@ -323,7 +326,10 @@ class Payment extends BaseModel
                 return '<h6><span class="badge badge-danger">'.ctrans('texts.payment_status_3').'</span></h6>';
             case self::STATUS_COMPLETED:
 
-                if ($this->amount > $this->applied) {
+                if($this->applied == 0){
+                    return '<h6><span class="badge badge-info">' . ctrans('texts.unapplied') . '</span></h6>';
+                }
+                elseif ($this->amount > $this->applied) {
                     return '<h6><span class="badge badge-info">' . ctrans('texts.partially_unapplied') . '</span></h6>';
                 }
 

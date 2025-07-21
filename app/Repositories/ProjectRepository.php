@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -42,13 +42,16 @@ class ProjectRepository extends BaseRepository
                         if (!$task->isRunning())
                         { 
                             if ($key == 0 && $task->company->invoice_task_project) {
-                                $body = '<div class="project-header">'.$task->project->name.'</div>' .$task->project?->public_notes ?? '';
+                                $body = '<div class="project-header">'.$task->project->name.'</div>' .$task->project?->public_notes ?? ''; //@phpstan-ignore-line
                                 $body .= '<div class="task-time-details">'.$task->description().'</div>';
+                            }
+                            elseif(!$task->company->invoice_task_hours && !$task->company->invoice_task_timelog && !$task->company->invoice_task_datelog && !$task->company->invoice_task_item_description) {
+                                $body = $task->description ?? '';
                             }
                             else {
                                 $body = '<div class="task-time-details">'.$task->description().'</div>';
                             }
-
+                            
                             $item = new InvoiceItem();
                             $item->quantity = $task->getQuantity();
                             $item->cost = $task->getRate();

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -199,12 +199,12 @@ class Peppol extends AbstractService
 
             $this->p_invoice->DocumentCurrencyCode = $this->invoice->client->currency()->code;
 
-            if ($this->invoice->date && $this->invoice->due_date) {
-                $ip = new InvoicePeriod();
-                $ip->StartDate = new \DateTime($this->invoice->date);
-                $ip->EndDate = new \DateTime($this->invoice->due_date);
-                $this->p_invoice->InvoicePeriod = [$ip];
-            }
+            // if ($this->invoice->date && $this->invoice->due_date) {
+            //     $ip = new InvoicePeriod();
+            //     $ip->StartDate = new \DateTime($this->invoice->date);
+            //     $ip->EndDate = new \DateTime($this->invoice->due_date);
+            //     $this->p_invoice->InvoicePeriod = [$ip];
+            // }
 
             if ($this->invoice->project_id) {
                 $pr = new \InvoiceNinja\EInvoice\Models\Peppol\ProjectReferenceType\ProjectReference();
@@ -227,6 +227,7 @@ class Peppol extends AbstractService
             $this->setOrderReference()
                  ->setTaxBreakdown()
                  ->setPaymentTerms()
+                 ->addAttachments()
                  ->standardPeppolRules();
 
             //isolate this class to only peppol changes
@@ -254,6 +255,7 @@ class Peppol extends AbstractService
      */
     public function decode(mixed $invoice): self
     {
+        
         $this->p_invoice = $this->e->decode('Peppol', json_encode($invoice), 'json');
 
         return $this;
@@ -267,7 +269,7 @@ class Peppol extends AbstractService
     private function setInvoice(): self
     {
         /** Handle Existing Document */
-        if ($this->invoice->e_invoice && isset($this->invoice->e_invoice->Invoice)) {
+        if ($this->invoice->e_invoice && isset($this->invoice->e_invoice->Invoice)  && isset($this->invoice->e_invoice->Invoice->ID)) {
 
             $this->decode($this->invoice->e_invoice->Invoice);
 
@@ -404,22 +406,53 @@ class Peppol extends AbstractService
     private function setOrderReference(): self
     {
 
-
-        if (strlen($this->invoice->po_number ?? '') > 1) {
-
             $this->p_invoice->BuyerReference = $this->invoice->po_number ?? '';
 
             $order_reference = new OrderReference();
             $id = new ID();
-            $id->value = $this->invoice->po_number;
+            $id->value = strlen($this->invoice->po_number ?? '') > 1 ? $this->invoice->po_number : $this->invoice->number;
 
             $order_reference->ID = $id;
             $this->p_invoice->OrderReference = $order_reference;
 
-        }
-
         return $this;
 
+    }
+
+    private function addAttachments(): self
+    {
+
+        // Only the invoice itself to start with:
+        $filename = $this->invoice->getFileName();
+        $pdf = $this->invoice->service()->getInvoicePdf();
+        $mime_code = 'application/pdf';
+
+        $adr = new \InvoiceNinja\EInvoice\Models\Peppol\DocumentReferenceType\AdditionalDocumentReference();
+        
+        // Set ID
+        $id = new \InvoiceNinja\EInvoice\Models\Peppol\IdentifierType\ID();
+        $id->value = $filename;
+        $adr->ID = $id;
+
+        // Create EmbeddedDocumentBinaryObject
+        $attachment = new \InvoiceNinja\EInvoice\Models\Peppol\AttachmentType\Attachment();
+        
+        $binary = new \InvoiceNinja\EInvoice\Models\Peppol\EmbeddedDocumentBinaryObjectType\EmbeddedDocumentBinaryObject();
+        $binary->value = base64_encode($pdf);
+        $binary->mimeCode = $mime_code;
+        $binary->filename = $filename;
+        $attachment->EmbeddedDocumentBinaryObject = $binary;
+        
+        $adr->Attachment = $attachment;
+
+        // Add to invoice
+        if (!isset($this->p_invoice->AdditionalDocumentReference)) {
+            $this->p_invoice->AdditionalDocumentReference = [];
+        }
+        
+        $this->p_invoice->AdditionalDocumentReference[] = $adr;
+
+        return $this;
     }
 
     /**
@@ -987,14 +1020,14 @@ class Peppol extends AbstractService
             $pi = new PartyIdentification();
             $vatID = new ID();
             $vatID->schemeID = $this->resolveScheme();
-            $vatID->value = $this->override_vat_number ?? preg_replace("/[^a-zA-Z0-9]/", "", $this->company->settings->vat_number); //todo if we are cross border - switch to the supplier local vat number
+            $vatID->value = $this->override_vat_number ?? preg_replace("/[^a-zA-Z0-9]/", "", $this->invoice->company->settings->vat_number); //todo if we are cross border - switch to the supplier local vat number
 
             $pi->ID = $vatID;
             $party->PartyIdentification[] = $pi;
             $pts = new \InvoiceNinja\EInvoice\Models\Peppol\PartyTaxSchemeType\PartyTaxScheme();
 
             $companyID = new \InvoiceNinja\EInvoice\Models\Peppol\IdentifierType\CompanyID();
-            $companyID->value = $this->override_vat_number ?? preg_replace("/[^a-zA-Z0-9]/", "", $this->company->settings->vat_number);
+            $companyID->value = $this->override_vat_number ?? preg_replace("/[^a-zA-Z0-9]/", "", $this->invoice->company->settings->vat_number);
             $pts->CompanyID = $companyID;
 
             $ts = new TaxScheme();
@@ -1102,25 +1135,25 @@ class Peppol extends AbstractService
         $id->schemeID = $this->resolveScheme(true);
         $party->EndpointID = $id;
         
-
-
         $party->PartyName[] = $party_name;
 
-        $address = new Address();
-        $address->CityName = $this->invoice->client->city;
-        $address->StreetName = $this->invoice->client->address1;
+        $locationData = $this->invoice->service()->location();
 
-        if (strlen($this->invoice->client->address2 ?? '') > 1) {
-            $address->AdditionalStreetName = $this->invoice->client->address2;
+        $address = new Address();
+        $address->CityName = $locationData['city'];
+        $address->StreetName = $locationData['address1'];
+
+        if (strlen($locationData['address2'] ?? '') > 1) {
+            $address->AdditionalStreetName = $locationData['address2'];
         }
 
-        $address->PostalZone = $this->invoice->client->postal_code;
+        $address->PostalZone = $locationData['postal_code'];
         // $address->CountrySubentity = $this->invoice->client->state;
 
         $country = new Country();
 
         $ic = new IdentificationCode();
-        $ic->value = substr($this->invoice->client->country->iso_3166_2, 0, 2);
+        $ic->value = substr($locationData['country_code'], 0, 2);
 
         $country->IdentificationCode = $ic;
         $address->Country = $country;
@@ -1147,24 +1180,28 @@ class Peppol extends AbstractService
 
     private function getDelivery(): array
     {
+        $locationData = $this->invoice->service()->location();
         $delivery = new \InvoiceNinja\EInvoice\Models\Peppol\DeliveryType\Delivery();
         $location = new \InvoiceNinja\EInvoice\Models\Peppol\LocationType\DeliveryLocation();
 
         $address = new Address();
-        // $address->CityName = $this->invoice->client->city;
-        // $address->StreetName = $this->invoice->client->address1;
+        $address->CityName = $locationData['shipping_city'];
+        $address->StreetName = $locationData['shipping_address1'];
 
-        // if (strlen($this->invoice->client->address2 ?? '') > 1) {
-        //     $address->AdditionalStreetName = $this->invoice->client->address2;
-        // }
+        if (strlen($locationData['shipping_address2'] ?? '') > 1) {
+            $address->AdditionalStreetName = $locationData['shipping_address2'];
+        }
 
-        // $address->PostalZone = $this->invoice->client->postal_code;
-        // $address->CountrySubentity = $this->invoice->client->state;
-
+        $address->PostalZone = $locationData['shipping_postal_code'];
+        
         $country = new Country();
 
         $ic = new IdentificationCode();
-        $shipping = $this->invoice->client->shipping_country ? $this->invoice->client->shipping_country->iso_3166_2 : $this->invoice->client->country->iso_3166_2;
+        $ic->value = substr($locationData['shipping_country_code'], 0, 2);
+        $country->IdentificationCode = $ic;
+
+        $ic = new IdentificationCode();
+        $shipping = $locationData['shipping_country_code'];
         $ic->value = $shipping;
 
         $country->IdentificationCode = $ic;
@@ -1256,6 +1293,12 @@ class Peppol extends AbstractService
             }
         }
 
+        if(isset($this->invoice->e_invoice->Invoice)) {
+            foreach(get_object_vars($this->invoice->e_invoice->Invoice) as $prop => $value) {
+                $this->p_invoice->{$prop} = $value;
+            }
+        }
+
         // Plucks special overriding properties scanning the correct settings level
         $settings = [
             'AccountingCostCode' => 7,
@@ -1280,6 +1323,13 @@ class Peppol extends AbstractService
                 $this->p_invoice->{$prop} = $prop_value;
             }
 
+        }
+
+        if(!isset($this->p_invoice->InvoicePeriod)) {
+            $ip = new InvoicePeriod();
+            $ip->StartDate = new \DateTime($this->invoice->date);
+            $ip->EndDate = new \DateTime($this->invoice->due_date ?? $this->invoice->date);
+            $this->p_invoice->InvoicePeriod = [$ip];
         }
 
         return $this;
@@ -1513,9 +1563,9 @@ class Peppol extends AbstractService
     private function resolveScheme(bool $is_client = false): string
     {
 
-        $vat_number = $is_client ? preg_replace("/[^a-zA-Z0-9]/", "", $this->invoice->client->vat_number) : preg_replace("/[^a-zA-Z0-9]/", "", $this->company->settings->vat_number);
-        $tax_number = $is_client ? preg_replace("/[^a-zA-Z0-9]/", "", $this->invoice->client->id_number) : preg_replace("/[^a-zA-Z0-9]/", "", $this->company->settings->id_number);
-        $country_code = $is_client ? $this->invoice->client->country->iso_3166_2 : $this->company->country()->iso_3166_2;
+        $vat_number = $is_client ? preg_replace("/[^a-zA-Z0-9]/", "", $this->invoice->client->vat_number ?? '') : preg_replace("/[^a-zA-Z0-9]/", "", $this->invoice->company->settings->vat_number ?? '');
+        $tax_number = $is_client ? preg_replace("/[^a-zA-Z0-9]/", "", $this->invoice->client->id_number ?? ''): preg_replace("/[^a-zA-Z0-9]/", "", $this->invoice->company->settings->id_number ?? '');
+        $country_code = $is_client ? $this->invoice->client->country->iso_3166_2 : $this->invoice->company->country()->iso_3166_2;
 
         return '0037';
     }

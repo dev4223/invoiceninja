@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -73,7 +73,7 @@ class ZipInvoices implements ShouldQueue
         $invitation = $this->invoices->first()->invitations->first();
 
         if (!$invitation) {
-            nlog("no Invoice Invitations");
+            nlog("ZipInvoices:: no Invoice Invitations");
             return;
         }
 
@@ -118,7 +118,7 @@ class ZipInvoices implements ShouldQueue
             broadcast(new DownloadAvailable($storage_url, $message, $this->user));
 
         } catch (\PhpZip\Exception\ZipException $e) {
-            nlog('could not make zip => '.$e->getMessage());
+            nlog('ZipInvoices:: could not make zip => '.$e->getMessage());
         } finally {
             $zipFile->close();
         }

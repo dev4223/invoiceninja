@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -534,17 +534,15 @@ trait GeneratesCounter
         $reset_counter_frequency = (int) $client->getSetting('reset_counter_frequency_id');
         $settings_entity = $client->getSettingEntity('reset_counter_frequency_id');
         $settings = $settings_entity->settings;
-
+        
         if ($reset_counter_frequency == 0) {
+            
             if ($client->getSetting('reset_counter_date')) {
-                // $settings = $client->company->settings;
                 $settings->reset_counter_date = "";
                 $settings_entity->settings = $settings;
                 $settings_entity->saveQuietly();
-                // $client->company->settings = $settings;
-                // $client->company->save();
             }
-
+            
             return;
         }
 

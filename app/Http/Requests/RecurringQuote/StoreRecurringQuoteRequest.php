@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,7 +12,6 @@
 namespace App\Http\Requests\RecurringQuote;
 
 use App\Http\Requests\Request;
-use App\Http\ValidationRules\Recurring\UniqueRecurringQuoteNumberRule;
 use App\Models\Client;
 use App\Models\RecurringQuote;
 use App\Utils\Traits\CleanLineItems;
@@ -63,7 +62,7 @@ class StoreRecurringQuoteRequest extends Request
 
         $rules['frequency_id'] = 'required|integer|digits_between:1,12';
 
-        $rules['number'] = new UniqueRecurringQuoteNumberRule($this->all());
+        $rules['number'] = ['bail', 'nullable', \Illuminate\Validation\Rule::unique('recurring_quotes')->where('company_id', $user->company()->id)];
 
         return $rules;
     }

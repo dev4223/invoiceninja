@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -93,20 +93,21 @@ class SendEDocument implements ShouldQueue
             'account_key' => $model->company->account->key,
             'e_invoicing_token' => $model->company->account->e_invoicing_token,
         ];
-
+        
         //Self Hosted Sending Code Path
         if (Ninja::isSelfHost() && ($model instanceof Invoice) && $model->company->peppolSendingEnabled()) {
 
             $r = Http::withHeaders([...$this->getHeaders(), 'X-EInvoice-Token' => $model->company->account->e_invoicing_token])
                 ->post(config('ninja.hosted_ninja_url')."/api/einvoice/submission", $payload);
 
-            if ($r->hasHeader('X-EINVOICE-QUOTA')) {
-                $account = $model->company->account;
-                $account->e_invoice_quota = (int) $r->header('X-EINVOICE-QUOTA');
-                $account->save();
-            }
-
             if ($r->successful()) {
+                
+                if ($r->hasHeader('X-EINVOICE-QUOTA')) {
+                    $account = $model->company->account;
+                    $account->e_invoice_quota = (int) $r->header('X-EINVOICE-QUOTA');
+                    $account->save();
+                }
+
                 nlog("Model {$model->number} was successfully sent for third party processing via hosted Invoice Ninja");
                 $data = $r->json();
                 return $this->writeActivity($model, Activity::EINVOICE_DELIVERY_SUCCESS, $data['guid']);
@@ -216,9 +217,9 @@ class SendEDocument implements ShouldQueue
 
         if($activity_id == Activity::EINVOICE_DELIVERY_SUCCESS){
 
-            $std = new \stdClass();
-            $std->guid = str_replace('"', '', $notes);
-            $model->backup = $std;
+            $backup = ($model->backup && is_object($model->backup)) ? $model->backup : new \stdClass();
+            $backup->guid = str_replace('"', '', $notes);
+            $model->backup = $backup;
             $model->saveQuietly();
 
         }

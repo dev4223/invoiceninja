@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -247,7 +247,7 @@ class EmailDefaults
 
         //06-06-2023 ensure we do not parse markdown in custom templates
         if ($this->template != 'custom' && $this->template != 'email.template.custom') {
-            $this->email->email_object->body = $this->parseMarkdownToHtml($this->email->email_object->body);
+            $this->email->email_object->body = \App\Services\Pdf\Markdown::parse($this->email->email_object->body);
         }
 
         return $this;
@@ -326,7 +326,7 @@ class EmailDefaults
             }
         }
         /** E-Invoice xml file */
-        if ($this->email->email_object->settings->enable_e_invoice && !$this->email->email_object->settings->merge_e_invoice_to_pdf) {
+        if ($this->email->email_object->settings->enable_e_invoice && !($this->email->email_object->settings->merge_e_invoice_to_pdf ?? false)) {
 
             $xml_string = false;
 
@@ -408,18 +408,4 @@ class EmailDefaults
         return $this;
     }
 
-    /**
-     * Converts any markdown to HTML in the email
-     *
-     * @param  string $markdown The body to convert
-     * @return string           The parsed markdown response
-     */
-    private function parseMarkdownToHtml(string $markdown): string
-    {
-        $converter = new CommonMarkConverter([
-            'allow_unsafe_links' => false,
-        ]);
-
-        return $converter->convert($markdown);
-    }
 }

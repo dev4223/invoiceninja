@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -403,16 +403,24 @@ class BaseDriver extends AbstractPaymentDriver
         }
 
         $invoice = $this->payment_hash->fee_invoice;
+        
+        if(!$invoice)
+            return;
 
-        $fee_count = collect($invoice->line_items)
-                        ->map(function ($item) {
-                            $item->gross_line_total = round($item->gross_line_total, 2);
-                            return $item;
-                        })
-                        ->whereIn('type_id', ['3','4'])
+        if (collect($invoice->line_items)->contains('unit_code', $this->payment_hash->hash)) {
+            $invoice->service()->toggleFeesPaid($this->payment_hash->hash)->save();
+            return;
+        }
+
+        // $confirmed_fee_count = collect($invoice->line_items)
+        //                 ->where('type_id', '4')
+        //                 ->count();
+
+        $unconfirmed_fee_count = collect($invoice->line_items)
+                        ->where('type_id', '3')
                         ->count();
-
-        if ($invoice && $fee_count == 0) {
+                
+        if ($unconfirmed_fee_count == 0) {
 
             nlog("apparently no fee, so injecting here!");
 
@@ -466,7 +474,7 @@ class BaseDriver extends AbstractPaymentDriver
 
         } else {
 
-            $invoice->service()->toggleFeesPaid()->save();
+            $invoice->service()->toggleFeesPaid($this->payment_hash->hash)->save();
 
         }
 
@@ -594,7 +602,7 @@ class BaseDriver extends AbstractPaymentDriver
             $invoices = Invoice::query()->whereIn('id', $this->transformKeys(array_column($this->payment_hash->invoices(), 'invoice_id')))->withTrashed()->get();
 
             $invoices->first()->invitations->each(function ($invitation) use ($nmo) {
-                if ((bool) $invitation->contact->send_email !== false && $invitation->contact->email) {
+                if ((bool) $invitation->contact->send_email !== false && $invitation->contact->email && !$invitation->contact->is_locked) {
                     $nmo->to_user = $invitation->contact;
                     NinjaMailerJob::dispatch($nmo);
                 }

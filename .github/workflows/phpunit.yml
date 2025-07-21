@@ -41,6 +41,7 @@ jobs:
       NINJA_LICENSE: ${{ secrets.ninja_license }}
       TRAVIS: true
       MAIL_MAILER: log
+      PDF_GENERATOR: hosted_ninja
 
     services:
       mariadb:
@@ -119,7 +120,7 @@ jobs:
         
     - name: Migrate Database
       run: |
-        php artisan migrate:fresh --seed --force && php artisan db:seed --force
+        php artisan migrate && php artisan db:seed
   
     - name: Run Testsuite
       run: |

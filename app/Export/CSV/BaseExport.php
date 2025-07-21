@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -1675,7 +1675,14 @@ class BaseExport
         $currency = $this->company->currency();
 
         foreach ($entity as $key => $value) {
+
             if (is_float($value)) {
+
+                //Careful not to convert discount % to currency
+                if($key == 'discount' && isset($entity->is_amount_discount) && !$entity->is_amount_discount) {
+                    continue;
+                }
+
                 $entity[$key] = \App\Utils\Number::formatValue($value, $currency);
             }
         }

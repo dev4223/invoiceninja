@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -252,7 +252,12 @@ class BaseRule implements RuleInterface
 
                 $tax_data = $company->origin_tax_data;
 
+            } elseif($this->client->location && $this->client->location->is_shipping_location && $this->client->location->tax_data){
+
+                $tax_data = $this->client->location->tax_data;
+                
             } elseif ($this->client->tax_data) {
+
 
                 $tax_data = $this->client->tax_data;
 

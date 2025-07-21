@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -159,14 +159,29 @@ class UpdateCompanyRequest extends Request
             $input['e_invoice'] = $this->company->filterNullsRecursive($input['e_invoice']);
         }
 
+        if(isset($input['calculate_taxes']) && $input['calculate_taxes'] == true) {
+            $input['settings']['tax_name1'] = '';
+            $input['settings']['tax_rate1'] = 0;
+            $input['settings']['tax_name2'] = '';
+            $input['settings']['tax_rate2'] = 0;
+            $input['settings']['tax_name3'] = '';
+            $input['settings']['tax_rate3'] = 0;
+            $input['enabled_tax_rates'] = 0;
+            $input['enabled_item_tax_rates'] = 1;
+        }
+
+        if(isset($input['session_timeout']) && $input['session_timeout'] < 0) {
+            $input['session_timeout'] = 0;
+        }
+
         $this->replace($input);
     }
 
 
-    private function getCountryCode()
-    {
-        return auth()->user()->company()->country()->iso_3166_2;
-    }
+    // private function getCountryCode()
+    // {
+    //     return auth()->user()->company()->country()->iso_3166_2;
+    // }
 
     /**
      * For the hosted platform, we restrict the feature settings.
@@ -184,7 +199,10 @@ class UpdateCompanyRequest extends Request
 
         if (Ninja::isHosted()) {
             foreach ($this->protected_input as $protected_var) {
-                $settings[$protected_var] = str_replace("script", "", $settings[$protected_var]);
+
+                if(isset($settings[$protected_var])) {
+                    $settings[$protected_var] = str_replace("script", "", $settings[$protected_var]);
+                }
             }
         }
 

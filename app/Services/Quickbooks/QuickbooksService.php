@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -20,12 +20,13 @@ use App\Factory\InvoiceFactory;
 use App\Factory\ProductFactory;
 use App\DataMapper\QuickbooksSync;
 use App\Factory\ClientContactFactory;
+use App\Services\Quickbooks\Models\QbClient;
 use QuickBooksOnline\API\Core\CoreConstants;
 use App\Services\Quickbooks\Models\QbInvoice;
+use App\Services\Quickbooks\Models\QbPayment;
 use App\Services\Quickbooks\Models\QbProduct;
 use QuickBooksOnline\API\DataService\DataService;
 use App\Services\Quickbooks\Jobs\QuickbooksImport;
-use App\Services\Quickbooks\Models\QbClient;
 use App\Services\Quickbooks\Transformers\ClientTransformer;
 use App\Services\Quickbooks\Transformers\InvoiceTransformer;
 use App\Services\Quickbooks\Transformers\PaymentTransformer;
@@ -41,6 +42,8 @@ class QuickbooksService
 
     public QbClient $client;
 
+    public QbPayment $payment;
+    
     public QuickbooksSync $settings;
 
     private bool $testMode = true;
@@ -68,9 +71,7 @@ class QuickbooksService
 
         $this->sdk = DataService::Configure($merged);
 
-        // $this->sdk->setLogLocation(storage_path("logs/quickbooks.log"));
         $this->sdk->enableLog();
-
         $this->sdk->setMinorVersion("73");
         $this->sdk->throwExceptionOnError(true);
 
@@ -82,9 +83,11 @@ class QuickbooksService
 
         $this->client = new QbClient($this);
 
+        $this->payment = new QbPayment($this);
+
         $this->settings = $this->company->quickbooks->settings;
 
-        $this->checkDefaultAccounts();
+        // $this->checkDefaultAccounts(); // disabled, because if OAuth not present, we don't have access to the accounts.
 
         return $this;
     }
@@ -98,8 +101,6 @@ class QuickbooksService
 
             nlog("Checking default accounts for company {$this->company->company_key}");
             $accounts = $this->sdk->Query($accountQuery);
-
-            nlog($accounts);
 
             $find_income_account = true;
             $find_expense_account = true;
@@ -188,7 +189,7 @@ class QuickbooksService
      */
     public function syncable(string $entity, \App\Enum\SyncDirection $direction): bool
     {
-        return $this->settings->{$entity}->direction === $direction || $this->settings->{$entity}->direction === \App\Enum\SyncDirection::BIDIRECTIONAL;
+        return isset($this->settings->{$entity}->direction) && ($this->settings->{$entity}->direction === $direction || $this->settings->{$entity}->direction === \App\Enum\SyncDirection::BIDIRECTIONAL);
     }
 
 }

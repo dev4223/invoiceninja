@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -121,13 +121,13 @@ class CreateAccount
             $t = app('translator');
             $t->replace(Ninja::transformTranslations($sp035a66->settings));
 
-            $nmo = new NinjaMailerObject();
-            $nmo->mailable = new \Modules\Admin\Mail\Welcome($sp035a66->owner());
-            $nmo->company = $sp035a66;
-            $nmo->settings = $sp035a66->settings;
-            $nmo->to_user = $sp035a66->owner();
+            // $nmo = new NinjaMailerObject();
+            // $nmo->mailable = new \Modules\Admin\Mail\Welcome($sp035a66->owner());
+            // $nmo->company = $sp035a66;
+            // $nmo->settings = $sp035a66->settings;
+            // $nmo->to_user = $sp035a66->owner();
 
-            NinjaMailerJob::dispatch($nmo, true);
+            // NinjaMailerJob::dispatch($nmo, true);
 
             (new \Modules\Admin\Jobs\Account\NinjaUser([], $sp035a66))->handle();
 

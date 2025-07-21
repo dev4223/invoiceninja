@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -413,6 +413,10 @@ class RecurringInvoiceController extends BaseController
     {
         /** @var \App\Models\User $user */
         $user = auth()->user();
+
+        if((stripos($request->action, 'send_now') !== false) && $user->hasExactPermission('disable_emails')){
+            return response(['message' => ctrans('texts.disable_emails_error')], 400);
+        }
 
         $percentage_increase = request()->has('percentage_increase') ? request()->input('percentage_increase') : 0;
 

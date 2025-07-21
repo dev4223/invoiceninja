@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://opensource.org/licenses/AAL
  */
@@ -132,6 +132,10 @@ class BTCPayPaymentDriver extends BaseDriver
         }
 
 
+        sleep(1);
+
+        $this->init();
+
         $webhookClient = new Webhook($this->btcpay_url, $this->api_key);
 
         if (!$webhookClient->isIncomingWebhookRequestValid($webhook_payload, $sig, $this->webhook_secret)) {
@@ -139,11 +143,6 @@ class BTCPayPaymentDriver extends BaseDriver
                 'Invalid BTCPayServer payment notification message received - signature did not match.'
             );
         }
-
-
-        sleep(1);
-
-        $this->init();
 
         $this->setPaymentMethod(GatewayType::CRYPTO);
         $this->payment_hash = PaymentHash::where('hash', $btcpayRep->metadata->InvoiceNinjaPaymentHash)->firstOrFail();

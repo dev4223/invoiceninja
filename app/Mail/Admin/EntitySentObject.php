@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -88,10 +88,19 @@ class EntitySentObject
                 'settings' => $this->company->settings,
                 'whitelabel' => $this->company->account->isPaid() ? true : false,
                 'template' => $this->company->account->isPremium() ? 'email.template.admin_premium' : 'email.template.admin',
-
+                'text_body' => ctrans(
+                    $this->template_body,
+                    [
+                        'amount' => $mail_obj->amount,
+                        'vendor' => $this->contact->vendor->present()->name(),
+                        'purchase_order' => $this->entity->number,
+                    ]
+                    ),
             ];
+
             $mail_obj->markdown = 'email.admin.generic';
             $mail_obj->tag = $this->company->company_key;
+            
         } else {
             $mail_obj = new stdClass();
             $mail_obj->amount = $this->getAmount();

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -48,7 +48,9 @@ class ClientContactRepository extends BaseRepository
         }
 
         /* Set first record to primary - always */
-        $contacts = $contacts->sortByDesc('is_primary')->map(function ($contact) {
+        $contacts = $contacts->sortByDesc('is_primary')->filter(function ($contact){
+            return is_array($contact);
+        })->map(function ($contact) {
             $contact['is_primary'] = $this->is_primary;
             $this->is_primary = false;
 

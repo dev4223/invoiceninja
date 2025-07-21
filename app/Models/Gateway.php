@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -107,7 +107,7 @@ class Gateway extends StaticModel
             $link = 'https://docs.btcpayserver.org/InvoiceNinja/';
         } elseif ($this->id == 63) {
             $link = 'https://rotessa.com';
-        } elseif ($this->id == 64) {
+        } elseif ($this->id == 65) {
             $link = 'https://help.blockonomics.co/a/solutions/articles/33000291849';
         }
 

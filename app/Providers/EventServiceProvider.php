@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -24,6 +24,7 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Project;
+use App\Models\Location;
 use App\Models\Proposal;
 use App\Models\CompanyToken;
 use App\Models\Subscription;
@@ -51,6 +52,7 @@ use App\Events\Task\TaskWasUpdated;
 use App\Events\User\UserWasCreated;
 use App\Events\User\UserWasDeleted;
 use App\Events\User\UserWasUpdated;
+use App\Observers\LocationObserver;
 use App\Observers\ProposalObserver;
 use App\Events\Quote\QuoteWasViewed;
 use App\Events\Task\TaskWasArchived;
@@ -89,6 +91,7 @@ use App\Events\Credit\CreditWasArchived;
 use App\Events\Credit\CreditWasRestored;
 use App\Events\Design\DesignWasArchived;
 use App\Events\Design\DesignWasRestored;
+use App\Events\General\EntityWasEmailed;
 use App\Events\Invoice\InvoiceWasViewed;
 use App\Events\Misc\InvitationWasViewed;
 use App\Events\Payment\PaymentWasVoided;
@@ -137,10 +140,13 @@ use App\Events\Vendor\VendorContactLoggedIn;
 use App\Listeners\Quote\QuoteViewedActivity;
 use App\Listeners\User\ArchivedUserActivity;
 use App\Listeners\User\RestoredUserActivity;
+use App\Events\Invoice\InvoiceAutoBillFailed;
 use App\Events\Quote\QuoteReminderWasEmailed;
 use App\Events\Statement\StatementWasEmailed;
+use App\Listeners\Credit\CreditEmailActivity;
 use App\Listeners\Quote\QuoteApprovedWebhook;
 use App\Listeners\Quote\QuoteDeletedActivity;
+use App\Events\Invoice\InvoiceAutoBillSuccess;
 use App\Listeners\Credit\CreditViewedActivity;
 use App\Listeners\Invoice\InvoicePaidActivity;
 use App\Listeners\Payment\PaymentNotification;
@@ -155,8 +161,6 @@ use App\Listeners\Activity\TaskUpdatedActivity;
 use App\Listeners\Invoice\InvoiceEmailActivity;
 use App\Listeners\SendVerificationNotification;
 use App\Events\Credit\CreditWasEmailedAndFailed;
-use App\Events\Invoice\InvoiceAutoBillFailed;
-use App\Events\Invoice\InvoiceAutoBillSuccess;
 use App\Listeners\Activity\CreatedQuoteActivity;
 use App\Listeners\Activity\DeleteClientActivity;
 use App\Listeners\Activity\DeleteCreditActivity;
@@ -216,6 +220,7 @@ use App\Listeners\Quote\QuoteReminderEmailActivity;
 use App\Events\PurchaseOrder\PurchaseOrderWasViewed;
 use App\Events\Subscription\SubscriptionWasArchived;
 use App\Events\Subscription\SubscriptionWasRestored;
+use App\Listeners\General\EntityEmailedNotification;
 use App\Events\PurchaseOrder\PurchaseOrderWasCreated;
 use App\Events\PurchaseOrder\PurchaseOrderWasDeleted;
 use App\Events\PurchaseOrder\PurchaseOrderWasEmailed;
@@ -240,6 +245,8 @@ use App\Events\RecurringQuote\RecurringQuoteWasArchived;
 use App\Events\RecurringQuote\RecurringQuoteWasRestored;
 use App\Listeners\Activity\SubscriptionArchivedActivity;
 use App\Listeners\Activity\SubscriptionRestoredActivity;
+use App\Listeners\Invoice\InvoiceAutoBillFailedActivity;
+use App\Listeners\Invoice\InvoiceAutoBillSuccessActivity;
 use App\Listeners\Invoice\InvoiceFailedEmailNotification;
 use App\Events\RecurringExpense\RecurringExpenseWasCreated;
 use App\Events\RecurringExpense\RecurringExpenseWasDeleted;
@@ -252,8 +259,6 @@ use App\Events\RecurringExpense\RecurringExpenseWasArchived;
 use App\Events\RecurringExpense\RecurringExpenseWasRestored;
 use App\Events\RecurringInvoice\RecurringInvoiceWasArchived;
 use App\Events\RecurringInvoice\RecurringInvoiceWasRestored;
-use App\Listeners\Invoice\InvoiceAutoBillFailedActivity;
-use App\Listeners\Invoice\InvoiceAutoBillSuccessActivity;
 use App\Listeners\PurchaseOrder\CreatePurchaseOrderActivity;
 use App\Listeners\PurchaseOrder\PurchaseOrderViewedActivity;
 use App\Listeners\PurchaseOrder\UpdatePurchaseOrderActivity;
@@ -392,7 +397,8 @@ class EventServiceProvider extends ServiceProvider
         CreditWasEmailedAndFailed::class => [
         ],
         CreditWasEmailed::class => [
-            CreditEmailedNotification::class,
+            CreditEmailActivity::class,
+            // CreditEmailedNotification::class,
         ],
         CreditWasMarkedSent::class => [
         ],
@@ -413,6 +419,9 @@ class EventServiceProvider extends ServiceProvider
         DesignWasDeleted::class => [
         ],
         DesignWasRestored::class => [
+        ],
+        EntityWasEmailed::class => [
+            EntityEmailedNotification::class,
         ],
         ExpenseWasCreated::class => [
             CreatedExpenseActivity::class,
@@ -453,7 +462,7 @@ class EventServiceProvider extends ServiceProvider
         ],
         InvoiceWasEmailed::class => [
             InvoiceEmailActivity::class,
-            InvoiceEmailedNotification::class,
+            // InvoiceEmailedNotification::class,
         ],
         InvoiceWasEmailedAndFailed::class => [
             InvoiceEmailFailedActivity::class,
@@ -461,7 +470,7 @@ class EventServiceProvider extends ServiceProvider
         ],
         InvoiceReminderWasEmailed::class => [
             InvoiceReminderEmailActivity::class,
-            InvoiceEmailedNotification::class,
+            // InvoiceEmailedNotification::class,
         ],
         InvoiceWasDeleted::class => [
             InvoiceDeletedActivity::class,
@@ -499,7 +508,7 @@ class EventServiceProvider extends ServiceProvider
         ],
         PurchaseOrderWasEmailed::class => [
             PurchaseOrderEmailActivity::class,
-            PurchaseOrderEmailedNotification::class,
+            // PurchaseOrderEmailedNotification::class,
         ],
         PurchaseOrderWasRestored::class => [
             PurchaseOrderRestoredActivity::class,
@@ -532,7 +541,6 @@ class EventServiceProvider extends ServiceProvider
         ],
         QuoteWasEmailed::class => [
             QuoteEmailActivity::class,
-            QuoteEmailedNotification::class,
         ],
         QuoteWasViewed::class => [
             QuoteViewedActivity::class,
@@ -685,6 +693,7 @@ class EventServiceProvider extends ServiceProvider
         Credit::observe(CreditObserver::class);
         Expense::observe(ExpenseObserver::class);
         Invoice::observe(InvoiceObserver::class);
+        Location::observe(LocationObserver::class);
         Payment::observe(PaymentObserver::class);
         Product::observe(ProductObserver::class);
         Project::observe(ProjectObserver::class);

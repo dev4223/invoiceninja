@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -281,6 +281,10 @@ class Task extends BaseModel
 
     public function getRate(): float
     {
+        if(is_numeric($this->rate) && $this->rate > 0) {
+            return $this->rate;
+        }
+
         if ($this->project && $this->project->task_rate > 0) {
             return $this->project->task_rate;
         }
@@ -390,7 +394,13 @@ class Task extends BaseModel
                 }
 
                 if ($this->company->invoice_task_hours) {
-                    $date_time[] = "{$this->logDuration($log[0], $log[1])} {$hours}";
+                    $duration = $this->logDuration($log[0], $log[1]);
+
+                    if($this->company->use_comma_as_decimal_place){
+                        $duration = number_format($duration, 2, ',', '.');
+                    }
+
+                    $date_time[] = "{$duration} {$hours}";
                 }
 
                 $parts[] = implode(" • ", $date_time);

@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -50,6 +50,20 @@ trait WithSecureContext
         $this->dispatch(self::CONTEXT_UPDATE);
 
         return $clone;
+    }
+
+    public function bulkSetContext(array $data): array
+    {
+
+        $clone = $this->getContext();
+        $clone = array_merge($clone, $data);
+
+        \Illuminate\Support\Facades\Cache::put(session()->getId(), $clone, now()->addHour());
+
+        $this->dispatch(self::CONTEXT_UPDATE);
+
+        return $clone;
+        
     }
 
     public function resetContext(): void

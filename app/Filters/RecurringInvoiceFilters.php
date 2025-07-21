@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -125,8 +125,12 @@ class RecurringInvoiceFilters extends QueryFilters
     {
 
         $sort_col = explode('|', $sort);
+        
+        if ($sort_col[0] == 'next_send_datetime') {
+            $sort_col[0] = 'next_send_date';
+        }
 
-        if (!is_array($sort_col) || count($sort_col) != 2) {
+        if (!is_array($sort_col) || count($sort_col) != 2 || !in_array($sort_col[0], \Illuminate\Support\Facades\Schema::getColumnListing('recurring_invoices'))) {
             return $this->builder;
         }
 
@@ -143,10 +147,6 @@ class RecurringInvoiceFilters extends QueryFilters
 
         if ($sort_col[0] == 'status_id') {
             return $this->builder->orderBy('status_id', $dir)->orderBy('last_sent_date', $dir);
-        }
-
-        if ($sort_col[0] == 'next_send_datetime') {
-            $sort_col[0] = 'next_send_date';
         }
 
         return $this->builder->orderBy($sort_col[0], $dir);

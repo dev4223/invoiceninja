@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -37,6 +37,7 @@ use App\Utils\PaymentHtmlEngine;
 use App\Utils\Traits\MakesDates;
 use App\Utils\HostedPDF\NinjaPdf;
 use App\Utils\Traits\Pdf\PdfMaker;
+use Illuminate\Support\Facades\App;
 use Twig\Extra\Intl\IntlExtension;
 use League\CommonMark\CommonMarkConverter;
 use Twig\Extra\Markdown\MarkdownExtension;
@@ -68,7 +69,7 @@ class TemplateService
 
     private ?Vendor $vendor = null;
 
-    private Invoice | Quote | Credit | PurchaseOrder | RecurringInvoice | Task | Project $entity;
+    private Invoice | Quote | Credit | PurchaseOrder | RecurringInvoice | Task | Project | Payment | Client $entity;
 
     private Payment $payment;
 
@@ -89,7 +90,6 @@ class TemplateService
      */
     private function init(): self
     {
-
         $this->commonmark = new CommonMarkConverter([
             'allow_unsafe_links' => false,
         ]);
@@ -108,7 +108,6 @@ class TemplateService
         $this->twig->addExtension(new \Twig\Extension\DebugExtension());
         $this->twig->addExtension(new MarkdownExtension());
 
-        
         $this->twig->addRuntimeLoader(new class () implements RuntimeLoaderInterface {
             public function load($class)
             {
@@ -119,11 +118,14 @@ class TemplateService
         });
 
         $function = new \Twig\TwigFunction('img', \Closure::fromCallable(function (string $image_src, string $image_style = '') {
+            
             $html = '<img src="' . $image_src . '" style="' . $image_style . '"></img>';
 
-            return new \Twig\Markup($html, 'UTF-8');
+            return $html;
+            // return new \Twig\Markup($html, 'UTF-8');
 
         }));
+        
         $this->twig->addFunction($function);
 
         $function = new \Twig\TwigFunction('t', \Closure::fromCallable(function (string $text_key) {
@@ -140,8 +142,14 @@ class TemplateService
         }));
         $this->twig->addFilter($filter);
 
+        $filter = new \Twig\TwigFilter('json_decode', \Closure::fromCallable(function (?string $json_string) {
+            return json_decode($json_string ?? '', true, 512);
+        }));
+        $this->twig->addFilter($filter);
+
+
         $allowedTags = ['if', 'for', 'set', 'filter'];
-        $allowedFilters = ['split','replace', 'escape', 'e', 'upper', 'lower', 'capitalize', 'filter', 'length', 'merge','format_currency', 'format_number','format_percent_number','map', 'join', 'first', 'date', 'sum', 'number_format','nl2br','striptags','markdown_to_html'];
+        $allowedFilters = ['capitalize', 'abs', 'date_modify', 'keys', 'join', 'reduce', 'format_date','json_decode','date_modify','trim','round','format_spellout_number','split','replace', 'escape', 'e', 'reverse', 'shuffle', 'slice', 'batch', 'title', 'sort', 'split', 'upper', 'lower', 'capitalize', 'filter', 'length', 'merge','format_currency', 'format_number','format_percent_number','map', 'join', 'first', 'date', 'sum', 'number_format','nl2br','striptags','markdown_to_html'];
         $allowedFunctions = ['range', 'cycle', 'constant', 'date','img','t'];
         $allowedProperties = ['type_id'];
         // $allowedMethods = ['img','t'];
@@ -344,9 +352,8 @@ class TemplateService
 
             $f = $this->document->createDocumentFragment();
 
-            $template = htmlspecialchars($template, ENT_XML1, 'UTF-8');
-
-            $f->appendXML(html_entity_decode($template));
+            // $template = htmlspecialchars($template, ENT_XML1, 'UTF-8'); //2025-02-07 double encoding the entities = bad
+            $f->appendXML(str_ireplace("<br>", "<br/>", html_entity_decode($template)));
 
             $replacements[] = $f;
 
@@ -392,7 +399,13 @@ class TemplateService
             }
         }
 
-        @$this->document->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
+                
+        $html = htmlspecialchars_decode($html, ENT_QUOTES | ENT_HTML5);
+        $html = str_ireplace(['<br>'], '<br/>', $html);
+
+        @$this->document->loadHTML('<?xml encoding="UTF-8">'.$html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+
+        // @$this->document->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
 
         $this->save();
 
@@ -406,133 +419,8 @@ class TemplateService
      */
     public function save(): self
     {
-        $this->cleanHtml();
-        
-        $this->compiled_html = str_replace('%24', '$', $this->document->saveHTML());
 
-        return $this;
-    }
-
-    private function cleanHtml(): self
-    {
-        if (!$this->document || !$this->document->documentElement) {
-            return $this;
-        }
-
-        $dangerous_elements = [
-            'iframe', 'form', 'object', 'embed', 
-            'applet', 'audio', 'video',
-            'frame', 'frameset', 'base', 'svg'
-        ];
-
-        $dangerous_attributes = [
-            'onabort', 'onblur', 'onchange', 'onclick', 'ondblclick', 
-            'onerror', 'onfocus', 'onkeydown', 'onkeypress', 'onkeyup', 
-            'onload', 'onmousedown', 'onmousemove', 'onmouseout', 
-            'onmouseover', 'onmouseup', 'onreset', 'onresize', 
-            'onselect', 'onsubmit', 'onunload'
-        ];
-
-        // Function to recursively check nodes
-        $removeNodes = function ($node) use (&$removeNodes, $dangerous_elements, $dangerous_attributes) {
-            if (!$node) {
-                return;
-            }
-
-            // Store children in array first to avoid modification during iteration
-            $children = [];
-            if ($node->hasChildNodes()) {
-                foreach ($node->childNodes as $child) {
-                    $children[] = $child;
-                }
-            }
-
-            // Process each child
-            foreach ($children as $child) {
-                $removeNodes($child);
-            }
-
-            // Only process element nodes
-            if ($node instanceof \DOMElement) {
-                // Remove dangerous elements
-                if (in_array(strtolower($node->tagName), $dangerous_elements)) {
-                    if ($node->parentNode) {
-                        $node->parentNode->removeChild($node);
-                    }
-                    return;
-                }
-
-                // Remove dangerous attributes
-                $attributes_to_remove = [];
-                foreach ($node->attributes as $attr) {
-                    $attr_name = strtolower($attr->name);
-                    $attr_value = strtolower($attr->value);
-
-                    // Remove event handlers
-                    if (in_array($attr_name, $dangerous_attributes) || strpos($attr_name, 'on') === 0) {
-                        $attributes_to_remove[] = $attr->name;
-                        continue;
-                    }
-
-                    // Remove dangerous URLs/protocols
-                    if (in_array($attr_name, ['data', 'href', 'meta', 'link'])) {
-                        if (preg_match('/(javascript|data|file|ftp|jar|dict|gopher|ldap|smb|php|alert|prompt|confirm):|\/\/\/\/+|127\.0\.0\.1|localhost/i', $attr_value)) {
-                            $attributes_to_remove[] = $attr->name;
-                            continue;
-                        }
-                    }else if ($attr_name === 'src') {
-                        // For src attributes, only block dangerous protocols but allow data:image
-                        if (preg_match('/(javascript|file|ftp|jar|dict|gopher|ldap|smb|php):|\/\/\/\/+|127\.0\.0\.1|localhost/i', $attr_value)) {
-                            $attributes_to_remove[] = $attr->name;
-                            continue;
-                        }
-                        // Additional check for data: URLs - only allow image types
-                        if (strpos($attr_value, 'data:') === 0 && !preg_match('/^data:image\//i', $attr_value)) {
-                            $attributes_to_remove[] = $attr->name;
-                            continue;
-                        }
-                        
-                        // Check for localhost references
-                        if (preg_match('/localhost|127\.|0\.0\.0\.0|::1|0:0:0:0:0:0:0:1/i', $attr_value)) {
-                            $attributes_to_remove[] = $attr->name;
-                            continue;
-                        }
-
-                    }elseif ($attr_name === 'style') {
-                        
-                        if (preg_match('/(expression|javascript|behavior|vbscript):|url\s*\(|import|@import|eval\s*\(|-moz-binding|behavior|expression/i', $attr_value)) {
-                            $attributes_to_remove[] = $attr->name;
-                            continue;
-                        }
-
-                    }
-
-                    // Remove expressions
-                    if (preg_match('/expression|javascript:|vbscript:|livescript:/i', $attr_value)) {
-                        $attributes_to_remove[] = $attr->name;
-                        continue;
-                    }
-                }
-
-                // Remove the collected dangerous attributes
-                foreach ($attributes_to_remove as $attr) {
-                    $node->removeAttribute($attr);
-                }
-            }
-        };
-
-        try {
-            $removeNodes($this->document->documentElement);
-        } catch (\Exception $e) {
-            info('Error cleaning HTML: ' . $e->getMessage());
-            
-            // Clear the document to prevent unsanitized content
-            $this->document = new \DOMDocument();
-
-            // Throw sanitized exception to alert calling code
-            throw new \RuntimeException('HTML sanitization failed');
-
-        }
+        $this->compiled_html = \App\Services\Pdf\Purify::clean($this->document->saveHTML());
 
         return $this;
     }
@@ -753,14 +641,18 @@ class TemplateService
         return collect($items)->map(function ($item) use ($client_or_vendor) {
 
             $item->cost_raw = $item->cost ?? 0;
+            
             $item->discount_raw = $item->discount ?? 0;
             $item->line_total_raw = $item->line_total ?? 0;
             $item->gross_line_total_raw = $item->gross_line_total ?? 0;
             $item->tax_amount_raw = $item->tax_amount ?? 0;
             $item->product_cost_raw = $item->product_cost ?? 0;
 
-            $item->cost = Number::formatMoney($item->cost_raw, $client_or_vendor);
+            $item->net_cost_raw = $item->net_cost ?? 0;
+            $item->net_cost = Number::formatMoney($item->net_cost_raw, $client_or_vendor);
 
+            $item->cost = Number::formatMoney($item->cost_raw, $client_or_vendor);
+            
             if ($item->is_amount_discount) {
                 $item->discount = Number::formatMoney($item->discount_raw, $client_or_vendor);
             }
@@ -1091,6 +983,27 @@ class TemplateService
             ] : [];
     }
 
+    private function getVendor($entity): array
+    {
+
+        return $entity->vendor ? [
+            'name' => $entity->vendor->present()->name(),
+            'phone' => $entity->vendor->present()->phone(),
+            'website' => $entity->vendor->website ?? '',
+            'number' => $entity->vendor->number ?? '',
+            'id_number' => $entity->vendor->id_number ?? '',
+            'vat_number' => $entity->vendor->vat_number ?? '',
+            'currency' => $entity->vendor->currency()->code ?? 'USD',
+            'custom_value1' => $entity->vendor->custom_value1 ?? '',
+            'custom_value2' => $entity->vendor->custom_value2 ?? '',
+            'custom_value3' => $entity->vendor->custom_value3 ?? '',
+            'custom_value4' => $entity->vendor->custom_value4 ?? '',
+            'address' => $entity->vendor->present()->address(),
+            'shipping_address' => $entity->vendor->present()->shipping_address(),
+            'locale' => substr($entity->vendor->locale(), 0, 2),
+            ] : [];
+    }
+
     private function processInvoiceTask(string $task_id): array
     {
         $task = Task::where('company_id', $this->company->id)
@@ -1119,6 +1032,46 @@ class TemplateService
         ] : [];
     }
 
+    /**
+     *
+     * @param  array | \Illuminate\Support\Collection $expenses
+     * @return array
+     */
+    public function processExpenses($expenses, bool $nested = false): array
+    {
+        return collect($expenses)->map(function ($expense) use ($nested) {
+            /** @var \App\Models\Expense $expense */
+            return [
+                'category' => $expense->category ? $expense->category->name : '',
+                'amount' => Number::formatMoney($expense->amount, $expense->client ?? $expense->company),
+                'amount_raw' => $expense->amount,
+                'date' => $expense->date ? $this->translateDate($expense->date, $expense->client->date_format(), $expense->client->locale()) : '',
+                'private_notes' => (string) $expense->private_notes ?: '',
+                'public_notes' => (string) $expense->public_notes ?: '',
+                'exchange_rate' => (float) $expense->exchange_rate,
+                'tax_name1' => $expense->tax_name1 ?: '',
+                'tax_rate1' => (float) $expense->tax_rate1,
+                'tax_name2' => $expense->tax_name2 ?: '',
+                'tax_rate2' => (float) $expense->tax_rate2,
+                'tax_name3' => $expense->tax_name3 ?: '',
+                'tax_rate3' => (float) $expense->tax_rate3,
+                'tax_amount1' => (float) $expense->tax_amount1,
+                'tax_amount2' => (float) $expense->tax_amount2,
+                'tax_amount3' => (float) $expense->tax_amount3,
+                'payment_date' => $expense->payment_date ? $this->translateDate($expense->payment_date, $expense->client->date_format(), $expense->client->locale()) : '',
+                'transaction_reference' => $expense->transaction_reference ?: '',
+                'custom_value1' => $expense->custom_value1 ?: '',
+                'custom_value2' => $expense->custom_value2 ?: '',
+                'custom_value3' => $expense->custom_value3 ?: '',
+                'custom_value4' => $expense->custom_value4 ?: '',
+                'calculate_tax_by_amount' => (bool) $expense->calculate_tax_by_amount,
+                'uses_inclusive_taxes' => (bool) $expense->uses_inclusive_taxes,
+                'client' => $this->getClient($expense),
+                'vendor' => $this->getVendor($expense),
+                'project' => ($expense->project && !$nested) ? $this->transformProject($expense->project, true) : [],
+            ];
+         })->toArray();
+    }
 
     /**
      * @todo refactor
@@ -1189,6 +1142,7 @@ class TemplateService
     {
 
         return [
+            'id' => $project->hashed_id,
             'name' => $project->name ?: '',
             'number' => $project->number ?: '',
             'created_at' => $this->translateDate($project->created_at, $project->client->date_format(), $project->client->locale()),
@@ -1209,7 +1163,8 @@ class TemplateService
             'client' => $this->getClient($project),
             'user' => $this->userInfo($project->user),
             'assigned_user' => $project->assigned_user ? $this->userInfo($project->assigned_user) : [],
-            'invoices' => $this->processInvoices($project->invoices)
+            'invoices' => $this->processInvoices($project->invoices),
+            'expenses' => ($project->expenses && !$nested) ? $this->processExpenses($project->expenses, true) : [],
         ];
 
     }
@@ -1694,23 +1649,14 @@ class TemplateService
 
         foreach ($children as $child) {
             $contains_html = false;
+            $child['content'] = $child['content'] ?? '';
 
-            //06-11-2023 for some reason this parses content as HTML
-            // if ($child['element'] !== 'script') {
-            //     if ($this->company->markdown_enabled && array_key_exists('content', $child)) {
-            //         $child['content'] = str_replace('<br>', "\r", $child['content']);
-            //         $child['content'] = $this->commonmark->convert($child['content'] ?? '');
-            //     }
-            // }
-
-            if (isset($child['content'])) {
-                if (isset($child['is_empty']) && $child['is_empty'] === true) {
-                    continue;
-                }
-
-                $contains_html = preg_match('#(?<=<)\w+(?=[^<]*?>)#', $child['content'], $m) != 0;
+            if (isset($child['is_empty']) && $child['is_empty'] === true) {
+                continue;
             }
 
+            $contains_html = str_contains($child['content'], '<') && str_contains($child['content'], '>');
+        
             if ($contains_html) {
                 // If the element contains the HTML, we gonna display it as is. Backend is going to
                 // encode it for us, preventing any errors on the processing stage.
@@ -1724,7 +1670,7 @@ class TemplateService
             } else {
                 // .. in case string doesn't contain any HTML, we'll just return
                 // raw $content.
-                $_child = $this->document->createElement($child['element'], isset($child['content']) ? $child['content'] : '');
+                $_child = $this->document->createElement($child['element'], $child['content']);
             }
 
             $element->appendChild($_child);

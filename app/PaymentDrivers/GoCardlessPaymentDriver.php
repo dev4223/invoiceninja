@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -88,7 +88,7 @@ class GoCardlessPaymentDriver extends BaseDriver
             $types[] = GatewayType::SEPA;
         }
 
-        if ($this->client && $this->client->currency()->code === 'GBP') {
+        if ($this->client && (($this->client->currency()->code === 'GBP' && $this->client->country->iso_3166_2 === 'GB') || ($this->client->currency()->code === 'EUR' && in_array($this->client->country->iso_3166_2, ['IE','FR','DE'])))) {
             $types[] = GatewayType::INSTANT_BANK_PAY;
         }
 
@@ -97,10 +97,16 @@ class GoCardlessPaymentDriver extends BaseDriver
 
     public function init(): self
     {
+        $environment = $this->company_gateway->getConfigField('testMode') ? \GoCardlessPro\Environment::SANDBOX : \GoCardlessPro\Environment::LIVE;
+        
+        if ($this->company_gateway->getConfigField('oauth2')) {
+            $environment = \GoCardlessPro\Environment::LIVE;
+        }
+
         try {
             $this->gateway = new \GoCardlessPro\Client([
                 'access_token' => $this->company_gateway->getConfigField('accessToken'),
-                'environment'  => $this->company_gateway->getConfigField('testMode') ? \GoCardlessPro\Environment::SANDBOX : \GoCardlessPro\Environment::LIVE,
+                'environment'  => $environment,
             ]);
         } catch (\GoCardlessPro\Core\Exception\AuthenticationException $e) {
 

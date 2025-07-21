@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -197,6 +197,8 @@ class Invoice extends BaseModel
         'auto_bill_enabled',
         'uses_inclusive_taxes',
         'vendor_id',
+        'e_invoice',
+        'location_id',
     ];
 
     protected $casts = [
@@ -316,6 +318,11 @@ class Invoice extends BaseModel
     public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class)->withTrashed();
+    }
+
+    public function location(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Location::class)->withTrashed();
     }
 
     public function recurring_invoice(): \Illuminate\Database\Eloquent\Relations\BelongsTo

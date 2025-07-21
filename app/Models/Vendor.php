@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -215,6 +215,11 @@ class Vendor extends BaseModel
         return $this->hasMany(Activity::class);
     }
 
+    public function locations(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Location::class)->withTrashed();
+    }
+
     public function getCurrencyCode(): string
     {
         if ($this->currency()) {
@@ -317,6 +322,11 @@ class Vendor extends BaseModel
     public function locale(): string
     {
         return $this->language ? $this->language->locale : $this->company->locale();
+    }
+
+    public function preferredLocale(): string
+    {
+        return $this->locale();
     }
 
     public function language(): \Illuminate\Database\Eloquent\Relations\BelongsTo

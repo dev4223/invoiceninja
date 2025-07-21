@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -36,7 +36,7 @@ class ApplyNumber extends AbstractService
 
     public function run()
     {
-        if ($this->invoice->number != '') {
+        if (is_string($this->invoice->number) && trim($this->invoice->number) !== '') {
             return $this->invoice;
         }
 

@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -154,6 +154,7 @@ class BaseController extends Controller
           'company.bank_transactions',
           'company.bank_transaction_rules',
           'company.task_schedulers',
+          'company.locations',
         ];
 
     /**
@@ -178,6 +179,7 @@ class BaseController extends Controller
         'company.bank_integrations',
         'company.bank_transaction_rules',
         'company.task_schedulers',
+        'company.locations',
     ];
 
     /**
@@ -525,6 +527,9 @@ class BaseController extends Controller
                 'company.task_schedulers' => function ($query) {
                     $query->whereNotNull('updated_at');
                 },
+                'company.locations' => function ($query) {
+                    $query->whereNotNull('updated_at');
+                },
             ]
         );
 
@@ -629,6 +634,9 @@ class BaseController extends Controller
                     if (! $user->isAdmin()) {
                         $query->where('schedulers.user_id', $user->id);
                     }
+                },
+                'company.locations' => function ($query) use ($created_at) {
+                    $query->where('created_at', '>=', $created_at);
                 },
             ]
         );

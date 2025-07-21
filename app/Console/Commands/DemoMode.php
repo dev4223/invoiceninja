@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -78,7 +78,7 @@ class DemoMode extends Command
     {
         set_time_limit(0);
 
-        if (config('ninja.is_docker')) {
+        if (config('ninja.is_docker') || Ninja::isHosted()) {
             return;
         }
 

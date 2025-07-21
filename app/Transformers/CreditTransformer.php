@@ -4,7 +4,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -32,8 +32,20 @@ class CreditTransformer extends EntityTransformer
     protected array $availableIncludes = [
         'activities',
         'client',
+        'location',
     ];
 
+    public function includeLocation(Credit $credit)
+    {
+        $transformer = new LocationTransformer($this->serializer);
+
+        if (!$credit->location) {
+            return null;
+        }
+
+        return $this->includeItem($credit->location, $transformer, \App\Models\Location::class);
+    }
+    
     public function includeActivities(Credit $credit)
     {
         $transformer = new ActivityTransformer($this->serializer);
@@ -134,6 +146,7 @@ class CreditTransformer extends EntityTransformer
             'invoice_id' => $credit->invoice_id ? $this->encodePrimaryKey($credit->invoice_id) : '',
             'tax_info' => $credit->tax_data ?: new \stdClass(),
             'e_invoice' => $credit->e_invoice ?: new \stdClass(),
+            'location_id' => $this->encodePrimaryKey($credit->location_id),
 
         ];
     }

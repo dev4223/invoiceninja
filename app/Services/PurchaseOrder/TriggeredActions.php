@@ -4,14 +4,13 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Services\PurchaseOrder;
 
-use App\Jobs\PurchaseOrder\PurchaseOrderEmail;
 use App\Models\PurchaseOrder;
 use App\Services\AbstractService;
 use App\Utils\Traits\GeneratesCounter;
@@ -71,6 +70,6 @@ class TriggeredActions extends AbstractService
 
     private function sendEmail()
     {
-        PurchaseOrderEmail::dispatch($this->purchase_order, $this->purchase_order->company);
+        $this->purchase_order->service()->sendEmail();
     }
 }
