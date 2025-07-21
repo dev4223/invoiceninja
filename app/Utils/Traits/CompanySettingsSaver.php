@@ -1,10 +1,11 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -98,7 +99,6 @@ trait CompanySettingsSaver
         } elseif ($entity?->calculate_taxes && $company_settings->country_id == "840" && array_key_exists('calculate_taxes', $entity->getDirty()) && $entity->getOriginal('calculate_taxes') == 0 && !$entity?->account->isFreeHostedClient()) {
             CompanyTaxRate::dispatch($entity);
         }
-
 
         $entity->save();
     }
@@ -208,14 +208,6 @@ trait CompanySettingsSaver
                     $value = 'string';
                 }
 
-                // if ($key == 'gmail_sending_user_id') {
-                //     $value = 'string';
-                // }
-
-                // if ($key == 'besr_id') {
-                //     $value = 'string';
-                // }
-
                 if (! property_exists($settings, $key)) {
                     continue;
                 } elseif ($this->checkAttribute($value, $settings->{$key})) {
@@ -270,12 +262,10 @@ trait CompanySettingsSaver
             case 'int':
             case 'integer':
                 return ctype_digit(strval(abs((int) $value)));
-                // return is_int($value) || ctype_digit(strval(abs($value)));
             case 'real':
             case 'float':
             case 'double':
                 return ! is_string($value) && (is_float($value) || is_numeric(strval($value)));
-                //                return is_float($value) || is_numeric(strval($value));
             case 'string':
                 return (is_string($value) && method_exists($value, '__toString')) || is_null($value) || is_string($value);
             case 'bool':

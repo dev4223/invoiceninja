@@ -1,10 +1,11 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -12,7 +13,7 @@
 namespace App\Models;
 
 use App\Utils\Number;
-use Laravel\Scout\Searchable;
+use Elastic\ScoutDriverPlus\Searchable;
 use Illuminate\Support\Carbon;
 use App\Utils\Traits\MakesHash;
 use App\Helpers\Invoice\InvoiceSum;
@@ -134,7 +135,7 @@ class RecurringInvoice extends BaseModel
     use HasRecurrence;
     use PresentableTrait;
     use Searchable;
-    
+
     protected $presenter = RecurringInvoicePresenter::class;
 
     /**
@@ -226,6 +227,8 @@ class RecurringInvoice extends BaseModel
         'vendor_id',
         'next_send_date_client',
         'uses_inclusive_taxes',
+        'e_invoice',
+        'location_id',
     ];
 
     protected $casts = [
@@ -235,6 +238,7 @@ class RecurringInvoice extends BaseModel
         'updated_at' => 'timestamp',
         'created_at' => 'timestamp',
         'deleted_at' => 'timestamp',
+        'e_invoice' => 'object',
     ];
 
     protected $appends = [
@@ -261,6 +265,7 @@ class RecurringInvoice extends BaseModel
         'public_notes',
         'terms',
         'footer',
+        'remaining_cycles',
     ];
 
     public function toSearchableArray()
@@ -269,7 +274,7 @@ class RecurringInvoice extends BaseModel
         App::setLocale($locale);
 
         return [
-            'id' => $this->id,
+            'id' => $this->company->db.":".$this->id,
             'name' => ctrans('texts.recurring_invoice') . " " . $this->number . " | " . $this->client->present()->name() .  ' | ' . Number::formatMoney($this->amount, $this->company) . ' | ' . $this->translateDate($this->date, $this->company->date_format(), $locale),
             'hashed_id' => $this->hashed_id,
             'number' => $this->number,
@@ -289,9 +294,10 @@ class RecurringInvoice extends BaseModel
 
     public function getScoutKey()
     {
-        return $this->hashed_id;
+        return $this->company->db.":".$this->id;
     }
-    
+
+
     public function getEntityType()
     {
         return self::class;
@@ -357,6 +363,11 @@ class RecurringInvoice extends BaseModel
     public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class)->withTrashed();
+    }
+
+    public function location(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Location::class)->withTrashed();
     }
 
     public function assigned_user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
@@ -725,7 +736,7 @@ class RecurringInvoice extends BaseModel
             // if ($this->client->timezone_offset() < 0) {
             //     $next_send_date = $this->nextSendDateClient($next_send_date->addDay()->format('Y-m-d'));
             // } else {
-                $next_send_date = $this->nextDateByFrequencyNoOffset($next_send_date);
+            $next_send_date = $this->nextDateByFrequencyNoOffset($next_send_date);
             // }
         }
 
@@ -745,7 +756,11 @@ class RecurringInvoice extends BaseModel
 
             default:
 
-                $date = now()->addSeconds($this->client->timezone_offset());
+                // 2025-01-23 - Reverting this back, this is tightly linked to recurring invoice generation and
+                // the timezone offset of the client AND when it was generated.
+                $date = Carbon::parse($date);
+                // $date = now()->addSeconds($this->client->timezone_offset());
+                //$date = Carbon::parse($date)->addSeconds($this->client->timezone_offset());
                 return $this->setDayOfMonth($date, $this->due_date_days);
         }
     }

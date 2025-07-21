@@ -1,10 +1,11 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -14,6 +15,8 @@ namespace App\DataMapper;
 class InvoiceItem
 {
     public $quantity = 0;
+
+    public $net_cost = 0;
 
     public $cost = 0;
 
@@ -68,6 +71,7 @@ class InvoiceItem
     public $unit_code = 'C62';
 
     public static $casts = [
+        'net_cost' => 'float',
         'task_id' => 'string',
         'expense_id' => 'string',
         'tax_id' => 'string',

@@ -1,10 +1,11 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -109,7 +110,11 @@ class InvoiceItemSumInclusive
 
     private $tax_collection;
 
+    private $custom_surcharge_map;
+
     private bool $calc_tax = false;
+
+    private $total_discount;
 
     private Client | Vendor $client;
 
@@ -118,6 +123,9 @@ class InvoiceItemSumInclusive
     public function __construct(RecurringInvoice | Invoice | Quote | Credit | PurchaseOrder | RecurringQuote $invoice)
     {
         $this->tax_collection = collect([]);
+        $this->custom_surcharge_map = collect([]);
+
+        $this->total_discount = 0;
 
         $this->invoice = $invoice;
         $this->client = $invoice->client ?? $invoice->vendor;
@@ -138,7 +146,7 @@ class InvoiceItemSumInclusive
             return $this;
         }
 
-        $this->calcLineItems();
+        $this->calcLineItems()->getPeppolSurchargeTaxes();
 
         return $this;
     }
@@ -175,8 +183,10 @@ class InvoiceItemSumInclusive
     {
         if ($this->invoice->is_amount_discount) {
             $this->setLineTotal($this->getLineTotal() - $this->formatValue($this->item->discount, $this->currency->precision));
+            $this->total_discount += $this->item->discount;
         } else {
             $this->setLineTotal($this->getLineTotal() - $this->formatValue(($this->item->line_total * ($this->item->discount / 100)), $this->currency->precision));
+            $this->total_discount += ($this->item->line_total * ($this->item->discount / 100));
         }
 
         $this->item->is_amount_discount = $this->invoice->is_amount_discount;
@@ -208,6 +218,13 @@ class InvoiceItemSumInclusive
 
         $this->item->tax_name3 = $this->rule->tax_name3;
         $this->item->tax_rate3 = round($this->rule->tax_rate3, $precision);
+
+        $this->invoice->tax_name1 = '';
+        $this->invoice->tax_rate1 = 0;
+        $this->invoice->tax_name2 = '';
+        $this->invoice->tax_rate2 = 0;
+        $this->invoice->tax_name3 = '';
+        $this->invoice->tax_rate3 = 0;
 
         return $this;
     }
@@ -265,10 +282,89 @@ class InvoiceItemSumInclusive
 
         $this->item->tax_amount = $this->formatValue($item_tax, $this->currency->precision);
 
+        try {
+            $this->item->net_cost = round(($amount - $this->item->tax_amount) / $this->item->quantity, $this->currency->precision);
+        } catch (\DivisionByZeroError $e) {
+            $this->item->net_cost = $this->item->cost;
+        }
+
         $this->setTotalTaxes($this->formatValue($item_tax, $this->currency->precision));
 
         return $this;
     }
+
+    private function getPeppolSurchargeTaxes(): self
+    {
+
+        if (!$this->client->getSetting('enable_e_invoice')) {
+            return $this;
+        }
+
+        $this->custom_surcharge_map = collect([]);
+
+        collect($this->invoice->line_items)
+            ->flatMap(function ($item) {
+                return collect([1, 2, 3])
+                    ->map(fn ($i) => [
+                        'name' => $item->{"tax_name{$i}"} ?? '',
+                        'percentage' => $item->{"tax_rate{$i}"} ?? 0,
+                        'tax_id' => $item->tax_id ?? '1',
+                    ])
+                    ->filter(fn ($tax) => strlen($tax['name']) > 1);
+            })
+            ->unique(fn ($tax) => $tax['percentage'] . '_' . $tax['name'])
+            ->values()
+            ->each(function ($tax) {
+
+                $tax_component = 0;
+
+                if ($this->invoice->custom_surcharge1) {
+                    $tax_component += round($this->invoice->custom_surcharge1 - ($this->invoice->custom_surcharge1 / (1 + ($tax['percentage'] / 100))), 2);
+                    $this->setCustomSurchargeNetMap(['custom_surcharge1' => round($this->invoice->custom_surcharge1 / (1 + ($tax['percentage'] / 100)), 2)]);
+                }
+
+                if ($this->invoice->custom_surcharge2) {
+                    $tax_component += round($this->invoice->custom_surcharge2 - ($this->invoice->custom_surcharge2 / (1 + ($tax['percentage'] / 100))), 2);
+                    $this->setCustomSurchargeNetMap(['custom_surcharge2' => round($this->invoice->custom_surcharge2 / (1 + ($tax['percentage'] / 100)), 2)]);
+                }
+
+                if ($this->invoice->custom_surcharge3) {
+                    $tax_component += round($this->invoice->custom_surcharge3 - ($this->invoice->custom_surcharge3 / (1 + ($tax['percentage'] / 100))), 2);
+                    $this->setCustomSurchargeNetMap(['custom_surcharge3' => round($this->invoice->custom_surcharge3 / (1 + ($tax['percentage'] / 100)), 2)]);
+                }
+
+                if ($this->invoice->custom_surcharge4) {
+                    $tax_component += round($this->invoice->custom_surcharge4 - ($this->invoice->custom_surcharge4 / (1 + ($tax['percentage'] / 100))), 2);
+                    $this->setCustomSurchargeNetMap(['custom_surcharge4' => round($this->invoice->custom_surcharge4 / (1 + ($tax['percentage'] / 100)), 2)]);
+                }
+
+                $amount = $this->invoice->custom_surcharge4 + $this->invoice->custom_surcharge3 + $this->invoice->custom_surcharge2 + $this->invoice->custom_surcharge1;
+
+                if ($tax_component > 0) {
+                    $this->groupTax($tax['name'], $tax['percentage'], $tax_component, $amount, $tax['tax_id']);
+                }
+
+            });
+
+        return $this;
+    }
+
+    private function setCustomSurchargeNetMap(array $surcharge): self
+    {
+        $this->custom_surcharge_map->push($surcharge);
+
+        return $this;
+    }
+
+    public function getCustomSurchargeNetMap()
+    {
+        return $this->custom_surcharge_map;
+    }
+
+
+
+
+
 
     private function groupTax($tax_name, $tax_rate, $tax_total, $amount, $tax_id = '')
     {
@@ -276,9 +372,19 @@ class InvoiceItemSumInclusive
 
         $key = str_replace(' ', '', $tax_name.$tax_rate);
 
-        $group_tax = ['key' => $key, 'total' => $tax_total, 'tax_name' => $tax_name.' '.Number::formatValueNoTrailingZeroes(floatval($tax_rate), $this->client).'%', 'tax_id' => $tax_id, 'base_amount' => $amount];
+        //Handles an edge case where a blank line is entered.
+        if ($tax_rate > 0 && $amount == 0) {
+            return;
+        }
+
+        $group_tax = ['key' => $key, 'total' => $tax_total, 'tax_name' => $tax_name.' '.Number::formatValueNoTrailingZeroes(floatval($tax_rate), $this->client).'%', 'tax_id' => $tax_id, 'tax_rate' => $tax_rate, 'base_amount' => $tax_rate > 0 ? round($amount / (1 + ($tax_rate / 100)), 2) : $amount];
 
         $this->tax_collection->push(collect($group_tax));
+    }
+
+    public function getTotalDiscount()
+    {
+        return $this->total_discount;
     }
 
     public function getTotalTaxes()
@@ -295,9 +401,9 @@ class InvoiceItemSumInclusive
 
     public function setLineTotal($total)
     {
-        $this->item->gross_line_total = round(($total + 0.000000000000004),2);
+        $this->item->gross_line_total = round(($total + 0.000000000000004), 2);
 
-        $this->item->line_total = round(($total + 0.000000000000004),2);
+        $this->item->line_total = round(($total + 0.000000000000004), 2);
 
         return $this;
     }
@@ -360,13 +466,11 @@ class InvoiceItemSumInclusive
     {
         $this->setGroupedTaxes(collect([]));
 
-
         foreach ($this->line_items as $this->item) {
             if ($this->sub_total == 0) {
                 $amount = $this->item->line_total;
             } else {
                 $amount = $this->item->line_total - ($this->invoice->discount * ($this->item->line_total / $this->sub_total));
-                // $amount = $this->item->line_total - ($this->item->line_total * ($this->invoice->discount / $this->sub_total));
             }
 
             $item_tax = 0;
@@ -400,11 +504,19 @@ class InvoiceItemSumInclusive
 
             $this->item->tax_amount = $item_tax;
 
+            try {
+                $this->item->net_cost = round($amount * (100 / (100 + ($this->item->tax_rate1 + $this->item->tax_rate2 + $this->item->tax_rate3))) / $this->item->quantity, $this->currency->precision + 1);
+                $this->item->net_cost = round($this->item->net_cost, $this->currency->precision);
+            } catch (\DivisionByZeroError $e) {
+                $this->item->net_cost = $this->item->cost;
+            }
+
         }
+
+        $this->getPeppolSurchargeTaxes();
 
         return $this;
 
-        // $this->setTotalTaxes($item_tax);
     }
 
 

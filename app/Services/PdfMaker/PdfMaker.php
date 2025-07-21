@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -15,6 +15,9 @@ namespace App\Services\PdfMaker;
 use App\Services\Template\TemplateService;
 use League\CommonMark\CommonMarkConverter;
 
+/**
+ * @deprecated 2025-02-04
+ */
 class PdfMaker
 {
     use PdfMakerUtilities;
@@ -28,6 +31,8 @@ class PdfMaker
     public $document;
 
     private $options;
+
+    public $xpath;
 
     /** @var CommonMarkConverter */
     protected $commonmark;
@@ -57,6 +62,7 @@ class PdfMaker
 
     public function build()
     {
+
         if (isset($this->data['template']) && isset($this->data['variables'])) {
             $this->getEmptyElements($this->data['template'], $this->data['variables']);
         }
@@ -72,7 +78,7 @@ class PdfMaker
 
             $ts = new TemplateService();
 
-            if (isset($this->options['client'])) {
+            if (isset($this->options['client']) && !empty($this->options['client'])) {
                 $client = $this->options['client'];
                 try {
                     $ts->setCompany($client->company);
@@ -82,7 +88,7 @@ class PdfMaker
                 }
             }
 
-            if (isset($this->options['vendor'])) {
+            if (isset($this->options['vendor']) && !empty($this->options['vendor'])) {
                 $vendor = $this->options['vendor'];
                 try {
                     $ts->setCompany($vendor->company);
@@ -118,6 +124,67 @@ class PdfMaker
             $this->updateVariables($this->data['variables']);
         }
 
+
+        $elements = [
+                    'product-table', 'task-table', 'delivery-note-table',
+                    'statement-invoice-table', 'statement-payment-table', 'statement-aging-table-totals',
+                    'statement-invoice-table-totals', 'statement-payment-table-totals', 'statement-aging-table',
+                    'client-details', 'vendor-details', 'swiss-qr', 'shipping-details', 'statement-credit-table', 'statement-credit-table-totals',
+                ];
+
+        foreach ($elements as $element) {
+
+            $el = $this->document->getElementById($element);
+
+            if ($el && $el->childElementCount === 0) {
+                $el->setAttribute('style', 'display: none !important;');
+            }
+
+        }
+
+        $xpath = new \DOMXPath($this->document);
+        $elements = $xpath->query('//*[@data-state="encoded-html"]');
+
+        foreach ($elements as $element) {
+
+
+            // Decode the HTML content
+            $html = htmlspecialchars_decode($element->textContent, ENT_QUOTES | ENT_HTML5);
+            $html = str_ireplace(['<br>','<?xml encoding="UTF-8">'], ['<br/>',''], $html);
+
+            // Create a temporary document to properly parse the HTML
+            $temp = new \DOMDocument();
+
+            // Add UTF-8 wrapper and div container
+            $wrappedHtml = '<?xml encoding="UTF-8"><div>' . $html . '</div>';
+
+            // Load the HTML, suppressing any parsing warnings
+            @$temp->loadHTML($wrappedHtml, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+
+            // Import the div's contents
+            $imported = $this->document->importNode($temp->getElementsByTagName('div')->item(0), true);
+
+            // Clear existing content - more efficient
+            $element->textContent = '';
+            // Get the first div's content
+            $divContent = $temp->getElementsByTagName('div')->item(0);
+
+            if ($divContent) {
+                // Import all nodes from the temporary div
+                foreach ($divContent->childNodes as $child) {
+                    $imported = $this->document->importNode($child, true);
+                    $element->appendChild($imported);
+                }
+            } else {
+                // Fallback - import the entire content if no div found
+                $imported = $this->document->importNode($temp->documentElement, true);
+                $element->appendChild($imported);
+
+            }
+
+
+        }
+
         return $this;
     }
 
@@ -129,140 +196,11 @@ class PdfMaker
      */
     public function getCompiledHTML($final = false)
     {
-        $this->cleanHtml();
 
-        $html = $this->document->saveHTML();
+        $html = \App\Services\Pdf\Purify::clean($this->document->saveHTML());
 
-        return str_replace('%24', '$', $html);
+        return $html;
+
     }
-
-
-    private function cleanHtml(): self
-    {
-        if (!$this->document || !$this->document->documentElement) {
-            return $this;
-        }
-
-        $dangerous_elements = [
-            'iframe', 'form', 'object', 'embed', 
-            'applet', 'audio', 'video',
-            'frame', 'frameset', 'base','svg'
-        ];
-
-        $dangerous_attributes = [
-            'onabort', 'onblur', 'onchange', 'onclick', 'ondblclick', 
-            'onerror', 'onfocus', 'onkeydown', 'onkeypress', 'onkeyup', 
-            'onload', 'onmousedown', 'onmousemove', 'onmouseout', 
-            'onmouseover', 'onmouseup', 'onreset', 'onresize', 
-            'onselect', 'onsubmit', 'onunload'
-        ];
-
-        // Function to recursively check nodes
-        $removeNodes = function ($node) use (&$removeNodes, $dangerous_elements, $dangerous_attributes) {
-            if (!$node) {
-                return;
-            }
-
-            // Store children in array first to avoid modification during iteration
-            $children = [];
-            if ($node->hasChildNodes()) {
-                foreach ($node->childNodes as $child) {
-                    $children[] = $child;
-                }
-            }
-
-            // Process each child
-            foreach ($children as $child) {
-                $removeNodes($child);
-            }
-
-            // Only process element nodes
-            if ($node instanceof \DOMElement) {
-                // Remove dangerous elements
-                if (in_array(strtolower($node->tagName), $dangerous_elements)) {
-                    if ($node->parentNode) {
-                        $node->parentNode->removeChild($node);
-                    }
-                    return;
-                }
-
-                // Remove dangerous attributes
-                $attributes_to_remove = [];
-                foreach ($node->attributes as $attr) {
-                    $attr_name = strtolower($attr->name);
-                    $attr_value = strtolower($attr->value);
-
-                    // Remove event handlers
-                    if (in_array($attr_name, $dangerous_attributes) || strpos($attr_name, 'on') === 0) {
-                        $attributes_to_remove[] = $attr->name;
-                        continue;
-                    }
-
-                    // Remove dangerous URLs/protocols
-                    if (in_array($attr_name, ['data', 'href', 'meta', 'link'])) {
-                        if (preg_match('/(javascript|data|file|ftp|jar|dict|gopher|ldap|smb|php|alert|prompt|confirm):|\/\/\/\/+|127\.0\.0\.1|localhost/i', $attr_value)) {
-                            $attributes_to_remove[] = $attr->name;
-                            continue;
-                        }
-                    }else if ($attr_name === 'src') {
-                        // For src attributes, only block dangerous protocols but allow data:image
-                        if (preg_match('/(javascript|file|ftp|jar|dict|gopher|ldap|smb|php):|\/\/\/\/+|127\.0\.0\.1|localhost/i', $attr_value)) {
-                            $attributes_to_remove[] = $attr->name;
-                            continue;
-                        }
-                        // Additional check for data: URLs - only allow image types
-                        if (strpos($attr_value, 'data:') === 0 && !preg_match('/^data:image\//i', $attr_value)) {
-                            $attributes_to_remove[] = $attr->name;
-                            continue;
-                        }
-                        
-                        // Check for localhost references
-                        if (preg_match('/localhost|127\.|0\.0\.0\.0|::1|0:0:0:0:0:0:0:1/i', $attr_value)) {
-                            $attributes_to_remove[] = $attr->name;
-                            continue;
-                        }
-
-                    }elseif ($attr_name === 'style') {
-                        // if (preg_match('/(expression|javascript|behavior|vbscript):|url\s*\(|import/i', $attr_value)) {
-                        //     $attributes_to_remove[] = $attr->name;
-                        // }
-                        
-                        if (preg_match('/(expression|javascript|behavior|vbscript):|url\s*\(|import|@import|eval\s*\(|-moz-binding|behavior|expression/i', $attr_value)) {
-                            $attributes_to_remove[] = $attr->name;
-                            continue;
-                        }
-
-                    }
-
-                    // Remove expressions
-                    if (preg_match('/expression|javascript:|vbscript:|livescript:/i', $attr_value)) {
-                        $attributes_to_remove[] = $attr->name;
-                        continue;
-                    }
-                }
-
-                // Remove the collected dangerous attributes
-                foreach ($attributes_to_remove as $attr) {
-                    $node->removeAttribute($attr);
-                }
-            }
-        };
-
-        try {
-            $removeNodes($this->document->documentElement);
-        } catch (\Exception $e) {
-            info('Error cleaning HTML: ' . $e->getMessage());
-            
-            // Clear the document to prevent unsanitized content
-            $this->document = new \DOMDocument();
-
-            // Throw sanitized exception to alert calling code
-            throw new \RuntimeException('HTML sanitization failed');
-
-        }
-
-        return $this;
-    }
-
 
 }

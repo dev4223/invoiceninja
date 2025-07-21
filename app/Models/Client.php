@@ -1,17 +1,18 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
 
 namespace App\Models;
 
-use Laravel\Scout\Searchable;
+use Elastic\ScoutDriverPlus\Searchable;
 use App\DataMapper\ClientSync;
 use App\Utils\Traits\AppSetup;
 use App\Utils\Traits\MakesHash;
@@ -249,7 +250,7 @@ class Client extends BaseModel implements HasLocalePreference
         }
 
         return [
-            'id' => $this->id,
+            'id' => $this->company->db.":".$this->id,
             'name' => $name,
             'is_deleted' => $this->is_deleted,
             'hashed_id' => $this->hashed_id,
@@ -282,13 +283,8 @@ class Client extends BaseModel implements HasLocalePreference
 
     public function getScoutKey()
     {
-        return $this->hashed_id;
+        return $this->company ? $this->company->db.":".$this->id : config('database.default').":".$this->id; //28-04-2025 handle removing clients when purged
     }
-
-    // public function getScoutKeyName()
-    // {
-    //     return 'hashed_id';
-    // }
 
     public function getEntityType()
     {
@@ -318,6 +314,11 @@ class Client extends BaseModel implements HasLocalePreference
     public function projects(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Project::class)->withTrashed();
+    }
+
+    public function locations(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Location::class);
     }
 
     /**
@@ -664,7 +665,7 @@ class Client extends BaseModel implements HasLocalePreference
 
 
     //todo refactor this  - it is only searching for existing tokens
-    public function getBankTransferGateway(): ?CompanyGateway
+    public function getBankTransferGateway($is_add_payment_method = false): ?CompanyGateway
     {
         $pms = $this->service()->getPaymentMethods(-1);
 
@@ -711,13 +712,15 @@ class Client extends BaseModel implements HasLocalePreference
             }
         }
 
-        if (in_array($this->currency()->code, ['CAD','USD']) && in_array(GatewayType::ACSS, array_column($pms, 'gateway_type_id'))) {
+        // if (in_array($this->currency()->code, ['USD']) && in_array(GatewayType::ACSS, array_column($pms, 'gateway_type_id'))) {
+            if (in_array($this->currency()->code, ['CAD','USD']) && in_array(GatewayType::ACSS, array_column($pms, 'gateway_type_id'))) {
             // if ($this->currency()->code == 'CAD' && in_array(GatewayType::ACSS, array_column($pms, 'gateway_type_id'))) {
             foreach ($pms as $pm) {
                 if ($pm['gateway_type_id'] == GatewayType::ACSS) {
                     $cg = CompanyGateway::query()->find($pm['company_gateway_id']);
 
-                    if ($cg && $cg->fees_and_limits->{GatewayType::ACSS}->is_enabled) {
+                    //supports a weird edge case where we need to allow rotessa to be used when adding a payment method.
+                    if ($cg && ($is_add_payment_method || $cg->gateway_key != '91be24c7b792230bced33e930ac61676') && $cg->fees_and_limits->{GatewayType::ACSS}->is_enabled) {
                         return $cg;
                     }
                 }
@@ -743,7 +746,6 @@ class Client extends BaseModel implements HasLocalePreference
 
     public function getBankTransferMethodType()
     {
-
 
         $pms = $this->service()->getPaymentMethods(-1);
 
@@ -800,6 +802,7 @@ class Client extends BaseModel implements HasLocalePreference
             foreach ($pms as $pm) {
                 if ($pm['gateway_type_id'] == GatewayType::ACSS) {
                     $cg = CompanyGateway::query()->find($pm['company_gateway_id']);
+                    // $cg = CompanyGateway::query()->where('id', $pm['company_gateway_id'])->where('gateway_key', '!=', '91be24c7b792230bced33e930ac61676')->first();
 
                     if ($cg && $cg->fees_and_limits->{GatewayType::ACSS}->is_enabled) {
                         return GatewayType::ACSS;
@@ -824,29 +827,6 @@ class Client extends BaseModel implements HasLocalePreference
 
         return null;
 
-
-
-
-        // if ($this->currency()->code == 'USD') {
-        //     return GatewayType::BANK_TRANSFER;
-        // }
-
-        // if ($this->currency()->code == 'EUR') {
-        //     return GatewayType::SEPA;
-        // }
-
-        // //Special handler for GoCardless
-        // if($this->currency()->code == 'CAD' && ($this->getBankTransferGateway()->gateway_key == 'b9886f9257f0c6ee7c302f1c74475f6c') ?? false) {
-        //     return GatewayType::DIRECT_DEBIT;
-        // }
-
-        // if (in_array($this->currency()->code, ['EUR', 'GBP','DKK','SEK','AUD','NZD','USD'])) {
-        //     return GatewayType::DIRECT_DEBIT;
-        // }
-
-        // if(in_array($this->currency()->code, ['CAD'])) {
-        //     return GatewayType::ACSS;
-        // }
     }
 
     public function getCurrencyCode(): string
@@ -1035,31 +1015,33 @@ class Client extends BaseModel implements HasLocalePreference
     {
         return $this->getSetting('e_invoice_type') == 'PEPPOL' && $this->company->peppolSendingEnabled() && is_null($this->checkDeliveryNetwork());
     }
-    
+
     /**
      * checkDeliveryNetwork
      *
      * Checks whether the client country is supported
      * for sending over the PEPPOL network.
-     * 
+     *
      * @return string|null
      */
     public function checkDeliveryNetwork(): ?string
     {
 
-        if(!isset($this->country->iso_3166_2))
+        if (!isset($this->country->iso_3166_2)) {
             return "Client has no country set!";
-        
+        }
+
         $br = new \App\DataMapper\Tax\BaseRule();
 
         $government_countries = array_merge($br->peppol_business_countries, $br->peppol_government_countries);
 
-        if(in_array($this->country->iso_3166_2, $government_countries) && $this->classification == 'government'){
+        if (in_array($this->country->iso_3166_2, $government_countries) && $this->classification == 'government') {
             return null;
         }
 
-        if(in_array($this->country->iso_3166_2, $br->peppol_business_countries))
+        if (in_array($this->country->iso_3166_2, $br->peppol_business_countries)) {
             return null;
+        }
 
         return "Country {$this->country->full_name} ( {$this->country->iso_3166_2} ) is not supported by the PEPPOL network for e-delivery.";
 

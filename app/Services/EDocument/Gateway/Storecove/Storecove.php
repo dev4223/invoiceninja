@@ -1,10 +1,11 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -248,6 +249,36 @@ class Storecove
         return $r;
     }
 
+    /**
+     * checkNetworkStatus
+     *
+     * @param  array $data
+     * @return bool|array
+     */
+    public function checkNetworkStatus(array $data): mixed
+    {
+
+        $scheme = $this->router->resolveRouting($data['country'], $data['classification']);
+
+        return (strlen($data['vat_number'] ?? '') > 3 && $this->exists($data['vat_number'], $scheme)) ? [
+                'status' => 'error',
+                'code' => 422,
+                'body' => [],
+                'error' => [
+                    'status' => 'error',
+                    'code' => 422,
+                    'message' => 'This VAT number is already registered on the PEPPOL network. Please disconnect if you are using another provider.',
+                    'errors' => [
+                        [
+                            'source' => 'identifier',
+                            'details' => 'This VAT number is already registered on the PEPPOL network. Please disconnect if you are using another provider.',
+                        ]
+                    ]
+                ]
+            ] : false;
+
+    }
+
     public function setupLegalEntity(array $data): array|\Illuminate\Http\Client\Response
     {
         $legal_entity_response = $this->createLegalEntity($data);
@@ -256,7 +287,7 @@ class Storecove
             return $legal_entity_response;
         }
 
-        $scheme = $this->router->resolveRouting($data['country'], $data['classification']);
+        $scheme = $this->router->resolveTaxScheme($data['country'], $data['classification']);
 
         $add_identifier_response = $this->addIdentifier(
             legal_entity_id: $legal_entity_response['id'],
@@ -266,6 +297,10 @@ class Storecove
 
         if (! is_array($add_identifier_response)) {
             return $add_identifier_response;
+        }
+
+        if($data['country'] == "DK"){
+           $add_identifier_response = $this->addIdentifier($legal_entity_response['id'], str_replace(" ", "", $data['vat_number']), "DK:DIGST");
         }
 
         return [
@@ -385,10 +420,7 @@ class Storecove
     public function addIdentifier(int $legal_entity_id, string $identifier, string $scheme): array|\Illuminate\Http\Client\Response
     {
         $uri = "legal_entities/{$legal_entity_id}/peppol_identifiers";
-
-        $identifier = str_ireplace('BE', '', $identifier);
         $identifier = preg_replace("/[^a-zA-Z0-9]/", "", $identifier);
-        
         $data = [
             "identifier" => $identifier,
             "scheme" => $scheme,
@@ -402,7 +434,7 @@ class Storecove
 
             return $data;
         }
-       
+
         $this->deleteIdentifier($legal_entity_id);
 
         return $r;

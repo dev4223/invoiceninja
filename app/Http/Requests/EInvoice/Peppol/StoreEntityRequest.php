@@ -5,7 +5,7 @@
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -76,10 +76,6 @@ class StoreEntityRequest extends FormRequest
 
         $input['acts_as_receiver'] = $input['acts_as_receiver'] ?? true;
         $input['acts_as_sender'] = $input['acts_as_sender'] ?? true;
-
-        if(isset($input['vat_number'])){
-            $input['vat_number'] = str_ireplace('BE', '', $input['vat_number']);
-        }
 
         $this->replace($input);
     }

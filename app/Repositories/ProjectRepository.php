@@ -1,10 +1,11 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
  * @link https://github.com/invoiceninja/invoiceninja source repository
  *
- * @copyright Copyright (c) 2024. Invoice Ninja LLC (https://invoiceninja.com)
+ * @copyright Copyright (c) 2025. Invoice Ninja LLC (https://invoiceninja.com)
  *
  * @license https://www.elastic.co/licensing/elastic-license
  */
@@ -31,7 +32,7 @@ class ProjectRepository extends BaseRepository
 
         $lines = [];
 
-        foreach($projects as $project) {
+        foreach ($projects as $project) {
             $project->tasks()
                     ->withTrashed()
                     ->whereNull('invoice_id')
@@ -39,13 +40,13 @@ class ProjectRepository extends BaseRepository
                     ->cursor()
                     ->each(function ($task, $key) use (&$lines) {
 
-                        if (!$task->isRunning())
-                        { 
+                        if (!$task->isRunning()) {
                             if ($key == 0 && $task->company->invoice_task_project) {
-                                $body = '<div class="project-header">'.$task->project->name.'</div>' .$task->project?->public_notes ?? '';
+                                $body = '<div class="project-header">'.$task->project->name.'</div>' .$task->project?->public_notes ?? ''; //@phpstan-ignore-line
                                 $body .= '<div class="task-time-details">'.$task->description().'</div>';
-                            }
-                            else {
+                            } elseif (!$task->company->invoice_task_hours && !$task->company->invoice_task_timelog && !$task->company->invoice_task_datelog && !$task->company->invoice_task_item_description) {
+                                $body = $task->description ?? '';
+                            } else {
                                 $body = '<div class="task-time-details">'.$task->description().'</div>';
                             }
 
@@ -60,7 +61,7 @@ class ProjectRepository extends BaseRepository
 
                             $lines[] = $item;
                         }
-                        
+
                     });
 
             $project->expenses()
@@ -93,7 +94,7 @@ class ProjectRepository extends BaseRepository
 
         $invoice->uses_inclusive_taxes = $project->company->settings->inclusive_taxes ?? false;
         $invoice->line_items = $lines;
-        
+
         return $invoice;
 
     }
