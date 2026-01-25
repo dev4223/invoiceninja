@@ -22,8 +22,7 @@
                     <label class="mr-4">
                         <input type="radio" data-token="{{ $token->token }}" name="payment-type"
                             class="form-radio cursor-pointer toggle-payment-with-token" />
-                        <span class="ml-1 cursor-pointer">{{ ctrans('texts.bank_transfer') }}
-                            (#{{ $token->token }})</span>
+                        <span class="ml-1 cursor-pointer">{{ $token->getGatewayAccountName() }}</span>
                     </label>
                 @endforeach
             @endisset

@@ -25,7 +25,7 @@ class InvoiceCreatedNotification implements ShouldQueue
 {
     use UserNotifies;
 
-    public $delay = 3;
+    public $delay = 6;
 
     public function __construct()
     {

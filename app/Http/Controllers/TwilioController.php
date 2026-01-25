@@ -26,6 +26,8 @@ class TwilioController extends BaseController
         '+23',
         '+21',
         '+17152567760',
+        '+93',
+        '+85',
     ];
 
     public function __construct()
@@ -40,6 +42,10 @@ class TwilioController extends BaseController
      */
     public function generate(GenerateSmsRequest $request)
     {
+        
+        nlog('generateSmsResetCode');
+        nlog($request->all());
+
         /** @var \App\Models\User $user */
         $user = auth()->user();
 
@@ -149,6 +155,7 @@ class TwilioController extends BaseController
      */
     public function generate2faResetCode(Generate2faRequest $request)
     {
+        nlog('generate2faResetCode');
         nlog($request->all());
 
         $user = User::where('email', $request->email)->first();
@@ -226,7 +233,7 @@ class TwilioController extends BaseController
                 return response()->json(['message' => 'SMS verified'], 200);
             }
 
-            $user->google_2fa_secret = '';
+            $user->google_2fa_secret = null;
             $user->sms_verification_code = '';
             $user->save();
 

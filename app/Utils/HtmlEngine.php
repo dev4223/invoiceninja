@@ -12,22 +12,23 @@
 
 namespace App\Utils;
 
-use App\Helpers\Epc\EpcQrGenerator;
-use App\Helpers\SwissQr\SwissQrGenerator;
+use Exception;
 use App\Models\Account;
 use App\Models\Country;
-use App\Models\CreditInvitation;
 use App\Models\GatewayType;
-use App\Models\InvoiceInvitation;
-use App\Models\QuoteInvitation;
-use App\Models\RecurringInvoiceInvitation;
 use App\Utils\Traits\AppSetup;
-use App\Utils\Traits\DesignCalculator;
-use App\Utils\Traits\MakesDates;
+use App\Models\QuoteInvitation;
 use App\Utils\Traits\MakesHash;
-use Exception;
+use App\Models\CreditInvitation;
+use App\Utils\Traits\MakesDates;
+use App\Models\InvoiceInvitation;
+use App\Helpers\Epc\EpcQrGenerator;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Cache;
+use App\Utils\Traits\DesignCalculator;
+use App\Helpers\SwissQr\SwissQrGenerator;
+use App\Models\RecurringInvoiceInvitation;
+use App\Services\EDocument\Standards\Verifactu;
 
 class HtmlEngine
 {
@@ -186,12 +187,36 @@ class HtmlEngine
         $data['$payment_qrcode_raw'] = ['value' => $this->invitation->getPaymentQrCodeRaw(), 'label' => ctrans('texts.pay_now')];
 
         $data['$exchange_rate'] = ['value' => $this->entity->exchange_rate ?: ' ', 'label' => ctrans('texts.exchange_rate')];
-        $data['$triangular_tax'] = ['value' => ctrans('texts.triangular_tax'), 'label' => ''];
+        $data['$triangular_tax'] = ['value' => ctrans('texts.triangular_tax_info'), 'label' => ''];
         $data['$tax_info'] = ['value' => $this->taxLabel(), 'label' => ''];
         $data['$net'] = ['value' => '', 'label' => ctrans('texts.net')];
 
-        if ($this->entity_string == 'invoice' || $this->entity_string == 'recurring_invoice') {
-            $data['$entity'] = ['value' => ctrans('texts.invoice'), 'label' => ctrans('texts.invoice')];
+        $data['$payment_schedule'] = ['value' => '', 'label' => ctrans('texts.payment_schedule')];
+        $data['$payment_schedule_interval'] = ['value' => '', 'label' => ctrans('texts.payment_schedule')];
+
+        if(method_exists($this->entity, 'paymentSchedule')) {
+            $data['$payment_schedule'] = ['value' => $this->entity->paymentSchedule(true), 'label' => ctrans('texts.payment_schedule')];
+            $data['$payment_schedule_interval'] = ['value' => $this->entity->paymentScheduleInterval(), 'label' => ctrans('texts.payment_schedule')];
+        }
+
+        $data['$location1'] = ['value' => $this->helpers->formatCustomFieldValue($this->company->custom_fields, 'location1', $this->entity->location?->custom_value1, $this->client) ?: ' ', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'location1')];
+        $data['$location2'] = ['value' => $this->helpers->formatCustomFieldValue($this->company->custom_fields, 'location2', $this->entity->location?->custom_value2, $this->client) ?: ' ', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'location2')];
+        $data['$location3'] = ['value' => $this->helpers->formatCustomFieldValue($this->company->custom_fields, 'location3', $this->entity->location?->custom_value3, $this->client) ?: ' ', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'location3')];
+        $data['$location4'] = ['value' => $this->helpers->formatCustomFieldValue($this->company->custom_fields, 'location4', $this->entity->location?->custom_value4, $this->client) ?: ' ', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'location4')];
+        $data['$location.custom1'] = &$data['$location1'];
+        $data['$location.custom2'] = &$data['$location2'];
+        $data['$location.custom3'] = &$data['$location3'];
+        $data['$location.custom4'] = &$data['$location4'];
+
+        if ($this->entity_string == 'invoice' || $this->entity_string == 'recurring_invoice') {    
+            
+            if($this->client->peppolSendingEnabled() && $this->entity->amount < 0) {
+                $data['$entity'] = ['value' => ctrans('texts.credit'), 'label' => ctrans('texts.credit')];
+            }
+            else {
+                $data['$entity'] = ['value' => ctrans('texts.invoice'), 'label' => ctrans('texts.invoice')];
+            }
+            
             $data['$number'] = ['value' => $this->entity->number ?: ' ', 'label' => ctrans('texts.invoice_number')];
             $data['$invoice'] = ['value' => $this->entity->number ?: ' ', 'label' => ctrans('texts.invoice_number')];
             $data['$number_short'] = ['value' => $this->entity->number ?: ' ', 'label' => ctrans('texts.invoice_number_short')];
@@ -209,7 +234,7 @@ class HtmlEngine
             $data['$invoice.custom2'] = ['value' => $this->helpers->formatCustomFieldValue($this->company->custom_fields, 'invoice2', $this->entity->custom_value2, $this->client) ?: ' ', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'invoice2')];
             $data['$invoice.custom3'] = ['value' => $this->helpers->formatCustomFieldValue($this->company->custom_fields, 'invoice3', $this->entity->custom_value3, $this->client) ?: ' ', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'invoice3')];
             $data['$invoice.custom4'] = ['value' => $this->helpers->formatCustomFieldValue($this->company->custom_fields, 'invoice4', $this->entity->custom_value4, $this->client) ?: ' ', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'invoice4')];
-
+            
             $data['$custom1'] = &$data['$invoice.custom1'];
             $data['$custom2'] = &$data['$invoice.custom2'];
             $data['$custom3'] = &$data['$invoice.custom3'];
@@ -387,6 +412,10 @@ class HtmlEngine
 
         $data['$total'] = ['value' => Number::formatMoney($this->entity_calc->getTotal(), $this->client) ?: ' ', 'label' => ctrans('texts.total')];
         $data['$amount'] = &$data['$total'];
+        $data['$amount_bgn_eur'] = ['value' => Number::formatValue($this->entity_calc->getTotal()/1.95583, app('currencies')->first(function ($currency) {
+            /** @var \App\Models\Currency $currency */
+            return $currency->code == 'EUR';
+        })) ?: ' ', 'label' => ''];
         $data['$amount_due'] = ['value' => &$data['$balance_due']['value'], 'label' => ctrans('texts.amount_due')];
         $data['$quote.total'] = &$data['$total'];
         $data['$invoice.total'] = ['value' => Number::formatMoney($this->entity_calc->getTotal(), $this->client) ?: ' ', 'label' => ctrans('texts.invoice_total')];
@@ -471,7 +500,7 @@ class HtmlEngine
         $data['$country_2'] = ['value' => $locationData['country_code'] , 'label' => ctrans('texts.country')];
         $data['$email'] = ['value' => isset($this->contact) ? $this->contact->email : 'no contact email on record', 'label' => ctrans('texts.email')];
 
-        if (str_contains($data['$email']['value'], 'example.com')) {
+        if (str_contains($data['$email']['value'] ?? '', 'example.com')) {
             $data['$email'] = ['value' => '', 'label' => ctrans('texts.email')];
         }
 
@@ -500,6 +529,9 @@ class HtmlEngine
         $data['$client.country'] = &$data['$country'];
         $data['$client.email'] = &$data['$email'];
         $data['$client.classification'] = ['value' => isset($this->client->classification) ? ctrans("texts.{$this->client->classification}") : ' ', 'label' => ctrans('texts.classification')];
+
+        $data['$client.location_name'] = ['value' => $locationData['location_name'], 'label' => ctrans('texts.location')];
+
         $data['$client.billing_address'] = &$data['$client_address'];
         $data['$client.billing_address1'] = &$data['$client.address1'];
         $data['$client.billing_address2'] = &$data['$client.address2'];
@@ -683,7 +715,7 @@ class HtmlEngine
             $data['$contact.signature'] = ['value' => '', 'label' => ''];
         }
 
-        if ($this->entity->quote) {
+        if ($this->entity->quote) { //@phpstan-ignore-line
             $data['$quote.reference'] = ['value' => $this->entity->quote->number ?: '&nbsp;', 'label' => ctrans('texts.quote_number')];
         }
 
@@ -761,7 +793,7 @@ class HtmlEngine
         if ($this->entity_string == 'invoice' && $this->entity->net_payments()->exists()) {
             $payment_list = '<br><br>';
 
-            foreach ($this->entity->net_payments as $payment) {
+            foreach ($this->entity->net_payments as $payment) { //@phpstan-ignore-line
                 $payment_list .= ctrans('texts.payment_subject') . ": " . $this->formatDate($payment->date, $this->client->date_format()) . " :: " . Number::formatMoney($payment->amount, $this->client) ." :: ". $payment->translatedType() . "<br>";
             }
 
@@ -788,11 +820,60 @@ class HtmlEngine
             $data['$sepa_qr_code_raw'] = ['value' => html_entity_decode($data['$sepa_qr_code']['value']), 'label' => ''];
         }
 
+
+        $data['$verifactu_qr_code'] = ['value' => $this->getVerifactuQrCode(), 'label' => ''];
+
         $arrKeysLength = array_map('strlen', array_keys($data));
         array_multisort($arrKeysLength, SORT_DESC, $data);
 
         return $data;
     }
+
+    private function getVerifactuQrCode()
+    {
+        if(!($this->entity instanceof \App\Models\Invoice) || !$this->company->verifactuEnabled() || strlen($this->entity->backup->guid ?? '') < 2 || $this->entity->backup->guid == 'exempt') {
+            return '';
+        }
+
+        $verifactu_log = $this->entity->verifactu_logs()->orderBy('id','desc')->first();
+
+        if(!$verifactu_log) {
+            return '';
+        }
+
+        $qr_code = (new Verifactu($this->entity))->calculateQrCode($verifactu_log);
+
+        $qr_code = base64_encode($qr_code);
+
+        $f1_text = "Factura F1<br/>
+Factura verificable en la Sede Electrónica de la AEAT - VERI*FACTU<br/>
+Emitida conforme al RD 1007/2023 (Veri*Factu)<br/>
+Código seguro de verificación (CSV): {$verifactu_log->status}";
+
+        $r2_text = "Factura Rectificativa R2<br/>
+Factura verificable en la Sede Electrónica de la AEAT - VERI*FACTU<br/>
+Motivo de la rectificación: Anulación total de la factura original<br/>
+Factura rectificativa de la factura nº {$this->entity->backup->parent_invoice_number}, de fecha {$this->entity->date}<br/>
+Tipo de rectificación: I (Por diferencias)<br/>
+Código seguro de verificación (CSV): {$verifactu_log->status}";
+
+        $r1_text = "Factura Rectificativa R1<br/>
+Factura verificable en la Sede Electrónica de la AEAT - VERI*FACTU<br/>
+Factura rectificativa de la factura nº {$this->entity->backup->parent_invoice_number}, de fecha {$this->entity->date}<br/>
+Motivo de la rectificación: Corrección de base imponible<br/>
+Tipo de rectificación: I (Por diferencias)\n
+Código seguro de verificación (CSV): {$verifactu_log->status}";
+
+        $text = match($this->entity->backup->document_type) {
+            'F1' => $f1_text,
+            'R1' => $r1_text,
+            'R2' => $r2_text,
+            default => '',
+        };
+
+        return "<tr><td>{$text}</td></tr><tr><td><img src=\"data:image/png;base64,{$qr_code}\" alt=\"Verifactu QR Code\"></td></tr>";
+    }
+
 
     private function getPaymentMeta(\App\Models\Payment $payment)
     {

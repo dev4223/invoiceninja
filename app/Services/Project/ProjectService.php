@@ -42,7 +42,7 @@ class ProjectService
 
                                 return [
                                         'date' => $task->calculated_start_date ?? \Carbon\Carbon::parse($task->created_at)->format('Y-m-d'),
-                                        'hours_used' => $task->calcDuration() / 60 / 60,
+                                        'hours_used' => $task->calcDuration(true) / 60 / 60,
                                     ];
                             });
 

@@ -93,6 +93,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Document> $documents
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Invoice> $invoices
  * @property \Illuminate\Database\Eloquent\Collection<int, \App\Models\Payment>|\Illuminate\Support\Collection $paymentables
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Activity> $activities
  * @mixin \Eloquent
  */
 class Payment extends BaseModel
@@ -475,25 +476,10 @@ class Payment extends BaseModel
         if (Ninja::isHosted()) {
             $domain = $this->company->domain();
         } else {
-            $domain = strlen($this->company->portal_domain) > 5 ? $this->company->portal_domain : config('ninja.app_url');
+            $domain = strlen($this->company->portal_domain ?? '') > 5 ? $this->company->portal_domain : config('ninja.app_url');
         }
 
         return $domain.'/client/payment/'.$this->client->contacts()->first()->contact_key.'/'.$this->hashed_id.'?next=/client/payments/'.$this->hashed_id;
-    }
-
-    public function transaction_event()
-    {
-        $payment = $this->fresh();
-
-        return [
-            'payment_id' => $payment->id,
-            'payment_amount' => $payment->amount ?: 0,
-            'payment_applied' => $payment->applied ?: 0,
-            'payment_refunded' => $payment->refunded ?: 0,
-            'payment_status' => $payment->status_id ?: 1,
-            'paymentables' => $payment->paymentables->toArray(),
-            'payment_request' => [],
-        ];
     }
 
     public function translate_entity(): string

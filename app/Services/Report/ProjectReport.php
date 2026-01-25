@@ -66,6 +66,8 @@ class ProjectReport extends BaseExport
         $query = \App\Models\Project::with(['invoices','expenses','tasks'])
                                 ->where('company_id', $this->company->id);
 
+        $query = $this->filterByUserPermissions($query);
+
         $projects = &$this->input['projects'];
 
         if ($projects) {
@@ -95,14 +97,16 @@ class ProjectReport extends BaseExport
 
         $ts = new TemplateService();
 
-        /** @var Project $_project */
+        /** @var ?Project $_project */
         $_project = $query->first();
+
+        $currency_code = $_project?->client ? $_project->client->currency()->code : $this->company->currency()->code;
 
         $ts_instance = $ts->setCompany($this->company)
                     // ->setData($data)
                     ->processData($data)
                     ->setRawTemplate(file_get_contents(resource_path($this->template)))
-                    ->addGlobal(['currency_code' => $_project->client->company->currency()->code])
+                    ->addGlobal(['currency_code' => $currency_code])
                     ->setGlobals()
                     ->parseNinjaBlocks()
                     ->save();

@@ -29,7 +29,7 @@ class TwoFactorController extends BaseController
         /** @var \App\Models\User $user */
         $user = auth()->user();
 
-        if ($user->google_2fa_secret) {
+        if (strlen($user->google_2fa_secret ?? '') > 2) {
             return response()->json(['message' => '2FA already enabled'], 400);
         } elseif (Ninja::isSelfHost()) {
 

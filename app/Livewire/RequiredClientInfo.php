@@ -225,7 +225,7 @@ class RequiredClientInfo extends Component
             $hash = Cache::get(request()->input('hash'));
 
             /** @var \App\Models\Invoice $invoice */
-            $invoice = Invoice::find($this->decodePrimaryKey($hash['invoice_id']));
+            $invoice = Invoice::withTrashed()->find($this->decodePrimaryKey($hash['invoice_id']));
 
             $this->invoice_terms = $invoice->terms;
         }

@@ -223,6 +223,14 @@ class ExpenseFilters extends QueryFilters
     {
         $sort_col = explode('|', $sort);
 
+
+        // Handle relationship-based sorting
+        if (is_array($sort_col) && count($sort_col) == 2 && $sort_col[0] == 'documents') {
+            $dir = ($sort_col[1] == 'asc') ? 'asc' : 'desc';
+
+            return $this->builder->withCount('documents')->orderBy('documents_count', $dir);
+        } 
+
         if (!is_array($sort_col) || count($sort_col) != 2 || !in_array($sort_col[0], \Illuminate\Support\Facades\Schema::getColumnListing($this->builder->getModel()->getTable()))) {
             return $this->builder;
         }

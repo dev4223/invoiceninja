@@ -26,8 +26,7 @@
                             data-token="{{ $token->token }}"
                             name="payment-type"
                             class="form-radio text-indigo-600 rounded-full cursor-pointer toggle-payment-with-token"/>
-                        <span class="ml-2 cursor-pointer">{{ App\Models\GatewayType::getAlias($token->gateway_type_id) }}
-                            (#{{ $token->token }})</span>
+                        <span class="ml-2 cursor-pointer">{{ App\Models\GatewayType::getAlias($token->gateway_type_id) }} {{ $token->getGatewayAccountName() }}</span>
                     </label>
                 </li>
                 @endforeach

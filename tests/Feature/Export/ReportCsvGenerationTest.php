@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -27,6 +28,7 @@ use App\Models\Credit;
 use App\Models\Expense;
 use App\Models\Invoice;
 use App\Models\User;
+use App\Repositories\InvoiceRepository;
 use App\Utils\Traits\MakesHash;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Http;
@@ -34,7 +36,7 @@ use League\Csv\Reader;
 use Tests\TestCase;
 
 /**
- * 
+ *
  */
 class ReportCsvGenerationTest extends TestCase
 {
@@ -54,7 +56,7 @@ class ReportCsvGenerationTest extends TestCase
 
         $this->withoutExceptionHandling();
 
-        // Invoice::withTrashed()->cursor()->each(function ($i) { $i->forceDelete();});
+        config(['queue.default' => 'sync']);
 
         $this->buildData();
 
@@ -191,9 +193,10 @@ class ReportCsvGenerationTest extends TestCase
      */
     private function buildData()
     {
-        if($this->account)
+        if ($this->account) {
             $this->account->forceDelete();
-        
+        }
+
         /** @var \App\Models\Account $account */
         $this->account = Account::factory()->create([
             'hosted_client_count' => 1000,
@@ -206,7 +209,7 @@ class ReportCsvGenerationTest extends TestCase
         $this->user = User::factory()->create([
             'account_id' => $this->account->id,
             'confirmation_code' => 'xyz123',
-            'email' => $this->faker->unique()->safeEmail(),
+            'email' => \Illuminate\Support\Str::random(32)."@example.com",
         ]);
 
         $settings = CompanySettings::defaults();
@@ -272,13 +275,12 @@ class ReportCsvGenerationTest extends TestCase
 
     public function testContactProps()
     {
-        Invoice::factory()->count(5)->create(
-            [
+
+        Invoice::factory()->count(5)->create([
                 'client_id' => $this->client->id,
                 'company_id' => $this->company->id,
                 'user_id' => $this->user->id
-            ]
-        );
+            ]);
 
         $data = [
             'date_range' => 'all',
@@ -322,13 +324,13 @@ class ReportCsvGenerationTest extends TestCase
 
         $this->assertEquals('client.name', $array[2]); //@phpstan-ignore-line
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
     private function poll($hash)
     {
-        $response = Http::retry(100, 400, throw: false)
+        $response = Http::retry(100, 200, throw: false)
                     ->withHeaders([
                         'X-API-SECRET' => config('ninja.api_secret'),
                         'X-API-TOKEN' => $this->token,
@@ -345,7 +347,7 @@ $this->account->forceDelete();
 
         $products = explode(",", "clown,joker,batman,bob the builder");
 
-        foreach($products as $product) {
+        foreach ($products as $product) {
             $query->where(function ($q) use ($product) {
                 $q->orWhereJsonContains('line_items', ['product_key' => $product]);
             });
@@ -369,7 +371,7 @@ $this->account->forceDelete();
         );
 
         $query->where(function ($q) use ($products) {
-            foreach($products as $product) {
+            foreach ($products as $product) {
                 $q->orWhereJsonContains('line_items', ['product_key' => $product]);
             }
         });
@@ -399,7 +401,7 @@ $this->account->forceDelete();
         $query = Invoice::query();
 
         $query->where(function ($q) use ($products) {
-            foreach($products as $product) {
+            foreach ($products as $product) {
                 $q->orWhereJsonContains('line_items', ['product_key' => $product]);
             }
         });
@@ -415,7 +417,7 @@ $this->account->forceDelete();
         $this->assertEquals(1, $query->count());
 
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -476,7 +478,7 @@ $this->account->forceDelete();
 
         $this->assertEquals(1, $q->count());
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -540,6 +542,7 @@ $this->account->forceDelete();
             'report_keys' => [],
             'send_email' => false,
             'include_deleted' => false,
+            'user_id' => $this->user->id,
             // 'status' => 'sometimes|string|nullable|in:all,draft,sent,viewed,paid,unpaid,overdue',
         ];
 
@@ -555,9 +558,9 @@ $this->account->forceDelete();
         $this->assertEquals('address1', $this->traverseJson($data, '0.0.value'));
         $this->assertEquals('vendor.address1', $this->traverseJson($data, '0.0.identifier'));
         $this->assertEquals('address1', $this->traverseJson($data, '0.0.display_value'));
-    
-    
-$this->account->forceDelete();
+
+
+        $this->account->forceDelete();
 
     }
 
@@ -591,6 +594,7 @@ $this->account->forceDelete();
             'report_keys' => ["vendor.name", "vendor.city", "vendor.number"],
             'send_email' => false,
             'include_deleted' => false,
+            'user_id' => $this->user->id,
         ];
 
         $response = $this->withHeaders([
@@ -628,7 +632,7 @@ $this->account->forceDelete();
         $this->assertEquals('Vendor 1', $this->traverseJson($data, '0.0.display_value'));
         $this->assertEquals('number', $this->traverseJson($data, '0.2.id'));
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -650,8 +654,26 @@ $this->account->forceDelete();
             'public_notes' => 'Public5',
             'private_notes' => 'Private5',
             'terms' => 'Terms5',
+            'tax_rate1' => 0,
+            'tax_rate2' => 0,
+            'tax_rate3' => 0,
+            'discount' => 0,
+            'line_items' => [
+                [
+                    'quantity' => 1,
+                    'product_key' => 'product_key',
+                    'notes' => 'notes',
+                    'cost' => 1000,
+                    'custom_value1' => 'Custom 1',
+                    'custom_value2' => 'Custom 2',
+                    'custom_value3' => 'Custom 3',
+                ]
+            ]
             ]);
 
+
+        $repo = new InvoiceRepository();
+        $invoice = $repo->save([], $invoice);
 
         $log =  '[[1689547165,1689550765,"sumtin",true]]';
 
@@ -685,6 +707,7 @@ $this->account->forceDelete();
             ],
             'send_email' => false,
             'include_deleted' => false,
+            'user_id' => $this->user->id,
         ];
 
         $response = $this->withHeaders([
@@ -733,6 +756,7 @@ $this->account->forceDelete();
             'date_range' => 'all',
             'report_keys' => $this->all_client_report_keys,
             'send_email' => false,
+            'user_id' => $this->user->id,
         ];
 
 
@@ -763,7 +787,7 @@ $this->account->forceDelete();
 
         $csv = $response->body();
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
 
     }
@@ -819,7 +843,7 @@ $this->account->forceDelete();
         $this->assertEquals('Custom 3', $this->getFirstValueByColumn($csv, 'Task Custom Value 3'));
         $this->assertEquals('Custom 4', $this->getFirstValueByColumn($csv, 'Task Custom Value 4'));
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -844,6 +868,7 @@ $this->account->forceDelete();
             'report_keys' => [],
             'send_email' => false,
             'include_deleted' => false,
+            'user_id' => $this->user->id,
         ];
 
         $response = $this->withHeaders([
@@ -885,7 +910,7 @@ $this->account->forceDelete();
         $this->assertEquals('custom_value1', $this->traverseJson($data, '0.0.identifier'));
         $this->assertEquals('Custom 1', $this->traverseJson($data, '0.0.display_value'));
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -902,16 +927,35 @@ $this->account->forceDelete();
             'balance' => 100,
             'number' => '12345',
             'status_id' => 2,
-            'discount' => 10,
+            'discount' => 0,
             'po_number' => '1234',
             'public_notes' => 'Public',
             'private_notes' => 'Private',
             'terms' => 'Terms',
+             'tax_rate1' => 0,
+            'tax_rate2' => 0,
+            'tax_rate3' => 0,
+            'line_items' => [
+                [
+                    'quantity' => 1,
+                    'product_key' => 'product_key',
+                    'notes' => 'notes',
+                    'cost' => 100,
+                    'custom_value1' => 'Custom 1',
+                    'custom_value2' => 'Custom 2',
+                    'custom_value3' => 'Custom 3',
+                ]
+            ]
             ]);
 
         $invoice->client->balance = 100;
         $invoice->client->paid_to_date = 0;
         $invoice->push();
+
+
+        $repo = new InvoiceRepository();
+        $invoice = $repo->save([], $invoice);
+
 
         $invoice->service()->markPaid()->save();
 
@@ -928,6 +972,7 @@ $this->account->forceDelete();
             ],
             'send_email' => false,
             'include_deleted' => false,
+            'user_id' => $this->user->id,
         ];
 
         $response = $this->withHeaders([
@@ -980,6 +1025,7 @@ $this->account->forceDelete();
             'date_range' => 'all',
             'report_keys' => $this->all_client_report_keys,
             'send_email' => false,
+            'user_id' => $this->user->id,
         ];
 
 
@@ -994,6 +1040,7 @@ $this->account->forceDelete();
             'date_range' => 'all',
             'report_keys' => array_merge(["payment.amount","payment.date"], $this->all_invoice_report_keys),
             'send_email' => false,
+            'user_id' => $this->user->id,
         ];
 
         $response = $this->withHeaders([
@@ -1012,7 +1059,7 @@ $this->account->forceDelete();
         $csv = $response->body();
 
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -1033,6 +1080,7 @@ $this->account->forceDelete();
             'date_range' => 'all',
             'report_keys' => [],
             'send_email' => false,
+            'user_id' => $this->user->id,
         ];
 
         $response = $this->withHeaders([
@@ -1057,7 +1105,7 @@ $this->account->forceDelete();
         $this->assertEquals('2020-01-01', $this->getFirstValueByColumn($csv, 'Payment Date'));
         $this->assertEquals('1234', $this->getFirstValueByColumn($csv, 'Payment Transaction Reference'));
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -1099,7 +1147,7 @@ $this->account->forceDelete();
 
         $this->assertEquals('bob', $res[1]);
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -1135,20 +1183,21 @@ $this->account->forceDelete();
         $this->assertEquals('', $this->getFirstValueByColumn($csv, 'Client Assigned User'));
         $this->assertEquals('USD', $this->getFirstValueByColumn($csv, 'Client Currency'));
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
     public function testCreditJsonReport()
     {
 
-        Credit::factory()->create([
+        config(['queue.default' => 'redis']);
+
+        Credit::factory()->count(100)->create([
                 'user_id' => $this->user->id,
                 'company_id' => $this->company->id,
                 'client_id' => $this->client->id,
                 'amount' => 100,
                 'balance' => 50,
-                'number' => '1234',
                 'status_id' => 2,
                 'discount' => 10,
                 'po_number' => '1234',
@@ -1168,7 +1217,6 @@ $this->account->forceDelete();
             'X-API-TOKEN' => $this->token,
         ])->postJson('/api/v1/reports/credits?output=json', $data);
 
-
         $response->assertStatus(200);
 
         $arr = $response->json();
@@ -1180,8 +1228,7 @@ $this->account->forceDelete();
 
         $response->assertStatus(409);
 
-
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -1241,14 +1288,14 @@ $this->account->forceDelete();
         $response = $this->poll($hash);
         $csv = $response->body();
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
     public function testInvoiceCustomColumnsCsvGeneration()
     {
 
-        \App\Models\Invoice::factory()->create([
+        $invoice = \App\Models\Invoice::factory()->create([
            'user_id' => $this->user->id,
            'company_id' => $this->company->id,
            'client_id' => $this->client->id,
@@ -1261,7 +1308,25 @@ $this->account->forceDelete();
            'public_notes' => 'Public',
            'private_notes' => 'Private',
            'terms' => 'Terms',
+            'tax_rate1' => 0,
+            'tax_rate2' => 0,
+            'tax_rate3' => 0,
+            'line_items' => [
+                [
+                    'quantity' => 1,
+                    'product_key' => 'product_key',
+                    'notes' => 'notes',
+                    'cost' => 100,
+                    'custom_value1' => 'Custom 1',
+                    'custom_value2' => 'Custom 2',
+                    'custom_value3' => 'Custom 3',
+                ]
+            ]
        ]);
+
+        $repo = new InvoiceRepository();
+        $invoice = $repo->save([], $invoice);
+
 
         $data = [
             'date_range' => 'all',
@@ -1307,7 +1372,7 @@ $this->account->forceDelete();
             'X-API-TOKEN' => $this->token,
         ])->post('/api/v1/reports/invoices', $data)->assertStatus(200);
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -1363,7 +1428,7 @@ $this->account->forceDelete();
             'X-API-TOKEN' => $this->token,
         ])->post('/api/v1/reports/recurring_invoices', $data)->assertStatus(200);
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -1412,7 +1477,7 @@ $this->account->forceDelete();
         $this->assertEquals('Daily', $this->getFirstValueByColumn($csv, 'Recurring Invoice How Often'));
         $this->assertEquals('Active', $this->getFirstValueByColumn($csv, 'Recurring Invoice Status'));
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -1420,7 +1485,7 @@ $this->account->forceDelete();
     public function testInvoiceItemsCustomColumnsCsvGeneration()
     {
 
-        \App\Models\Invoice::factory()->create([
+        $invoice = \App\Models\Invoice::factory()->create([
            'user_id' => $this->user->id,
            'company_id' => $this->company->id,
            'client_id' => $this->client->id,
@@ -1428,7 +1493,7 @@ $this->account->forceDelete();
            'balance' => 50,
            'number' => '1234',
            'status_id' => 2,
-           'discount' => 10,
+           'discount' => 0,
            'po_number' => '1234',
            'public_notes' => 'Public',
            'private_notes' => 'Private',
@@ -1452,6 +1517,9 @@ $this->account->forceDelete();
                 ],
            ]
        ]);
+
+        $repo = new InvoiceRepository();
+        $invoice = $repo->save([], $invoice);
 
         $data = [
             'date_range' => 'all',
@@ -1522,7 +1590,7 @@ $this->account->forceDelete();
             'X-API-TOKEN' => $this->token,
         ])->postJson('/api/v1/reports/invoice_items', $data)->assertStatus(200);
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -1584,7 +1652,6 @@ $this->account->forceDelete();
 
         $csv = $response->body();
 
-
         $this->assertEquals('bob', $this->getFirstValueByColumn($csv, 'Client Name'));
         $this->assertEquals('1234', $this->getFirstValueByColumn($csv, 'Quote Number'));
         $this->assertEquals('10', $this->getFirstValueByColumn($csv, 'Item Quantity'));
@@ -1596,7 +1663,6 @@ $this->account->forceDelete();
         $this->assertEquals('custom 1', $this->getFirstValueByColumn($csv, 'Item Custom Value 1'));
         $this->assertEquals('GST', $this->getFirstValueByColumn($csv, 'Item Tax Name 1'));
         $this->assertEquals('10', $this->getFirstValueByColumn($csv, 'Item Tax Rate 1'));
-
 
         $data = [
             'date_range' => 'all',
@@ -1610,8 +1676,7 @@ $this->account->forceDelete();
             'X-API-TOKEN' => $this->token,
         ])->post('/api/v1/reports/quote_items', $data)->assertStatus(200);
 
-
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -1671,9 +1736,8 @@ $this->account->forceDelete();
         $this->assertEquals('Public', $this->getFirstValueByColumn($csv, 'Purchase Order Public Notes'));
         $this->assertEquals('Private', $this->getFirstValueByColumn($csv, 'Purchase Order Private Notes'));
         $this->assertEquals('Terms', $this->getFirstValueByColumn($csv, 'Purchase Order Terms'));
-    
-    
-$this->account->forceDelete();
+
+        $this->account->forceDelete();
 
     }
 
@@ -1689,7 +1753,6 @@ $this->account->forceDelete();
                 'name' => 'Vendor 1',
             ]
         );
-
 
         \App\Models\PurchaseOrder::factory()->create([
            'user_id' => $this->user->id,
@@ -1759,7 +1822,7 @@ $this->account->forceDelete();
         $this->assertEquals('GST', $this->getFirstValueByColumn($csv, 'Item Tax Name 1'));
         $this->assertEquals('10', $this->getFirstValueByColumn($csv, 'Item Tax Rate 1'));
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -1821,7 +1884,7 @@ $this->account->forceDelete();
         ])->post('/api/v1/reports/quotes', $data)->assertStatus(200);
 
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -1838,12 +1901,30 @@ $this->account->forceDelete();
            'balance' => 100,
            'number' => '12345',
            'status_id' => 2,
-           'discount' => 10,
+           'discount' => 0,
            'po_number' => '1234',
            'public_notes' => 'Public',
            'private_notes' => 'Private',
            'terms' => 'Terms',
+           'tax_rate1' => 0,
+            'tax_rate2' => 0,
+            'tax_rate3' => 0,
+            'line_items' => [
+                [
+                    'quantity' => 1,
+                    'product_key' => 'product_key',
+                    'notes' => 'notes',
+                    'cost' => 100,
+                    'custom_value1' => 'Custom 1',
+                    'custom_value2' => 'Custom 2',
+                    'custom_value3' => 'Custom 3',
+                ]
+            ]
        ]);
+
+        $repo = new InvoiceRepository();
+        $invoice = $repo->save([], $invoice);
+
 
         $invoice->service()->markPaid()->save();
 
@@ -1873,7 +1954,7 @@ $this->account->forceDelete();
         $this->assertEquals(100, $this->getFirstValueByColumn($csv, 'Payment Amount'));
         $this->assertEquals(now()->addSeconds($this->company->timezone()->utc_offset)->format('Y-m-d'), $this->getFirstValueByColumn($csv, 'Payment Date'));
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -1920,7 +2001,7 @@ $this->account->forceDelete();
 
         $this->assertEquals('john@doe.com', $res[1]);
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -1957,6 +2038,20 @@ $this->account->forceDelete();
             'public_notes' => 'Public',
             'private_notes' => 'Private',
             'terms' => 'Terms',
+            'tax_rate1' => 0,
+            'tax_rate2' => 0,
+            'tax_rate3' => 0,
+            'line_items' => [
+                [
+                    'quantity' => 1,
+                    'product_key' => 'product_key',
+                    'notes' => 'notes',
+                    'cost' => 110,
+                    'custom_value1' => 'Custom 1',
+                    'custom_value2' => 'Custom 2',
+                    'custom_value3' => 'Custom 3',
+                ]
+            ]
         ]);
 
         $data = [
@@ -1969,8 +2064,6 @@ $this->account->forceDelete();
             'X-API-SECRET' => config('ninja.api_secret'),
             'X-API-TOKEN' => $this->token,
         ])->post('/api/v1/reports/credits', $data);
-
-        $response->assertStatus(200);
 
         $response->assertStatus(200);
 
@@ -2017,7 +2110,7 @@ $this->account->forceDelete();
             'X-API-TOKEN' => $this->token,
         ])->post('/api/v1/reports/credits', $data)->assertStatus(200);
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -2103,7 +2196,7 @@ $this->account->forceDelete();
         $this->assertEquals(floatval(30), $this->getFirstValueByColumn($csv, 'Invoice Tax Rate 3'));
         $this->assertEquals('Sent', $this->getFirstValueByColumn($csv, 'Invoice Status'));
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -2187,7 +2280,7 @@ $this->account->forceDelete();
         $this->assertEquals(floatval(30), $this->getFirstValueByColumn($csv, 'Recurring Invoice Tax Rate 3'));
         $this->assertEquals('Daily', $this->getFirstValueByColumn($csv, 'Recurring Invoice How Often'));
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -2195,7 +2288,7 @@ $this->account->forceDelete();
     public function testQuoteCsvGeneration()
     {
 
-        \App\Models\Quote::factory()->create([
+        $quote = \App\Models\Quote::factory()->create([
             'user_id' => $this->user->id,
             'company_id' => $this->company->id,
             'client_id' => $this->client->id,
@@ -2271,7 +2364,7 @@ $this->account->forceDelete();
         $this->assertEquals(floatval(30), $this->getFirstValueByColumn($csv, 'Quote Tax Rate 3'));
         $this->assertEquals('Expired', $this->getFirstValueByColumn($csv, 'Quote Status'));
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 
@@ -2324,7 +2417,7 @@ $this->account->forceDelete();
         $response = $this->poll($hash);
         $csv = $response->body();
 
-$this->account->forceDelete();
+        $this->account->forceDelete();
 
     }
 

@@ -66,7 +66,10 @@ class AdjustProductInventory implements ShouldQueue
         collect($this->invoice->line_items)->filter(function ($item) {
             return $item->type_id == '1';
         })->each(function ($i) {
-            $p = Product::query()->where('product_key', $i->product_key)->where('company_id', $this->company->id)->first();
+            $p = Product::query()
+                ->where('company_id', $this->company->id)
+                ->where('product_key', $i->product_key)
+                ->first();
 
             if ($p) {
                 $p->in_stock_quantity += $i->quantity;
@@ -82,7 +85,10 @@ class AdjustProductInventory implements ShouldQueue
         collect($this->invoice->line_items)->filter(function ($item) {
             return $item->type_id == '1';
         })->each(function ($i) {
-            $p = Product::query()->where('product_key', $i->product_key)->where('company_id', $this->company->id)->first();
+            $p = Product::query()
+                ->where('company_id', $this->company->id)
+                ->where('product_key', $i->product_key)
+                ->first();
 
             if ($p) {
                 $p->in_stock_quantity -= $i->quantity;
@@ -103,7 +109,10 @@ class AdjustProductInventory implements ShouldQueue
         collect($this->invoice->line_items)->filter(function ($item) {
             return $item->type_id == '1';
         })->each(function ($i) {
-            $p = Product::query()->where('product_key', $i->product_key)->where('company_id', $this->company->id)->first();
+            $p = Product::query()
+                ->where('company_id', $this->company->id)
+                ->where('product_key', $i->product_key)
+                ->first();
 
             if ($p) {
                 $p->in_stock_quantity -= $i->quantity;
@@ -125,7 +134,10 @@ class AdjustProductInventory implements ShouldQueue
         collect($this->old_invoice)->filter(function ($item) {
             return $item->type_id == '1';
         })->each(function ($i) {
-            $p = Product::query()->where('product_key', $i->product_key)->where('company_id', $this->company->id)->first();
+            $p = Product::query()
+                ->where('company_id', $this->company->id)
+                ->where('product_key', $i->product_key)
+                ->first();
 
             if ($p) {
                 $p->in_stock_quantity += $i->quantity;

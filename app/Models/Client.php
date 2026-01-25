@@ -38,12 +38,14 @@ use Illuminate\Contracts\Translation\HasLocalePreference;
  * @property int $id
  * @property int $company_id
  * @property int $user_id
+ * @property int|null $location_id
  * @property int|null $assigned_user_id
  * @property string|null $name
  * @property string|null $website
  * @property string|null $private_notes
  * @property string|null $public_notes
  * @property string|null $client_hash
+ * @property string|null $classification
  * @property string|null $logo
  * @property string|null $phone
  * @property string|null $routing_id
@@ -81,12 +83,17 @@ use Illuminate\Contracts\Translation\HasLocalePreference;
  * @property int|null $updated_at
  * @property int|null $deleted_at
  * @property string|null $id_number
+ * @property string|null $classification
  * @property-read mixed $hashed_id
  * @property-read \App\Models\User|null $assigned_user
  * @property-read \App\Models\User $user
  * @property-read \App\Models\Company $company
  * @property-read \App\Models\Country|null $country
+ * @property-read \App\Models\Country|null $shipping_country
+ * @property-read \App\Models\Industry|null $industry
+ * @property-read \App\Models\Size|null $size
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Activity> $activities
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Location> $locations
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\CompanyLedger> $company_ledger
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ClientContact> $contacts
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Credit> $credits
@@ -104,6 +111,7 @@ use Illuminate\Contracts\Translation\HasLocalePreference;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\SystemLog> $system_logs
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Task> $tasks
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\RecurringInvoice> $recurring_invoices
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Location> $locations
  * @method static \Illuminate\Database\Eloquent\Builder|Client exclude($columns)
  * @method static \Database\Factories\ClientFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder|Client filter(\App\Filters\QueryFilters $filters)
@@ -127,6 +135,16 @@ class Client extends BaseModel implements HasLocalePreference
     use ClientGroupSettingsSaver;
     use Excludable;
     use Searchable;
+
+    /**
+     * Get the index name for the model.
+     *
+     * @return string
+     */
+    public function searchableAs(): string
+    {
+        return 'clients';
+    }
 
     protected $presenter = ClientPresenter::class;
 
@@ -252,9 +270,9 @@ class Client extends BaseModel implements HasLocalePreference
         return [
             'id' => $this->company->db.":".$this->id,
             'name' => $name,
-            'is_deleted' => $this->is_deleted,
+            'is_deleted' => (bool)$this->is_deleted,
             'hashed_id' => $this->hashed_id,
-            'number' => $this->number,
+            'number' => (string)$this->number,
             'id_number' => $this->id_number,
             'vat_number' => $this->vat_number,
             'balance' => $this->balance,
@@ -432,12 +450,16 @@ class Client extends BaseModel implements HasLocalePreference
 
     public function language()
     {
+        return once(function () {
+            /** @var \Illuminate\Support\Collection<\App\Models\Language> */
+            $languages = app('languages');
 
-        /** @var \Illuminate\Support\Collection<\App\Models\Language> */
-        $languages = app('languages');
+            $language_id = $this->getSetting('language_id');
 
-        return $languages->first(function ($item) {
-            return $item->id == $this->getSetting('language_id');
+            return $languages->first(function ($item) use ($language_id) {
+                return $item->id == $language_id;
+            });
+
         });
     }
 
@@ -462,23 +484,36 @@ class Client extends BaseModel implements HasLocalePreference
 
     public function date_format()
     {
-        /** @var \Illuminate\Support\Collection<DateFormat> */
-        $date_formats = app('date_formats');
+        return once(function () {
 
-        return $date_formats->first(function ($item) {
-            return $item->id == $this->getSetting('date_format_id');
-        })->format;
+            /** @var \Illuminate\Support\Collection<DateFormat> */
+            $date_formats = app('date_formats');
+
+            $date_format = $this->getSetting('date_format_id');
+
+            return $date_formats->first(function ($item) use ($date_format) {
+                return $item->id == $date_format;
+            })->format;
+
+        });
     }
 
     public function currency()
     {
 
-        /** @var \Illuminate\Support\Collection<Currency> */
-        $currencies = app('currencies');
+        return once(function () {
+            
+            /** @var \Illuminate\Support\Collection<Currency> */
+            $currencies = app('currencies');
 
-        return $currencies->first(function ($item) {
-            return $item->id == $this->getSetting('currency_id');
-        });
+            $currency_id = $this->getSetting('currency_id');
+
+            return $currencies->first(function ($item) use ($currency_id) {
+                return $item->id == $currency_id;
+            });
+
+        }) ?? \App\Models\Currency::find($this->getSetting('currency_id'));
+
     }
 
     public function service(): ClientService
@@ -905,7 +940,12 @@ class Client extends BaseModel implements HasLocalePreference
     {
         return $this->company->company_key.'/';
     }
-
+    
+    /**
+     * document_filepath
+     * @deprecated. not used.
+     * @return string
+     */
     public function document_filepath(): string
     {
         return $this->company->company_key.'/documents/';
@@ -981,19 +1021,7 @@ class Client extends BaseModel implements HasLocalePreference
 
         return $offset;
     }
-
-    public function transaction_event()
-    {
-        $client = $this->fresh();
-
-        return [
-            'client_id' => $client->id,
-            'client_balance' => $client->balance ?: 0,
-            'client_paid_to_date' => $client->paid_to_date ?: 0,
-            'client_credit_balance' => $client->credit_balance ?: 0,
-        ];
-    }
-
+    
     public function translate_entity(): string
     {
         return ctrans('texts.client');

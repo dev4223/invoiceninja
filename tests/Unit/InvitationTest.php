@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -11,13 +12,14 @@
 
 namespace Tests\Unit;
 
-use App\Factory\InvoiceInvitationFactory;
-use App\Utils\Traits\MakesHash;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Routing\Middleware\ThrottleRequests;
-use Illuminate\Validation\ValidationException;
-use Tests\MockAccountData;
 use Tests\TestCase;
+use Tests\MockAccountData;
+use App\Utils\Traits\MakesHash;
+use Illuminate\Database\Eloquent\Model;
+use App\Factory\InvoiceInvitationFactory;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 
 class InvitationTest extends TestCase
 {
@@ -36,6 +38,8 @@ class InvitationTest extends TestCase
         );
 
         $this->withoutExceptionHandling();
+
+        Model::reguard();
     }
 
     public function testInvitationSanity()
@@ -57,10 +61,13 @@ class InvitationTest extends TestCase
 
         $response = null;
 
+        $data = $this->invoice->toArray();
+        unset($data['hashed_id']);
+
         $response = $this->withHeaders([
             'X-API-SECRET' => config('ninja.api_secret'),
             'X-API-TOKEN' => $this->token,
-        ])->putJson('/api/v1/invoices/'.$this->encodePrimaryKey($this->invoice->id), $this->invoice->toArray());
+        ])->putJson('/api/v1/invoices/'.$this->invoice->hashed_id, $data);
 
         $response->assertStatus(200);
 

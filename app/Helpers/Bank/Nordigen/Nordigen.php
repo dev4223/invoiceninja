@@ -177,6 +177,30 @@ class Nordigen
         );
     }
 
+    
+    /**
+     * validAgreement
+     * @param string $institution_id
+     * @param array $_accounts
+     * @return array|null
+     * @todo - very expensive!
+     */
+    public function validAgreement($institution_id, $_accounts)
+    {
+
+        $nc = new \App\Helpers\Bank\Nordigen\Http\NordigenClient($this->client->getAccessToken());
+        $requisitions = $nc->getAllRequisitions();
+
+        $requisition = $requisitions->filter(function($requisition) use ($institution_id, $_accounts){
+            if($requisition['institution_id'] == $institution_id && !empty(array_intersect($requisition['accounts'], $_accounts))){
+                return $requisition;
+            }
+        });
+
+        return $requisition->first()->toArray() ??  null;
+        
+    }
+
     public function getRequisition(string $requisitionId)
     {
         try {
@@ -196,10 +220,29 @@ class Nordigen
         try {
             $out = new \stdClass();
 
-            $out->data = $this->client->account($account_id)->getAccountDetails()['account'];
             $out->metadata = $this->client->account($account_id)->getAccountMetaData();
-            $out->balances = $this->client->account($account_id)->getAccountBalances()['balances'];
             $out->institution = $this->client->institution->getInstitution($out->metadata['institution_id']);
+
+            // if($out->metadata['status'] == 'READY'){
+            //     $out->data = $this->client->account($account_id)->getAccountDetails()['account'];
+            //     $out->balances = $this->client->account($account_id)->getAccountBalances()['balances'];
+            // }
+            // else{
+
+                $out->data = [
+                    'iban' => $out->metadata['iban'],
+                    'ownerName' => $out->metadata['owner_name'],
+                ];
+                $out->balances = [
+                    [
+                        'balanceType' => '',
+                        'balanceAmount' => [
+                            'amount' => 0,
+                            'currency' => '',
+                        ],
+                    ],
+                ];
+            // }
 
             $it = new AccountTransformer();
             return $it->transform($out);

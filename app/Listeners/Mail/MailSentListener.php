@@ -45,12 +45,17 @@ class MailSentListener
     {
 
         try {
+
             $message_id = $event->sent->getMessageId();
 
             $message = MessageConverter::toEmail($event->sent->getOriginalMessage()); //@phpstan-ignore-line
 
             if (!$message->getHeaders()->get('x-invitation')) {
                 return;
+            }
+
+            if($message->getHeaders()->get('x-message-id')) {
+                $message_id = $message->getHeaders()->get('x-message-id')->getValue();
             }
 
             $invitation_key = $message->getHeaders()->get('x-invitation')->getValue();

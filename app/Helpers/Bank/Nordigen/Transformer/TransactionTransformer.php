@@ -139,7 +139,7 @@ class TransactionTransformer implements BankRevenueInterface
             (array_key_exists('creditorName', $transaction) ?
                 $transaction['creditorName'] : null);
 
-        return [
+        $data = [
             'transaction_id' => 0,
             'nordigen_transaction_id' => $transactionId,
             'amount' => abs($amount),
@@ -153,7 +153,15 @@ class TransactionTransformer implements BankRevenueInterface
             'base_type' => $base_type,
         ];
 
+        // $data['currency_code'] = $this->makeHash($data);
+
+        return $data;
     }
+
+    // private function makeHash($data)
+    // {
+    //     return hash('sha1', $data['amount'].$data['date'].$data['description'].$data['participant'].$data['participant_name'].$data['base_type']);
+    // }
 
     private function convertCurrency(string $code)
     {

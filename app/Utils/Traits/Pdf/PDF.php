@@ -17,11 +17,20 @@ use setasign\Fpdi\Fpdi;
 class PDF extends FPDI
 {
     public $text_alignment = 'L';
+    public $x_offset = 0; // New property for X-axis offset
 
     public function Footer()
     {
-        $this->SetFont('Arial', 'I', 9);
-        $this->SetTextColor(135, 135, 135);
+        $this->SetFont(
+            config('ninja.pdf_page_numbering_font_name'), 
+            config('ninja.pdf_page_numbering_font_style'), 
+            config('ninja.pdf_page_numbering_font_size')
+        );
+        $this->SetTextColor(
+            config('ninja.pdf_page_numbering_font_color_red'), 
+            config('ninja.pdf_page_numbering_font_color_green'), 
+            config('ninja.pdf_page_numbering_font_color_blue')
+        );
 
         $trans = ctrans('texts.pdf_page_info', ['current' => $this->PageNo(), 'total' => '{nb}']);
 
@@ -33,17 +42,22 @@ class PDF extends FPDI
         // Set Y position
         $this->SetY(config('ninja.pdf_page_numbering_y_alignment'));
         
+        // Calculate X position with offset
+        $base_x = config('ninja.pdf_page_numbering_x_alignment');
+        
         // Set X position based on alignment
         if ($this->text_alignment == 'L') {
-            $this->SetX(5);
-            $this->Cell($this->GetPageWidth() - 10, 5, $trans, 0, 0, 'L');
+            $this->SetX($base_x+5);
+            $cell_width = $this->GetPageWidth();
+            $this->Cell($cell_width, 5, $trans, 0, 0, 'L');
         } elseif ($this->text_alignment == 'R') {
-            $this->SetX(0);
-            $this->Cell($this->GetPageWidth(), 5, $trans, 0, 0, 'R');
+            $this->SetX($this->GetPageWidth() - 100 - $base_x);
+            $cell_width = 100;
+            $this->Cell($cell_width, 5, $trans, 0, 0, 'R');
         } else {
             $this->SetX(0);
-            // $this->SetX(config('ninja.pdf_page_numbering_y_alignment')); // 10mm from left edge
-            $this->Cell($this->GetPageWidth(), 5, $trans, 0, 0, 'C');
+            $cell_width = $this->GetPageWidth();
+            $this->Cell($cell_width, 5, $trans, 0, 0, 'C');
         }
     }
 

@@ -12,12 +12,13 @@
 
 namespace App\Repositories;
 
-use App\Factory\ClientFactory;
 use App\Models\Client;
 use App\Models\Company;
-use App\Utils\Traits\GeneratesCounter;
+use App\Factory\ClientFactory;
 use App\Utils\Traits\SavesDocuments;
+use App\Utils\Traits\GeneratesCounter;
 use Illuminate\Database\QueryException;
+use App\Jobs\Client\PurgeClientDocuments;
 
 /**
  * ClientRepository.
@@ -147,7 +148,21 @@ class ClientRepository extends BaseRepository
     public function purge($client)
     {
 
+        $purged_client = $client->present()->name();
+        $purged_client_hash = $client->client_hash;
+
+        $user = auth()->user() ?? $client->user;
+        $company = $client->company;
+
+        $event_vars = \App\Utils\Ninja::eventVars(auth()->user() ? auth()->user()->id : null);
+        $event_vars['client_hash'] = $purged_client_hash;
+        
+        event(new \App\Events\Client\ClientWasPurged($purged_client, $user, $company, $event_vars));
+
         nlog("Purging client id => {$client->id} => {$client->number}");
+
+        // Delete documents associated with client's related entities before deleting the entities
+        $this->purgeClientDocuments($client);
 
         $client->contacts()->forceDelete();
         $client->tasks()->forceDelete();
@@ -162,8 +177,34 @@ class ClientRepository extends BaseRepository
         $client->expenses()->forceDelete();
         $client->recurring_expenses()->forceDelete();
         $client->system_logs()->forceDelete();
-        $client->documents()->forceDelete();
+        // $client->documents()->forceDelete();
         $client->payments()->forceDelete();
         $client->forceDelete();
     }
+
+    /**
+     * Purge all documents associated with client's related entities.
+     * This ensures documents attached to invoices, quotes, payments, etc. are also deleted.
+     */
+    private function purgeClientDocuments($client)
+    {
+        // Get all entity IDs that belong to this client
+        $data =[
+            'invoices' => $client->invoices()->pluck('id')->toArray(),
+            'App\Models\Quote' => $client->quotes()->pluck('id')->toArray(),
+            'App\Models\Payment' => $client->payments()->pluck('id')->toArray(),
+            'App\Models\Credit' => $client->credits()->pluck('id')->toArray(),
+            'App\Models\Expense' => $client->expenses()->pluck('id')->toArray(),
+            'App\Models\RecurringInvoice' => $client->recurring_invoices()->pluck('id')->toArray(),
+            'App\Models\RecurringExpense' => $client->recurring_expenses()->pluck('id')->toArray(),
+            'App\Models\Project' => $client->projects()->pluck('id')->toArray(),
+            'App\Models\Task' => $client->tasks()->pluck('id')->toArray(),
+            'App\Models\Client' => [$client->id],
+        ];
+
+        PurgeClientDocuments::dispatch($data, $client->company);
+        
+    }
+
+
 }

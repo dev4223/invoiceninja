@@ -316,6 +316,7 @@ class BraintreePaymentDriver extends BaseDriver
 
     public function processWebhookRequest($request)
     {
+        
         $validator = Validator::make($request->all(), [
             'bt_signature' => ['required'],
             'bt_payload' => ['required'],
@@ -333,6 +334,22 @@ class BraintreePaymentDriver extends BaseDriver
         );
 
         nlog('braintree webhook');
+        nlog($webhookNotification);
+
+        $message = $webhookNotification->kind; // "subscription_went_past_due"
+
+        nlog($message);
+
+        if($message == 'transaction_settlement_declined'){
+            $payment = Payment::withTrashed()->where('transaction_reference', $webhookNotification->transaction->id)->first();
+            
+            if ($payment && $payment->status_id == Payment::STATUS_COMPLETED) {
+                $payment->service()->deletePayment();
+                $payment->status_id = Payment::STATUS_FAILED;
+                $payment->save();
+            }
+
+        }
 
         return response()->json([], 200);
     }

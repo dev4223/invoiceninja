@@ -117,7 +117,7 @@ class VendorHtmlEngine
         if (! $this->vendor->currency()) {
             throw new Exception(debug_backtrace()[1]['function'], 1);
         }
-
+        
         App::forgetInstance('translator');
         $t = app('translator');
         App::setLocale($this->vendor->locale());
@@ -178,6 +178,15 @@ class VendorHtmlEngine
         $data['$discount'] = ['value' => $this->entity->discount, 'label' => ctrans('texts.discount')];
         $data['$subtotal'] = ['value' => Number::formatMoney($this->entity_calc->getSubTotal(), $this->vendor) ?: '&nbsp;', 'label' => ctrans('texts.subtotal')];
         $data['$gross_subtotal'] = ['value' => Number::formatMoney($this->entity_calc->getGrossSubTotal(), $this->vendor) ?: '&nbsp;', 'label' => ctrans('texts.subtotal')];
+
+        $data['$location1'] = ['value' => $this->helpers->formatCustomFieldValue($this->company->custom_fields, 'location1', $this->entity->location?->custom_value1, $this->vendor) ?: ' ', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'location1')];
+        $data['$location2'] = ['value' => $this->helpers->formatCustomFieldValue($this->company->custom_fields, 'location2', $this->entity->location?->custom_value2, $this->vendor) ?: ' ', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'location2')];
+        $data['$location3'] = ['value' => $this->helpers->formatCustomFieldValue($this->company->custom_fields, 'location3', $this->entity->location?->custom_value3, $this->vendor) ?: ' ', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'location3')];
+        $data['$location4'] = ['value' => $this->helpers->formatCustomFieldValue($this->company->custom_fields, 'location4', $this->entity->location?->custom_value4, $this->vendor) ?: ' ', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'location4')];
+        $data['$location.custom1'] = &$data['$location1'];
+        $data['$location.custom2'] = &$data['$location2'];
+        $data['$location.custom3'] = &$data['$location3'];
+        $data['$location.custom4'] = &$data['$location4'];
 
         if ($this->entity->uses_inclusive_taxes) {
             $data['$net_subtotal'] = ['value' => Number::formatMoney(($this->entity_calc->getSubTotal() - $this->entity->total_taxes - $this->entity_calc->getTotalDiscount()), $this->vendor) ?: '&nbsp;', 'label' => ctrans('texts.net_subtotal')];
@@ -443,6 +452,9 @@ class VendorHtmlEngine
         $data['$ship_to'] = &$data['$shipping'];
 
         if ($this->entity->client()->exists()) {
+
+            // $locationData = $this->entity->client->locations()->first();
+
             $data['$client1'] = ['value' => $this->helpers->formatCustomFieldValue($this->company->custom_fields, 'client1', $this->entity->client->custom_value1, $this->entity->client) ?: '&nbsp;', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'client1')];
             $data['$client2'] = ['value' => $this->helpers->formatCustomFieldValue($this->company->custom_fields, 'client2', $this->entity->client->custom_value2, $this->entity->client) ?: '&nbsp;', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'client2')];
             $data['$client3'] = ['value' => $this->helpers->formatCustomFieldValue($this->company->custom_fields, 'client3', $this->entity->client->custom_value3, $this->entity->client) ?: '&nbsp;', 'label' => $this->helpers->makeCustomField($this->company->custom_fields, 'client3')];
@@ -457,6 +469,28 @@ class VendorHtmlEngine
             $data['$client.name'] = &$data['$client_name'];
             $data['$client'] = &$data['$client_name'];
 
+            $data['$client.shipping_location_name'] = ['value' => '', 'label' => ''];
+            $data['$client.shipping_address'] = ['value' => $this->entity->client->present()->shipping_address() ?: '&nbsp;', 'label' => ctrans('texts.shipping_address')];
+            $data['$client.shipping_address1'] = ['value' => $this->entity->client->shipping_address1 ?: '&nbsp;', 'label' => ctrans('texts.shipping_address1')];
+            $data['$client.shipping_address2'] = ['value' => $this->entity->client->shipping_address2 ?: '&nbsp;', 'label' => ctrans('texts.shipping_address2')];
+            $data['$client.shipping_city'] = ['value' => $this->entity->client->shipping_city ?: '&nbsp;', 'label' => ctrans('texts.shipping_city')];
+            $data['$client.shipping_state'] = ['value' => $this->entity->client->shipping_state ?: '&nbsp;', 'label' => ctrans('texts.shipping_state')];
+            $data['$client.shipping_postal_code'] = ['value' => $this->entity->client->shipping_postal_code ?: '&nbsp;', 'label' => ctrans('texts.shipping_postal_code')];
+            $data['$client.shipping_country'] = ['value' => isset($this->entity->client->shipping_country->name) ? ctrans('texts.country_' . $this->entity->client->shipping_country->name) : '', 'label' => ctrans('texts.shipping_country')];
+
+            $data['$show_shipping_address'] = ['value' => 'flex', 'label' => ''];
+            $data['$show_shipping_address_block'] = ['value' =>'block', 'label' => ''];
+            $data['$show_shipping_address_visibility'] = ['value' => 1, 'label' => ''];
+            // $data['$client.shipping_location_name'] = ['value' => $locationData['shipping_location_name'], 'label' => ctrans('texts.shipping_location_name')];
+            // $data['$client.shipping_address'] = ['value' => $locationData['shipping_address'], 'label' => ctrans('texts.shipping_address')];
+            // $data['$client.shipping_address1'] = ['value' => $locationData['shipping_address1'], 'label' => ctrans('texts.shipping_address1')];
+            // $data['$client.shipping_address2'] = ['value' => $locationData['shipping_address2'], 'label' => ctrans('texts.shipping_address2')];
+            // $data['$client.shipping_city'] = ['value' => $locationData['shipping_city'], 'label' => ctrans('texts.shipping_city')];
+            // $data['$client.shipping_state'] = ['value' => $locationData['shipping_state'], 'label' => ctrans('texts.shipping_state')];
+            // $data['$client.shipping_postal_code'] = ['value' => $locationData['shipping_postal_code'], 'label' => ctrans('texts.shipping_postal_code')];
+            // $data['$client.shipping_country'] = ['value' => ctrans('texts.country_' . $locationData['shipping_country_name']), 'label' => ctrans('texts.shipping_country')];
+
+
             $data['$client.address1'] = &$data['$address1'];
             $data['$client.address2'] = &$data['$address2'];
             $data['$client_address'] = ['value' => $this->entity->client->present()->address() ?: '&nbsp;', 'label' => ctrans('texts.address')];
@@ -465,18 +499,13 @@ class VendorHtmlEngine
             $data['$client.public_notes'] = ['value' => $this->entity->client->public_notes ?: '&nbsp;', 'label' => ctrans('texts.notes')];
             $data['$client.city'] = ['value' => $this->entity->client->city ?: '&nbsp;', 'label' => ctrans('texts.city')];
             $data['$client.state'] = ['value' => $this->entity->client->state ?: '&nbsp;', 'label' => ctrans('texts.state')];
-            $data['$client.id_number'] = &$data['$id_number'];
-            $data['$client.vat_number'] = &$data['$vat_number'];
-            $data['$client.website'] = &$data['$website'];
-            $data['$client.phone'] = &$data['$phone'];
-            $data['$city_state_postal'] = ['value' => $this->entity->client->present()->cityStateZip($this->entity->client->city, $this->entity->client->state, $this->entity->client->postal_code, false) ?: '&nbsp;', 'label' => ctrans('texts.city_state_postal')];
+            // $data['$city_state_postal'] = ['value' => $this->entity->client->present()->cityStateZip($this->entity->client->city, $this->entity->client->state, $this->entity->client->postal_code, false) ?: '&nbsp;', 'label' => ctrans('texts.city_state_postal')];
             $data['$client.city_state_postal'] = &$data['$city_state_postal'];
-            $data['$postal_city_state'] = ['value' => $this->entity->client->present()->cityStateZip($this->entity->client->city, $this->entity->client->state, $this->entity->client->postal_code, true) ?: '&nbsp;', 'label' => ctrans('texts.postal_city_state')];
+            // $data['$postal_city_state'] = ['value' => $this->entity->client->present()->cityStateZip($this->entity->client->city, $this->entity->client->state, $this->entity->client->postal_code, true) ?: '&nbsp;', 'label' => ctrans('texts.postal_city_state')];
             $data['$client.postal_city_state'] = &$data['$postal_city_state'];
-            $data['$postal_city'] = ['value' => $this->entity->client->present()->cityStateZip($this->entity->client->city, null, $this->entity->client->postal_code, true) ?: '&nbsp;', 'label' => ctrans('texts.postal_city')];
+            // $data['$postal_city'] = ['value' => $this->entity->client->present()->cityStateZip($this->entity->client->city, null, $this->entity->client->postal_code, true) ?: '&nbsp;', 'label' => ctrans('texts.postal_city')];
             $data['$client.postal_city'] = &$data['$postal_city'];
             $data['$client.country'] = &$data['$country'];
-            $data['$client.email'] = &$data['$email'];
 
             $data['$client.billing_address'] = &$data['$client_address'];
             $data['$client.billing_address1'] = &$data['$client.address1'];
@@ -486,18 +515,16 @@ class VendorHtmlEngine
             $data['$client.billing_postal_code'] = &$data['$client.postal_code'];
             $data['$client.billing_country'] = &$data['$client.country'];
 
-            $data['$client.shipping_address'] = ['value' => $this->entity->client->present()->shipping_address() ?: '&nbsp;', 'label' => ctrans('texts.shipping_address')];
-            $data['$client.shipping_address1'] = ['value' => $this->entity->client->shipping_address1 ?: '&nbsp;', 'label' => ctrans('texts.shipping_address1')];
-            $data['$client.shipping_address2'] = ['value' => $this->entity->client->shipping_address2 ?: '&nbsp;', 'label' => ctrans('texts.shipping_address2')];
-            $data['$client.shipping_city'] = ['value' => $this->entity->client->shipping_city ?: '&nbsp;', 'label' => ctrans('texts.shipping_city')];
-            $data['$client.shipping_state'] = ['value' => $this->entity->client->shipping_state ?: '&nbsp;', 'label' => ctrans('texts.shipping_state')];
-            $data['$client.shipping_postal_code'] = ['value' => $this->entity->client->shipping_postal_code ?: '&nbsp;', 'label' => ctrans('texts.shipping_postal_code')];
-            $data['$client.shipping_country'] = ['value' => isset($this->entity->client->shipping_country->name) ? ctrans('texts.country_' . $this->entity->client->shipping_country->name) : '', 'label' => ctrans('texts.shipping_country')];
+
+            $data['$client.id_number'] = &$data['$id_number'];
+            $data['$client.vat_number'] = &$data['$vat_number'];
+            $data['$client.website'] = &$data['$website'];
+            $data['$client.phone'] = &$data['$phone'];
+            $data['$client.email'] = &$data['$email'];
+
 
             $data['$client.currency'] = ['value' => $this->entity->client->currency()->code, 'label' => ''];
-
             $data['$client.lang_2'] = ['value' => optional($this->entity->client->language())->locale, 'label' => ''];
-
             $data['$client.balance'] = ['value' => Number::formatMoney($this->entity->client->balance, $this->entity->client), 'label' => ctrans('texts.account_balance')];
             $data['$client_balance'] = ['value' => Number::formatMoney($this->entity->client->balance, $this->entity->client), 'label' => ctrans('texts.account_balance')];
         }
@@ -581,15 +608,16 @@ class VendorHtmlEngine
 
     private function getCountryName(): string
     {
+        return once(function () {
+            /** @var \Illuminate\Support\Collection<\App\Models\Country> */
+            $countries = app('countries');
 
-        /** @var \Illuminate\Support\Collection<\App\Models\Country> */
-        $countries = app('countries');
+            $country = $countries->first(function ($item) {
+                return $item->id == $this->settings->country_id;
+            });
 
-        $country = $countries->first(function ($item) {
-            return $item->id == $this->settings->country_id;
+            return $country ? ctrans('texts.country_' . $country->name) : '&nbsp;';
         });
-
-        return $country ? ctrans('texts.country_' . $country->name) : '&nbsp;';
     }
 
 
@@ -600,10 +628,7 @@ class VendorHtmlEngine
         if ($country) {
             return $country->iso_3166_2;
         }
-        // if ($country) {
-        //     return ctrans('texts.country_' . $country->iso_3166_2);
-        // }
-
+        
         return '&nbsp;';
     }
     /**

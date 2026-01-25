@@ -42,6 +42,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int $status_id
  * @property int|null $project_id
  * @property int|null $vendor_id
+ * @property int|null $location_id
  * @property int|null $recurring_id
  * @property int|null $design_id
  * @property int|null $invoice_id
@@ -82,6 +83,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int $custom_surcharge_tax2
  * @property int $custom_surcharge_tax3
  * @property int $custom_surcharge_tax4
+ * @property int|null $location_id
  * @property float $exchange_rate
  * @property float $amount
  * @property float $balance
@@ -95,7 +97,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string|null $reminder2_sent
  * @property string|null $reminder3_sent
  * @property string|null $reminder_last_sent
+ * @property int|null $location_id
+ * @property object|null $tax_data
+ * @property object|null $e_invoice
  * @property float $paid_to_date
+ * @property object|null $tax_data
  * @property int|null $subscription_id
  * @property \App\Models\User|null $assigned_user
  * @property \App\Models\Client $client
@@ -111,6 +117,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read \App\Models\Project|null $project
  * @property-read \App\Models\User $user
  * @property-read \App\Models\Vendor|null $vendor
+ * @property-read \App\Models\Location|null $location
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Activity> $activities
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Document> $documents
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Backup> $history
@@ -127,6 +134,16 @@ class Quote extends BaseModel
     use PresentableTrait;
     use MakesInvoiceValues;
     use Searchable;
+
+    /**
+     * Get the index name for the model.
+     *
+     * @return string
+     */
+    public function searchableAs(): string
+    {
+        return 'quotes';
+    }
 
     protected $presenter = QuotePresenter::class;
 
@@ -207,8 +224,8 @@ class Quote extends BaseModel
             'id' => $this->company->db.":".$this->id,
             'name' => ctrans('texts.quote') . " " . ($this->number ?? '') . " | " . $this->client->present()->name() .  ' | ' . Number::formatMoney($this->amount, $this->company) . ' | ' . $this->translateDate($this->date, $this->company->date_format(), $locale),
             'hashed_id' => $this->hashed_id,
-            'number' => $this->number,
-            'is_deleted' => $this->is_deleted,
+            'number' => (string)$this->number,
+            'is_deleted' => (bool)$this->is_deleted,
             'amount' => (float) $this->amount,
             'balance' => (float) $this->balance,
             'due_date' => $this->due_date,

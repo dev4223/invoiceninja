@@ -120,6 +120,7 @@ class InvoiceTransformer extends BaseTransformer
             ];
 
         }
+
         return $transformed;
     }
 

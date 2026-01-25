@@ -452,8 +452,17 @@ class RecurringInvoiceController extends BaseController
                     $recurring_invoices->each(function ($recurring_invoice) {
                         
                         if($recurring_invoice->status_id == RecurringInvoice::STATUS_COMPLETED){
+                           
+                            if(!$recurring_invoice->next_send_date){
+                            $recurring_invoice->next_send_date = $recurring_invoice->last_sent_date;
+                            $recurring_invoice->next_send_date_client = $recurring_invoice->last_sent_date;
+                            $recurring_invoice->next_send_date = $recurring_invoice->nextSendDate();
+                            $recurring_invoice->next_send_date_client = $recurring_invoice->nextSendDateClient();
+                            }
+
                             $recurring_invoice->status_id = RecurringInvoice::STATUS_PAUSED;
                             $recurring_invoice->save();
+
                         }
                     });
                 }

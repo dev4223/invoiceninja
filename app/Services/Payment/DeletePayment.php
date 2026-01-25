@@ -12,16 +12,23 @@
 
 namespace App\Services\Payment;
 
-use App\Models\BankTransaction;
 use App\Models\Credit;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\BankTransaction;
+use App\Listeners\Payment\PaymentTransactionEventEntry;
 use Illuminate\Contracts\Container\BindingResolutionException;
 
+/**
+ *
+ * @deprecated in favour of DeletePaymentV2
+ *
+ */
 class DeletePayment
 {
     private float $_paid_to_date_deleted = 0;
 
+    private float $total_payment_amount = 0;
     /**
      * @param Payment $payment
      * @return void
@@ -87,6 +94,11 @@ class DeletePayment
         $this->_paid_to_date_deleted = 0;
 
         if ($this->payment->invoices()->exists()) {
+
+            $invoice_ids = $this->payment->invoices()->pluck('invoices.id')->toArray();
+
+            $this->total_payment_amount = ($this->payment->amount - $this->payment->refunded) + ($this->payment->paymentables->where('paymentable_type', 'App\Models\Credit')->sum('amount') - $this->payment->paymentables->where('paymentable_type', 'App\Models\Credit')->sum('refunded'));
+
             $this->payment->invoices()->each(function ($paymentable_invoice) {
                 $net_deletable = $paymentable_invoice->pivot->amount - $paymentable_invoice->pivot->refunded;
 
@@ -135,15 +147,18 @@ class DeletePayment
 
                     // 2025-03-26 - If we are deleting a negative payment, then there is an edge case where the paid to date will be reduced further down.
                     // for this scenario, we skip the update to the client paid to date at this point.
+
+                    //2025-08-19 - if there is an unapplied amount, we need to subtract it from the paid to date.
                     $this->payment
                          ->client
                          ->service()
                          ->updateBalanceAndPaidToDate($net_deletable, ($net_deletable * -1) > 0 ? 0 : ($net_deletable * -1)) // if negative, set to 0, the paid to date will be reduced further down.
+                        //  ->updateBalanceAndPaidToDate($net_deletable, ($net_deletable * -1) > 0 ? 0 : ($net_deletable * -1 - ($this->payment->amount - $this->payment->applied))) // if negative, set to 0, the paid to date will be reduced further down.
                          ->save();
 
                     if (abs(floatval($paymentable_invoice->balance) - floatval($paymentable_invoice->amount)) < 0.005) {
                         $paymentable_invoice->service()->setStatus(Invoice::STATUS_SENT)->save();
-                    } elseif (floatval($paymentable_invoice->balance) == 0) {
+                    } elseif (abs(floatval($paymentable_invoice->balance)) < 0.005) {
                         $paymentable_invoice->service()->setStatus(Invoice::STATUS_PAID)->save();
                     } else {
                         $paymentable_invoice->service()->setStatus(Invoice::STATUS_PARTIAL)->save();
@@ -156,15 +171,31 @@ class DeletePayment
                     $paymentable_invoice->delete();
 
                 }
+
+                PaymentTransactionEventEntry::dispatch($this->payment, [$paymentable_invoice->id], $this->payment->company->db, $net_deletable, true);
+
             });
+
+        } elseif (floatval($this->payment->amount) == floatval($this->payment->applied)) {
+            // If there are no invoices associated with the payment, we should not be updating the clients paid to date amount
+            // The edge case handled here is when an invoice has been "reversed" an associated credit note is created, this is effectively the same
+            // payment which can then be used _again_. So the first payment of a reversed invoice should NEVER reduce the paid to date amount.
+            $this->update_client_paid_to_date = false;
         }
 
         //sometimes the payment is NOT created properly, this catches the payment and prevents the paid to date reducing inappropriately.
         if ($this->update_client_paid_to_date) {
 
+            // $reduced_paid_to_date = $this->payment->amount < 0 ? $this->payment->amount * -1 : min(0, ($this->payment->amount - $this->payment->refunded - $this->_paid_to_date_deleted) * -1);
             $reduced_paid_to_date = $this->payment->amount < 0 ? $this->payment->amount * -1 : min(0, ($this->payment->amount - $this->payment->refunded - $this->_paid_to_date_deleted) * -1);
 
-            if($reduced_paid_to_date != 0) {
+            /** handle the edge case where a partial credit + unapplied payment is deleted */
+            if (floatval($this->total_payment_amount) != floatval($this->_paid_to_date_deleted)) {
+                $reduced_paid_to_date = min(0, ($this->total_payment_amount - $this->_paid_to_date_deleted) * -1);
+            }
+
+            nlog("reduced paid to date: {$reduced_paid_to_date}");
+            if ($reduced_paid_to_date != 0) {
                 $this->payment
                     ->client
                     ->service()

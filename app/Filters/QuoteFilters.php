@@ -85,11 +85,14 @@ class QuoteFilters extends QueryFilters
         }
 
         $this->builder->where(function ($query) use ($status_parameters) {
+            
             if (in_array('sent', $status_parameters)) {
                 $query->orWhere(function ($q) {
                     $q->where('status_id', Quote::STATUS_SENT)
-                    ->whereNull('due_date')
-                    ->orWhere('due_date', '>=', now()->toDateString());
+                    ->where(function ($q) {
+                        $q->whereNull('due_date')
+                        ->orWhere('due_date', '>=', now()->toDateString());
+                    });
                 });
             }
 
@@ -170,7 +173,8 @@ class QuoteFilters extends QueryFilters
         }
 
         if ($sort_col[0] == 'client_id') {
-            return $this->builder->orderBy(\App\Models\Client::select('name')
+            return $this->builder->orderByRaw('ISNULL(client_id), client_id '. $dir)
+                    ->orderBy(\App\Models\Client::select('name')
                     ->whereColumn('clients.id', 'quotes.client_id'), $dir);
         }
 

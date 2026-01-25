@@ -158,7 +158,7 @@ class Statement
             $ts->addGlobal(['show_credits' => $this->options['show_credits_table']]);
             $ts->addGlobal(['show_aging' => $this->options['show_aging_table']]);
             $ts->addGlobal(['show_payments' => $this->options['show_payments_table']]);
-            $ts->addGlobal(['currency_code' => $this->client->company->currency()->code]);
+            $ts->addGlobal(['currency_code' => $this->client->currency()->code]);
 
             $ts->build([
                 'variables' => collect([$variables]),
@@ -212,6 +212,7 @@ class Statement
             $this->client->settings = $settings;
 
             $this->entity = \App\Models\Invoice::factory()->make(); //@phpstan-ignore-line
+            $this->entity->client_id = $this->client->id;//@phpstan-ignore-line
             $this->entity->client = $this->client;//@phpstan-ignore-line
             $ii = \App\Models\InvoiceInvitation::factory()->make(); //@phpstan-ignore-line
             $ii->setRelation('invoice', $this->entity); //@phpstan-ignore-line
@@ -219,16 +220,9 @@ class Statement
             $ii->setRelation('company', $this->client->company);
             $ii->setRelation('user', $this->client->user);
             $this->entity->client->setRelation('company', $this->client->company);
-            $this->entity->setRelation('invitations', $ii); //@phpstan-ignore-line
+            $this->entity->setRelation('invitations', collect([$ii])); //@phpstan-ignore-line
             $this->entity->setRelation('company', $this->client->company);
             $this->entity->setRelation('user', $this->client->user);
-
-            // $this->entity = \App\Models\Invoice::factory()->make(); //@phpstan-ignore-line
-            // $this->entity->client = \App\Models\Client::factory()->make(['settings' => $settings]); //@phpstan-ignore-line
-            // $this->entity->client->setRelation('company', $this->client->company);
-            // $this->entity->setRelation('invitations', \App\Models\InvoiceInvitation::factory()->make()); //@phpstan-ignore-line
-            // $this->entity->setRelation('company', $this->client->company);
-            // $this->entity->setRelation('user', $this->client->user);
 
         }
 

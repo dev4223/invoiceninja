@@ -66,19 +66,21 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property float $tax_amount3
  * @property bool $uses_inclusive_taxes
  * @property bool $calculate_tax_by_amount
+ * @property-read int|null $documents_count
+ * @property-read mixed $hashed_id
  * @property-read \App\Models\User|null $assigned_user
  * @property-read \App\Models\ExpenseCategory|null $category
  * @property-read \App\Models\Client|null $client
  * @property-read \App\Models\Company $company
  * @property-read \App\Models\Currency|null $currency
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Document> $documents
- * @property-read int|null $documents_count
- * @property-read mixed $hashed_id
  * @property-read \App\Models\PaymentType|null $payment_type
+ * @property-read \App\Models\Currency|null $invoice_currency
  * @property-read \App\Models\Project|null $project
  * @property-read \App\Models\PurchaseOrder|null $purchase_order
  * @property-read \App\Models\User $user
  * @property-read \App\Models\Vendor|null $vendor
+ * @property-read \App\Models\Currency|null $invoice_currency
  * @method static \Illuminate\Database\Eloquent\Builder|BaseModel company()
  * @method static \Illuminate\Database\Eloquent\Builder|BaseModel exclude($columns)
  * @method static \Database\Factories\ExpenseFactory factory($count = null, $state = [])
@@ -100,6 +102,16 @@ class Expense extends BaseModel
     use SoftDeletes;
     use Filterable;
     use Searchable;
+
+    /**
+     * Get the index name for the model.
+     *
+     * @return string
+     */
+    public function searchableAs(): string
+    {
+        return 'expenses_v2';
+    }
 
     protected $fillable = [
         'client_id',
@@ -176,8 +188,8 @@ class Expense extends BaseModel
             'id' => $this->company->db.":".$this->id,
             'name' => ctrans('texts.expense') . " " . ($this->number ?? '') . ' | ' . Number::formatMoney($this->amount, $this->company) . ' | ' . $this->translateDate($this->date, $this->company->date_format(), $locale),
             'hashed_id' => $this->hashed_id,
-            'number' => $this->number,
-            'is_deleted' => $this->is_deleted,
+            'number' => (string)$this->number,
+            'is_deleted' => (bool)$this->is_deleted,
             'amount' => (float) $this->amount,
             'date' => $this->date ?? null,
             'custom_value1' => (string)$this->custom_value1,
@@ -185,6 +197,8 @@ class Expense extends BaseModel
             'custom_value3' => (string)$this->custom_value3,
             'custom_value4' => (string)$this->custom_value4,
             'company_key' => $this->company->company_key,
+            'public_notes' => (string)$this->public_notes,
+            'private_notes' => (string)$this->private_notes
         ];
     }
 

@@ -12,11 +12,17 @@
 
 namespace App\Http\Requests\TaskScheduler;
 
+use App\Models\Design;
+use App\Models\Invoice;
 use App\Http\Requests\Request;
+use App\Utils\Traits\MakesHash;
+use Illuminate\Validation\Rule;
 use App\Http\ValidationRules\Scheduler\ValidClientIds;
+use App\Http\ValidationRules\Scheduler\InvoiceWithNoExistingSchedule;
 
 class StoreSchedulerRequest extends Request
 {
+    use MakesHash;
     public array $client_statuses = [
                         'all',
                         'draft',
@@ -37,7 +43,24 @@ class StoreSchedulerRequest extends Request
                         'converted',
                         'uninvoiced',
     ];
-
+    
+    public array $templates = [
+        'invoice',
+        'quote',
+        'credit',
+        'purchase_order',
+        'quote',
+        'credit',
+        'purchase_order',
+        'invoice',
+        'reminder1',
+        'reminder2',
+        'reminder3',
+        'reminder_endless',
+        'custom1',
+        'custom2',
+        'custom3',
+    ];
     /**
      * Determine if the user is authorized to make this request.
      *
@@ -70,11 +93,31 @@ class StoreSchedulerRequest extends Request
             'parameters.report_name' => ['bail','sometimes', 'string', 'required_if:template,email_report','in:vendor,purchase_order_item,purchase_order,ar_detailed,ar_summary,client_balance,tax_summary,profitloss,client_sales,user_sales,product_sales,activity,activities,client,clients,client_contact,client_contacts,credit,credits,document,documents,expense,expenses,invoice,invoices,invoice_item,invoice_items,quote,quotes,quote_item,quote_items,recurring_invoice,recurring_invoices,payment,payments,product,products,task,tasks'],
             'parameters.date_key' => ['bail','sometimes', 'string'],
             'parameters.status' => ['bail','sometimes', 'nullable', 'string'],
+            'parameters.include_project_tasks' => ['bail','sometimes', 'boolean', 'required_if:template,invoice_outstanding_tasks'],
+            'parameters.auto_send' => ['bail','sometimes', 'boolean', 'required_if:template,invoice_outstanding_tasks'],
+            'parameters.invoice_id' => ['bail', 'string', 'required_if:template,payment_schedule', new InvoiceWithNoExistingSchedule()],
+            'parameters.auto_bill' => ['bail', 'boolean', 'required_if:template,payment_schedule'],
+            'parameters.template' => ['bail', 'sometimes', 'nullable', 'string', Rule::in($this->templates)],
+            'parameters.schedule' => ['bail', 'array', 'required_if:template,payment_schedule', 'min:1'],
+            'parameters.schedule.*.id' => ['bail','sometimes', 'integer'],
+            'parameters.schedule.*.date' => ['bail','sometimes', 'date:Y-m-d'],
+            'parameters.schedule.*.amount' => ['bail','sometimes', 'numeric'],
+            'parameters.schedule.*.is_amount' => ['bail','sometimes', 'boolean'],
+            'parameters.template_id' => ['bail','sometimes', 'string', 'nullable'],
         ];
 
         return $rules;
     }
 
+    public function withValidator(\Illuminate\Validation\Validator $validator)
+    {
+        $validator->after(function ($validator) {
+            if(!empty($this->parameters['template_id']) && Design::where('id', $this->decodePrimaryKey($this->parameters['template_id']))->where('is_template',true)->company()->doesntExist()) {
+                $validator->errors()->add('template_id', 'Invalid Template ID Selected');
+            }
+        });
+    }
+    
     public function prepareForValidation()
     {
         $input = $this->all();
@@ -107,6 +150,29 @@ class StoreSchedulerRequest extends Request
 
         }
 
+        if(isset($input['parameters']['schedule']) && is_array($input['parameters']['schedule']) && count($input['parameters']['schedule']) > 0) {
+            $input['remaining_cycles'] = count($input['parameters']['schedule']);
+        }
+
+        if($input['template'] == 'payment_schedule' && isset($input['parameters']['invoice_id'])){
+            $i = Invoice::withTrashed()->find($this->decodePrimaryKey($input['parameters']['invoice_id']));
+            $input['name'] = ctrans('texts.payment_schedule'). " " . ctrans('texts.invoice_number_short') . " " . $i->number;
+        }
+        elseif($input['template'] == 'invoice_outstanding_tasks'){
+            $input['name'] = ctrans('texts.invoice_outstanding_tasks');
+        }
+
+        $input['parameters']['user_id'] = auth()->user()->id;
+
         $this->replace($input);
+    }
+
+    public function messages()
+    {
+        return [
+            'parameters.schedule.min' => 'The schedule must have at least one item.',
+            'parameters.schedule' => 'You must have at least one schedule entry.',
+            'parameters.invoice_id.required_if' => 'The invoice is required for the payment schedule template.'
+        ];
     }
 }

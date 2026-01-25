@@ -54,7 +54,6 @@ class ActivityExport extends BaseExport
             return ['identifier' => $key, 'display_value' => $headerdisplay[$value]];
         })->toArray();
 
-
         $report = $query->cursor()
             ->map(function ($resource) {
                 /** @var \App\Models\Activity $resource */
@@ -94,7 +93,7 @@ class ActivityExport extends BaseExport
 
     }
 
-    private function init(): Builder
+    public function init(): Builder
     {
         MultiDB::setDb($this->company->db);
         App::forgetInstance('translator');
@@ -116,6 +115,8 @@ class ActivityExport extends BaseExport
 
         $query = $this->addDateRange($query, 'activities');
 
+        $query = $this->filterByUserPermissions($query);
+
         if ($this->input['activity_type_id'] ?? false) {
             $query->where('activity_type_id', $this->input['activity_type_id']);
         }
@@ -128,18 +129,16 @@ class ActivityExport extends BaseExport
         $query = $this->init();
 
         //load the CSV document from a string
-        $this->csv = Writer::createFromString();
+        $this->csv = Writer::fromString();
         \League\Csv\CharsetConverter::addTo($this->csv, 'UTF-8', 'UTF-8');
 
         //insert the header
         $this->csv->insertOne($this->buildHeader());
 
-
         $query->cursor()
               ->each(function ($entity) {
 
                   /** @var \App\Models\Activity $entity */
-
                   $this->buildRow($entity);
               });
 

@@ -36,6 +36,7 @@ use App\Models\Presenters\RecurringInvoicePresenter;
  * @property int|null $project_id
  * @property int|null $vendor_id
  * @property int $status_id
+ * @property int|null $location_id
  * @property string|null $number
  * @property float $discount
  * @property bool $is_amount_discount
@@ -84,6 +85,7 @@ use App\Models\Presenters\RecurringInvoicePresenter;
  * @property bool $custom_surcharge_tax3
  * @property bool $custom_surcharge_tax4
  * @property string|null $due_date_days
+ * @property int|null $location_id
  * @property string|null $partial_due_date
  * @property float $exchange_rate
  * @property float $paid_to_date
@@ -109,6 +111,7 @@ use App\Models\Presenters\RecurringInvoicePresenter;
  * @property-read \App\Models\Subscription|null $subscription
  * @property-read \App\Models\User $user
  * @property-read \App\Models\Vendor|null $vendor
+ * @property-read \App\Models\Location|null $location
  * @method static \Illuminate\Database\Eloquent\Builder|BaseModel exclude($columns)
  * @method static \Database\Factories\RecurringInvoiceFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder|RecurringInvoice filter(\App\Filters\QueryFilters $filters)
@@ -135,6 +138,7 @@ class RecurringInvoice extends BaseModel
     use HasRecurrence;
     use PresentableTrait;
     use Searchable;
+
 
     protected $presenter = RecurringInvoicePresenter::class;
 
@@ -268,16 +272,64 @@ class RecurringInvoice extends BaseModel
         'remaining_cycles',
     ];
 
+
+    /**
+     * Get the index name for the model.
+     *
+     * @return string
+     */
+    public function searchableAs(): string
+    {
+        return 'recurring_invoices';
+    }
+    
     public function toSearchableArray()
     {
         $locale = $this->company->locale();
         App::setLocale($locale);
 
+        // Properly cast line items to ensure correct types
+        $line_items = [];
+        if ($this->line_items) {
+            foreach ($this->line_items as $item) {
+                $line_items[] = [
+                    'quantity' => (float)($item->quantity ?? 0),
+                    'net_cost' => (float)($item->net_cost ?? 0),
+                    'cost' => (float)($item->cost ?? 0),
+                    'product_key' => (string)($item->product_key ?? ''),
+                    'product_cost' => (float)($item->product_cost ?? 0),
+                    'notes' => (string)($item->notes ?? ''),
+                    'discount' => (float)($item->discount ?? 0),
+                    'is_amount_discount' => (bool)($item->is_amount_discount ?? false),
+                    'tax_name1' => (string)($item->tax_name1 ?? ''),
+                    'tax_rate1' => (float)($item->tax_rate1 ?? 0),
+                    'tax_name2' => (string)($item->tax_name2 ?? ''),
+                    'tax_rate2' => (float)($item->tax_rate2 ?? 0),
+                    'tax_name3' => (string)($item->tax_name3 ?? ''),
+                    'tax_rate3' => (float)($item->tax_rate3 ?? 0),
+                    'sort_id' => (string)($item->sort_id ?? ''),
+                    'line_total' => (float)($item->line_total ?? 0),
+                    'gross_line_total' => (float)($item->gross_line_total ?? 0),
+                    'tax_amount' => (float)($item->tax_amount ?? 0),
+                    'date' => (string)($item->date ?? ''),
+                    'custom_value1' => (string)($item->custom_value1 ?? ''),
+                    'custom_value2' => (string)($item->custom_value2 ?? ''),
+                    'custom_value3' => (string)($item->custom_value3 ?? ''),
+                    'custom_value4' => (string)($item->custom_value4 ?? ''),
+                    'type_id' => (string)($item->type_id ?? ''),
+                    'tax_id' => (string)($item->tax_id ?? ''),
+                    'task_id' => (string)($item->task_id ?? ''),
+                    'expense_id' => (string)($item->expense_id ?? ''),
+                    'unit_code' => (string)($item->unit_code ?? ''),
+                ];
+            }
+        }
+
         return [
             'id' => $this->company->db.":".$this->id,
             'name' => ctrans('texts.recurring_invoice') . " " . $this->number . " | " . $this->client->present()->name() .  ' | ' . Number::formatMoney($this->amount, $this->company) . ' | ' . $this->translateDate($this->date, $this->company->date_format(), $locale),
             'hashed_id' => $this->hashed_id,
-            'number' => $this->number,
+            'number' => (string)$this->number,
             'is_deleted' => $this->is_deleted,
             'amount' => (float) $this->amount,
             'balance' => (float) $this->balance,
@@ -289,6 +341,7 @@ class RecurringInvoice extends BaseModel
             'custom_value4' => (string)$this->custom_value4,
             'company_key' => $this->company->company_key,
             'po_number' => (string)$this->po_number,
+            'line_items' => $line_items,
         ];
     }
 

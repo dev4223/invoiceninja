@@ -126,20 +126,25 @@ class VendorContact extends Authenticatable implements HasLocalePreference
         'send_email',
     ];
 
+    public function searchableAs(): string
+    {
+        return 'vendor_contacts';
+    }
+
     public function toSearchableArray()
     {
         return [
             'id' => $this->company->db.":".$this->id,
             'name' => $this->present()->search_display(),
             'hashed_id' => $this->hashed_id,
-            'email' => $this->email,
-            'first_name' => $this->first_name,
-            'last_name' => $this->last_name,
-            'phone' => $this->phone,
-            'custom_value1' => $this->custom_value1,
-            'custom_value2' => $this->custom_value2,
-            'custom_value3' => $this->custom_value3,
-            'custom_value4' => $this->custom_value4,
+            'email' => (string)$this->email,
+            'first_name' => (string)$this->first_name,
+            'last_name' => (string)$this->last_name,
+            'phone' => (string)$this->phone,
+            'custom_value1' => (string)$this->custom_value1,
+            'custom_value2' => (string)$this->custom_value2,
+            'custom_value3' => (string)$this->custom_value3,
+            'custom_value4' => (string)$this->custom_value4,
             'company_key' => $this->company->company_key,
             'vendor_id' => $this->vendor->hashed_id,
         ];
@@ -210,13 +215,19 @@ class VendorContact extends Authenticatable implements HasLocalePreference
 
     public function preferredLocale()
     {
+        return once(function () {
 
-        /** @var \Illuminate\Support\Collection<\App\Models\Language> */
-        $languages = app('languages');
+            /** @var \Illuminate\Support\Collection<\App\Models\Language> */
+            $languages = app('languages');
 
-        return $languages->first(function ($item) {
-            return $item->id == $this->company->getSetting('language_id');
-        })->locale ?? 'en';
+            $language_id = $this->company->getSetting('language_id');
+
+            return $languages->first(function ($item) use ($language_id) {
+                return $item->id == $language_id;
+            })->locale ?? 'en';
+            
+        });
+
     }
 
     /**

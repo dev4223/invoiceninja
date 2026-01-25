@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -14,24 +15,24 @@ namespace Tests\Unit\Chart;
 use Tests\TestCase;
 use App\Models\Client;
 use App\Models\Company;
+use App\Models\Expense;
 use App\Models\Invoice;
 use App\Models\Currency;
 use Tests\MockAccountData;
 use App\DataMapper\ClientSettings;
 use App\DataMapper\CompanySettings;
-use App\Models\Expense;
 use App\Services\Chart\ChartService;
+use App\Repositories\InvoiceRepository;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 
 /**
- * 
+ *
  *   App\Services\Chart\ChartService
  */
 class ChartCurrencyTest extends TestCase
 {
     use MockAccountData;
     use DatabaseTransactions;
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -72,6 +73,8 @@ class ChartCurrencyTest extends TestCase
             'user_id' => $this->user->id,
             'company_id' => $company->id,
             'settings' => $settings,
+            'balance' => 0,
+            'paid_to_date' => 0,
         ]);
 
         Currency::query()->where('id', 1)->update(['exchange_rate' => 1]);
@@ -84,8 +87,9 @@ class ChartCurrencyTest extends TestCase
             'user_id' => $this->user->id,
             'company_id' => $company->id,
             'settings' => $settings,
+            'balance' => 0,
+            'paid_to_date' => 0,
         ]);
-
 
         $i1 = Invoice::factory()->create([
             'client_id' => $usd->id,
@@ -96,7 +100,18 @@ class ChartCurrencyTest extends TestCase
             'paid_to_date' => 0,
             'status_id' => 2,
             'date' => now(),
-            'due_date' => now()
+            'due_date' => now(),
+            'line_items' => [
+                [
+                    'product_key' => 'product_1',
+                    'quantity' => 1,
+                    'cost' => 100,
+                ]
+            ],
+            'tax_rate1' => 0,
+            'tax_rate2' => 0,
+            'tax_rate3' => 0,
+            'discount' => 0,
         ]);
 
         $i2 = Invoice::factory()->create([
@@ -108,18 +123,34 @@ class ChartCurrencyTest extends TestCase
             'paid_to_date' => 0,
             'status_id' => 2,
             'date' => now(),
-            'due_date' => now()
+            'due_date' => now(),
+            'line_items' => [
+                [
+                    'product_key' => 'product_1',
+                    'quantity' => 1,
+                    'cost' => 100,
+                ]
+            ],
+            'tax_rate1' => 0,
+            'tax_rate2' => 0,
+            'tax_rate3' => 0,
+            'discount' => 0,
         ]);
+
+        $repo = new InvoiceRepository();
+        $i1 = $repo->save([], $i1);
+        $i2 = $repo->save([], $i2);
 
         $i1->service()->markPaid()->save();
         $i2->service()->markPaid()->save();
+
+        $this->assertEquals(100, $i1->amount);
+        $this->assertEquals(100, $i2->amount);
 
         $cs = new ChartService($company, $this->user, true);
         $results = $cs->totals('1970-01-01', '2050-01-01');
 
         $this->assertCount(2, $results['currencies']);
-
-        // nlog($results);
 
         $this->assertEquals('USD', $results['currencies'][1]);
         $this->assertEquals('GBP', $results['currencies'][2]);

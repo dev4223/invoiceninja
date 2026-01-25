@@ -111,6 +111,11 @@ class SendEmailRequest extends Request
             })->slice(0, 4)->toArray();
         }
 
+        if(\App\Utils\Ninja::isHosted() && !$user->account->isPaid()){
+            unset($input['subject']);
+            unset($input['body']);
+            unset($input['cc_email']);
+        }
 
         $this->replace($input);
     }

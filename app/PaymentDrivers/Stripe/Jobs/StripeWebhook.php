@@ -88,4 +88,12 @@ class StripeWebhook implements ShouldQueue
             ], $stripe->stripe_connect_auth);
         }
     }
+
+    public function failed($exception = null)
+    {
+        nlog("StripeWebhook failed: " . $exception->getMessage());
+        
+        config(['queue.failed.driver' => null]);
+
+    }
 }

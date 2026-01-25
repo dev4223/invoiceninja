@@ -281,6 +281,20 @@ class Activity extends StaticModel
     public const EMAIL_CREDIT = 149;
 
     public const ACCOUNT_DELETED = 150;
+
+    public const MERGE_CLIENT = 151;
+
+    public const MERGE_VENDOR = 152;
+
+    public const PURGE_CLIENT = 153;
+
+    public const VERIFACTU_INVOICE_SENT = 154;
+
+    public const VERIFACTU_INVOICE_SENT_FAILURE = 155;
+
+    public const VERIFACTU_CANCELLATION_SENT = 156;
+
+    public const VERIFACTU_CANCELLATION_SENT_FAILURE = 157;
     
     protected $casts = [
         'is_system' => 'boolean',

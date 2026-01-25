@@ -54,12 +54,15 @@ use App\Events\PurchaseOrder\PurchaseOrderWasEmailed;
  * @property string|null $terms
  * @property string|null $tax_name1
  * @property float $tax_rate1
+ * @property bool $has_tasks
+ * @property bool $has_expenses
  * @property string|null $tax_name2
  * @property float $tax_rate2
  * @property string|null $tax_name3
  * @property float $tax_rate3
  * @property float $total_taxes
  * @property bool $uses_inclusive_taxes
+ * @property int|null $location_id
  * @property string|null $reminder1_sent
  * @property string|null $reminder2_sent
  * @property string|null $reminder3_sent
@@ -89,6 +92,9 @@ use App\Events\PurchaseOrder\PurchaseOrderWasEmailed;
  * @property int|null $updated_at
  * @property int|null $expense_id
  * @property int|null $currency_id
+ * @property int|null $location_id
+ * @property int|null $invoice_id
+ * @property object|null $tax_data
  * @property-read int|null $activities_count
  * @property \App\Models\User|null $assigned_user
  * @property \App\Models\Client|null $client
@@ -101,6 +107,10 @@ use App\Events\PurchaseOrder\PurchaseOrderWasEmailed;
  * @property \App\Models\User $user
  * @property \App\Models\Vendor $vendor
  * @property \App\Models\PurchaseOrderInvitation $invitation
+ * @property \App\Models\Currency|null $currency
+ * @property \App\Models\Location|null $location
+ * @property object|null $tax_data
+ * @property object|null $e_invoice
  * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder exclude($columns)
  * @method static \Database\Factories\PurchaseOrderFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder|PurchaseOrder filter(\App\Filters\QueryFilters $filters)
@@ -123,6 +133,16 @@ class PurchaseOrder extends BaseModel
     use Filterable;
     use SoftDeletes;
     use Searchable;
+
+    /**
+     * Get the index name for the model.
+     *
+     * @return string
+     */
+    public function searchableAs(): string
+    {
+        return 'purchase_orders';
+    }
 
     protected $hidden = [
         'id',
@@ -213,7 +233,7 @@ class PurchaseOrder extends BaseModel
             'id' => $this->company->db.":".$this->id,
             'name' => ctrans('texts.purchase_order') . " " . $this->number . " | " . $this->vendor->present()->name() .  ' | ' . Number::formatMoney($this->amount, $this->company) . ' | ' . $this->translateDate($this->date, $this->company->date_format(), $locale),
             'hashed_id' => $this->hashed_id,
-            'number' => $this->number,
+            'number' => (string)$this->number,
             'is_deleted' => $this->is_deleted,
             'amount' => (float) $this->amount,
             'balance' => (float) $this->balance,

@@ -113,7 +113,6 @@ class LoginController extends BaseController
                 ->increment()
                 ->batch();
 
-
             $ip = '';
 
             if (request()->hasHeader('Cf-Connecting-Ip')) {
@@ -136,13 +135,13 @@ class LoginController extends BaseController
 
                 if (strlen($request->input('one_time_password')) == 0 || !$google2fa->verifyKey(decrypt($user->google_2fa_secret), $request->input('one_time_password'))) {
                     return response()
-                        ->json(['message' => ctrans('texts.invalid_one_time_password')], 401)
+                        ->json(['message' => ctrans('texts.invalid_one_time_password')], 422)
                         ->header('X-App-Version', config('ninja.app_version'))
                         ->header('X-Api-Version', config('ninja.minimum_client_version'));
                 }
-            } elseif ($user->google_2fa_secret && !$request->has('one_time_password')) {
+            } elseif (strlen($user->google_2fa_secret ?? '') > 2 && !$request->has('one_time_password')) {
                 return response()
-                    ->json(['message' => ctrans('texts.invalid_one_time_password')], 401)
+                    ->json(['message' => ctrans('texts.invalid_one_time_password')], 422)
                     ->header('X-App-Version', config('ninja.app_version'))
                     ->header('X-Api-Version', config('ninja.minimum_client_version'));
             }
@@ -155,8 +154,10 @@ class LoginController extends BaseController
                 $user = $user->fresh();
             }
 
+            nlog("LOGIN:: {$request->email} - {$user->account_id}");
+
             /** @var \App\Models\CompanyUser $cu */
-            $cu = $this->hydrateCompanyUser();
+            $cu = $this->hydrateCompanyUser($user);
 
             if ($cu->count() == 0) {
                 return response()->json(['message' => 'User found, but not attached to any companies, please see your administrator'], 400);
@@ -307,7 +308,7 @@ class LoginController extends BaseController
             Auth::login($existing_user, false);
 
             /** @var \App\Models\CompanyUser $cu */
-            $cu = $this->hydrateCompanyUser();
+            $cu = $this->hydrateCompanyUser($existing_user);
 
             if ($cu->count() == 0) {
                 return response()->json(['message' => 'User found, but not attached to any companies, please see your administrator'], 400);
@@ -328,15 +329,13 @@ class LoginController extends BaseController
             Auth::login($existing_login_user, false);
             /** @var \App\Models\User $user */
 
-            $user = auth()->user();
-
-            $user->update([
+            $existing_login_user->update([
                 'oauth_user_id' => $user->id,
                 'oauth_provider_id' => $provider,
             ]);
 
             /** @var \App\Models\CompanyUser $cu */
-            $cu = $this->hydrateCompanyUser();
+            $cu = $this->hydrateCompanyUser($existing_login_user);
 
             if ($cu->count() == 0) {
                 return response()->json(['message' => 'User found, but not attached to any companies, please see your administrator'], 400);
@@ -376,33 +375,31 @@ class LoginController extends BaseController
 
         $account = (new CreateAccount($new_account, request()->getClientIp()))->handle();
 
-        Auth::login($account->default_company->owner(), false);
+        $account_user = $account->default_company->owner();
+        Auth::login($account_user, false);
 
-        /** @var \App\Models\User $user */
-        $user = auth()->user();
-
-        $user->email_verified_at = now();
-        $user->save();
+        // $account_user->email_verified_at = now();
+        // $account_user->save();
 
         /** @var \App\Models\CompanyUser $cu */
-        $cu = $this->hydrateCompanyUser();
+        $cu = $this->hydrateCompanyUser($account_user);
 
         if ($cu->count() == 0) {
             return response()->json(['message' => 'User found, but not attached to any companies, please see your administrator'], 400);
         }
 
-        if (Ninja::isHosted() && !$cu->first()->is_owner && !auth()->user()->account->isEnterprisePaidClient()) {
+        if (Ninja::isHosted() && !$cu->first()->is_owner && !$account_user->account->isEnterprisePaidClient()) {
             return response()->json(['message' => 'Pro / Free accounts only the owner can log in. Please upgrade'], 403);
         }
 
         return $this->timeConstrainedResponse($cu);
     }
 
-    private function hydrateCompanyUser(): Builder
+    private function hydrateCompanyUser(User $user): Builder
     {
 
-        /** @var \App\Models\User $user */
-        $user = auth()->user();
+        // /** @var \App\Models\User $user */
+        // $user = auth()->user();
 
         /** @var Builder $cu */
         $cu = CompanyUser::query()->where('user_id', $user->id);
@@ -427,8 +424,6 @@ class LoginController extends BaseController
         $truth->setCompany($set_company);
 
         //21-03-2024
-
-
         $cu->each(function ($cu) {
             /** @var \App\Models\CompanyUser $cu */
             if (CompanyToken::query()->where('company_id', $cu->company_id)->where('user_id', $cu->user_id)->where('is_system', true)->doesntExist()) {
@@ -512,7 +507,7 @@ class LoginController extends BaseController
         Auth::login($existing_user, false);
 
         /** @var \App\Models\CompanyUser $cu */
-        $cu = $this->hydrateCompanyUser();
+        $cu = $this->hydrateCompanyUser($existing_user);
 
         if ($cu->count() == 0) {
             return response()->json(['message' => 'User found, but not attached to any companies, please see your administrator'], 400);
@@ -527,19 +522,12 @@ class LoginController extends BaseController
         return $this->timeConstrainedResponse($cu);
     }
 
-    private function existingLoginUser($oauth_user_id, $provider)
+    private function existingLoginUser($user)
     {
 
-        /** @var \App\Models\User $user */
-        $user = auth()->user();
-
-        $user->update([
-            'oauth_user_id' => $oauth_user_id,
-            'oauth_provider_id' => $provider,
-        ]);
 
         /** @var \App\Models\CompanyUser $cu */
-        $cu = $this->hydrateCompanyUser();
+        $cu = $this->hydrateCompanyUser($user);
 
         if ($cu->count() == 0) {
             return response()->json(['message' => 'User found, but not attached to any companies, please see your administrator'], 400);
@@ -598,7 +586,13 @@ class LoginController extends BaseController
 
                 Auth::login($existing_login_user, false);
 
-                return $this->existingLoginUser($google->harvestSubField($user), 'google');
+                $existing_login_user->update([
+                    'oauth_user_id' => $google->harvestSubField($user),
+                    'oauth_provider_id' => 'google',
+                ]);
+
+
+                return $this->existingLoginUser($existing_login_user);
             }
 
             if (request()->has('create') && request()->input('create') == 'true') {
@@ -635,16 +629,14 @@ class LoginController extends BaseController
             return $account;
         }
 
-        Auth::login($account->default_company->owner(), false);
+        $user = $account->default_company->owner();        
+        // $user->email_verified_at = now();
+        // $user->save();
 
-        /** @var \App\Models\User $user */
-        $user = auth()->user();
-
-        $user->email_verified_at = now();
-        $user->save();
+        Auth::login($user, false);
 
         /** @var \App\Models\CompanyUser $cu */
-        $cu = $this->hydrateCompanyUser();
+        $cu = $this->hydrateCompanyUser($user);
 
         if ($cu->count() == 0) {
             return response()->json(['message' => 'User found, but not attached to any companies, please see your administrator'], 400);

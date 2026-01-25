@@ -46,6 +46,10 @@ class ConnectNordigenBankIntegrationRequest extends Request
             $input['institution_id'] = $context['institution_id'];
         }
 
+        if(isset($context['bank_account_id'])){
+            $input['bank_account_id'] = $context['bank_account_id'];
+        }
+        
         $input['redirect'] = ($context['is_react'] ?? false)
             ? config('ninja.react_url') . '/#/settings/bank_accounts'
             : config('ninja.app_url');
@@ -56,6 +60,7 @@ class ConnectNordigenBankIntegrationRequest extends Request
     /**
      * @return array{
      *   user_id: int,
+     *   bank_account_id?: string,
      *   company_key: string,
      *   context: string,
      *   is_react: bool,

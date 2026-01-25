@@ -64,7 +64,6 @@ class TaskSchedulerController extends BaseController
         return $this->itemResponse($scheduler);
     }
 
-
     public function show(ShowSchedulerRequest $request, Scheduler $scheduler)
     {
         return $this->itemResponse($scheduler);

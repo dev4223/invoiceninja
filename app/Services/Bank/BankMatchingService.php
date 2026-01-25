@@ -14,25 +14,21 @@ namespace App\Services\Bank;
 
 use App\Libraries\MultiDB;
 use App\Models\BankTransaction;
-use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 
 class BankMatchingService implements ShouldQueue
 {
     use Dispatchable;
-    use InteractsWithQueue;
-    use Queueable;
     use SerializesModels;
 
     public $tries = 1;
 
     public $timeout = 3600;
 
-    public function __construct(public $company_id, public $db)
+    public function __construct(public int $company_id, public string $db)
     {
     }
 
@@ -50,7 +46,7 @@ class BankMatchingService implements ShouldQueue
 
     public function middleware()
     {
-        return [(new WithoutOverlapping($this->db."_".$this->company_id))->releaseAfter(60)->expireAfter(60)];
+        return [(new WithoutOverlapping($this->db."_".$this->company_id))->dontRelease()];
     }
 
     public function failed($exception = null)

@@ -33,6 +33,10 @@ class Merge extends AbstractService
     public function run()
     {
 
+        $_mergeable_vendor = $this->mergable_vendor->present()->name();
+        $event_vars = \App\Utils\Ninja::eventVars(auth()->user() ? auth()->user()->id : null);
+        $event_vars['vendor_hash'] = $this->mergable_vendor->vendor_hash;
+
         $this->mergable_vendor->activities()->update(['vendor_id' => $this->vendor->id]);
         $this->mergable_vendor->contacts()->update(['vendor_id' => $this->vendor->id]);
         $this->mergable_vendor->credits()->update(['vendor_id' => $this->vendor->id]);
@@ -55,6 +59,8 @@ class Merge extends AbstractService
         });
 
         $this->mergable_vendor->forceDelete();
+
+        event(new \App\Events\Vendor\VendorWasMerged($_mergeable_vendor, $this->vendor, $this->vendor->company, $event_vars));
 
         return $this->vendor;
     }

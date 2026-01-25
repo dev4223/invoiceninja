@@ -99,4 +99,15 @@ class ClientGatewayToken extends BaseModel
     {
         return $this->belongsTo(User::class)->withTrashed();
     }
+
+    public function getGatewayAccountName()
+    {
+        $meta = $this->meta;
+
+        if($meta && isset($meta->brand) && isset($meta->last4)) {
+            return $meta->brand . ' **** ' . $meta->last4;
+        }
+
+        return ctrans('texts.bank_transfer') . ' ' . $this->token;
+    }
 }

@@ -236,7 +236,8 @@ class Purify
 
     public static function clean(string $html): string
     {
-        if (config('ninja.disable_purify_html')) {
+
+        if (config('ninja.disable_purify_html') || strlen($html) <= 1) {
             return str_replace('%24', '$', $html);
         }
 
@@ -244,6 +245,7 @@ class Purify
         libxml_use_internal_errors(true);
 
         $document = new \DOMDocument();
+        $html = '<?xml encoding="UTF-8">' . $html;
         @$document->loadHTML(htmlspecialchars_decode(htmlspecialchars($html, ENT_QUOTES, 'UTF-8')), LIBXML_NONET);
 
         // Function to recursively check nodes

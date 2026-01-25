@@ -31,7 +31,7 @@ class TaxService
 
         $vat_check = (new VatNumberCheck($this->client->vat_number, $client_country_code))->run();
 
-        nlog($vat_check);
+        // nlog($vat_check);
 
         if ($vat_check->isValid()) {
 

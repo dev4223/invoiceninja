@@ -12,15 +12,16 @@
 
 namespace App\Services\Payment;
 
-use App\Exceptions\PaymentRefundFailed;
-use App\Jobs\Payment\EmailRefundPayment;
-use App\Models\Activity;
+use stdClass;
+use App\Utils\Ninja;
 use App\Models\Credit;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\Activity;
+use App\Exceptions\PaymentRefundFailed;
+use App\Jobs\Payment\EmailRefundPayment;
 use App\Repositories\ActivityRepository;
-use App\Utils\Ninja;
-use stdClass;
+use App\Listeners\Payment\PaymentTransactionEventEntry;
 
 class RefundPayment
 {
@@ -48,8 +49,23 @@ class RefundPayment
                             ->save();
 
         if (array_key_exists('email_receipt', $this->refund_data) && $this->refund_data['email_receipt'] == 'true') {
-            $contact = $this->payment->client->contacts()->whereNotNull('email')->first();
-            EmailRefundPayment::dispatch($this->payment, $this->payment->company, $contact);
+
+            $payment_email_all_contacts = $this->payment->client->getSetting('payment_email_all_contacts');
+
+            $this->payment
+                ->client
+                ->contacts()
+                ->where('send_email', true)
+                ->whereNotNull('email')
+                ->when(!$payment_email_all_contacts, function ($query) {
+                    return $query->orderBy('id', 'asc')->take(1);
+                })
+                ->cursor()
+                ->each(function ($contact) {
+
+                    EmailRefundPayment::dispatch($this->payment, $this->payment->company, $contact);
+
+                });
         }
 
         $is_gateway_refund = ($this->refund_data['gateway_refund'] !== false || $this->refund_failed || (isset($this->refund_data['via_webhook']) && $this->refund_data['via_webhook'] !== false)) ? ctrans('texts.yes') : ctrans('texts.no');
@@ -276,6 +292,16 @@ class RefundPayment
             foreach ($this->refund_data['invoices'] as $refunded_invoice) {
                 $invoice = Invoice::withTrashed()->find($refunded_invoice['invoice_id']);
 
+                if ($invoice->status_id == Invoice::STATUS_REVERSED) {
+                    $_credit = Credit::withTrashed()->where('invoice_id', $invoice->id)->first();
+                    $_credit->client->service()->adjustCreditBalance($_credit->balance * -1)->save();
+                    $_credit->paid_to_date += $_credit->balance;
+                    $_credit->balance = 0;
+                    $_credit->status_id = Credit::STATUS_APPLIED;
+                    $_credit->save();
+                    continue;
+                }
+
                 if ($invoice->trashed()) {
                     $invoice->restore();
                 }
@@ -309,7 +335,10 @@ class RefundPayment
                 if ($invoice->is_deleted) {
                     $invoice->delete();
                 }
+
             }
+
+            PaymentTransactionEventEntry::dispatch($this->payment, array_column($this->refund_data['invoices'], 'invoice_id'), $this->payment->company->db, $this->total_refund, false);
 
         } else {
             //if we are refunding and no payments have been tagged, then we need to decrement the client->paid_to_date by the total refund amount.

@@ -13,12 +13,22 @@
 namespace App\Http\Controllers;
 
 use stdClass;
+use App\Models\Task;
 use App\Utils\Ninja;
+use App\Models\Quote;
 use App\Models\Client;
+use App\Models\Credit;
+use App\Models\Vendor;
+use App\Models\Expense;
 use App\Models\Invoice;
+use App\Models\Payment;
+use App\Models\Project;
 use App\Models\Activity;
 use Illuminate\Http\Request;
+use App\Models\PurchaseOrder;
 use App\Utils\Traits\MakesHash;
+use App\Models\RecurringExpense;
+use App\Models\RecurringInvoice;
 use App\Utils\PhantomJS\Phantom;
 use App\Utils\HostedPDF\NinjaPdf;
 use App\Utils\Traits\Pdf\PdfMaker;
@@ -28,15 +38,6 @@ use App\Transformers\ActivityTransformer;
 use App\Http\Requests\Activity\StoreNoteRequest;
 use App\Http\Requests\Activity\ShowActivityRequest;
 use App\Http\Requests\Activity\DownloadHistoricalEntityRequest;
-use App\Models\Credit;
-use App\Models\Expense;
-use App\Models\Payment;
-use App\Models\PurchaseOrder;
-use App\Models\Quote;
-use App\Models\RecurringExpense;
-use App\Models\RecurringInvoice;
-use App\Models\Task;
-use App\Models\Vendor;
 
 class ActivityController extends BaseController
 {
@@ -203,71 +204,102 @@ class ActivityController extends BaseController
                 $activity->client_id = $entity->client_id;
                 $activity->project_id = $entity->project_id;
                 $activity->vendor_id = $entity->vendor_id;
-                break;
+
+                $activity->save();
+                return $this->itemResponse($activity);
+
             case Credit::class:
                 $activity->credit_id = $entity->id;
                 $activity->client_id = $entity->client_id;
                 $activity->project_id = $entity->project_id;
                 $activity->vendor_id = $entity->vendor_id;
                 $activity->invoice_id = $entity->invoice_id;
-                break;
+
+                $activity->save();
+                return $this->itemResponse($activity);
+
             case Client::class:
                 $activity->client_id = $entity->id;
-                break;
+
+                $activity->save();
+                return $this->itemResponse($activity);
+
             case Quote::class:
                 $activity->quote_id = $entity->id;
                 $activity->client_id = $entity->client_id;
                 $activity->project_id = $entity->project_id;
                 $activity->vendor_id = $entity->vendor_id;
-                break;
+
+                $activity->save();
+                return $this->itemResponse($activity);
+
             case RecurringInvoice::class:
                 $activity->recurring_invoice_id = $entity->id;
                 $activity->client_id = $entity->client_id;
-                break;
+                                
+                $activity->save();
+                return $this->itemResponse($activity);
+
             case Expense::class:
                 $activity->expense_id = $entity->id;
                 $activity->client_id = $entity->client_id;
                 $activity->project_id = $entity->project_id;
                 $activity->vendor_id = $entity->vendor_id;
-                break;
+
+                $activity->save();
+                return $this->itemResponse($activity);
             case RecurringExpense::class:
                 $activity->recurring_expense_id = $entity->id;
                 $activity->expense_id = $entity->id;
                 $activity->client_id = $entity->client_id;
                 $activity->project_id = $entity->project_id;
                 $activity->vendor_id = $entity->vendor_id;
-                break;
+
+                $activity->save();
+                return $this->itemResponse($activity);
             case Vendor::class:
                 $activity->vendor_id = $entity->id;
-                break;
+                $activity->save();
+
+                return $this->itemResponse($activity);
+
             case PurchaseOrder::class:
                 $activity->purchase_order_id = $entity->id;
                 $activity->expense_id = $entity->id;
                 $activity->client_id = $entity->client_id;
                 $activity->project_id = $entity->project_id;
                 $activity->vendor_id = $entity->vendor_id;
-                // no break
-                break;
+
+                $activity->save();
+
+                return $this->itemResponse($activity);
             case Task::class:
                 $activity->task_id = $entity->id;
                 $activity->client_id = $entity->client_id;
                 $activity->project_id = $entity->project_id;
-                $activity->vendor_id = $entity->vendor_id;
-                // no break
-                break;
+
+                $activity->save();
+
+                return $this->itemResponse($activity);
+
             case Payment::class:
                 $activity->payment_id = $entity->id;
                 $activity->client_id = $entity->client_id;
                 $activity->project_id = $entity->project_id;
-                // no break
-                break;
+                
+                $activity->save();
+                return $this->itemResponse($activity);
+
+            case Project::class:
+                $activity->project_id = $entity->id;
+                $activity->save();
+
+                return $this->itemResponse($activity);
             default:
                 # code...
                 break;
         }
 
-        $activity->save();
-
-        return $this->itemResponse($activity);
+        
     }
 }

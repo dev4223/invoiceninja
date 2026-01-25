@@ -21,6 +21,13 @@ function boot() {
         document
             .getElementById('authorize-bank-account')
             ?.addEventListener('click', (e) => {
+
+                if (!document.getElementById('accept-terms').checked) {
+                    errors.textContent = "You must accept the mandate terms prior to making payment.";
+                    errors.hidden = false;
+                    return;
+                }
+
                 e.target.parentElement.disabled = true;
     
                 document.getElementById('errors').hidden = true;

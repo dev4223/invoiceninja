@@ -169,6 +169,11 @@ class ClientContact extends Authenticatable implements HasLocalePreference
         'email',
     ];
 
+    public function searchableAs(): string
+    {
+        return 'client_contacts';
+    }
+
     public function toSearchableArray()
     {
         return [
@@ -299,13 +304,16 @@ class ClientContact extends Authenticatable implements HasLocalePreference
 
     public function preferredLocale()
     {
+        return once(function () {
+            /** @var \Illuminate\Support\Collection<\App\Models\Language> */
+            $languages = app('languages');
 
-        /** @var \Illuminate\Support\Collection<\App\Models\Language> */
-        $languages = app('languages');
+            $language_id = $this->client->getSetting('language_id');
 
-        return $languages->first(function ($item) {
-            return $item->id == $this->client->getSetting('language_id');
-        })->locale ?? 'en';
+            return $languages->first(function ($item) use ($language_id) {
+                    return $item->id == $language_id;
+                })->locale ?? 'en';
+        });
     }
 
     public function routeNotificationForMail($notification)

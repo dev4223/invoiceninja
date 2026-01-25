@@ -350,7 +350,7 @@ class ZugferdEDokument extends AbstractService
             } elseif (in_array($this->document->client->country->iso_3166_2, ["ES-CE", "ES-ML"])) {
                 $tax_type = ZugferdDutyTaxFeeCategories::TAX_FOR_PRODUCTION_SERVICES_AND_IMPORTATION_IN_CEUTA_AND_MELILLA;
             } else {
-                nlog("Unkown tax case for xinvoice");
+                // nlog("Unkown tax case for xinvoice");
                 $tax_type = ZugferdDutyTaxFeeCategories::STANDARD_RATE;
             }
         }

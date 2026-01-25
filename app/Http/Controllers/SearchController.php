@@ -16,8 +16,10 @@ use App\Models\User;
 use App\Utils\Ninja;
 use App\Models\Client;
 use App\Models\Invoice;
+use App\Models\Project;
 use Elastic\Elasticsearch\ClientBuilder;
 use App\Http\Requests\Search\GenericSearchRequest;
+use Illuminate\Support\Str;
 
 class SearchController extends Controller
 {
@@ -41,6 +43,9 @@ class SearchController extends Controller
 
     private array $purchase_orders = [];
 
+    private array $projects = [];
+
+    private array $tasks = [];
 
     public function __invoke(GenericSearchRequest $request)
     {
@@ -59,10 +64,13 @@ class SearchController extends Controller
 
         $this->invoiceMap($user);
 
+        $this->projectMap($user);
+
         return response()->json([
             'clients' => $this->clients,
             'client_contacts' => $this->client_contacts,
             'invoices' => $this->invoices,
+            'projects' => $this->projects,
             'settings' => $this->settingsMap(),
         ], 200);
 
@@ -81,17 +89,42 @@ class SearchController extends Controller
 
         $params = [
             // 'index' => 'clients,invoices,client_contacts',
-            'index' => 'clients,invoices,client_contacts,quotes,expenses,credits,recurring_invoices,vendors,vendor_contacts,purchase_orders',
-            'body'  => [
+            'index' => 'clients,invoices,client_contacts,quotes,expenses_v2,credits,recurring_invoices,vendors,vendor_contacts,purchase_orders,projects',
+            // 'index' => 'clients_v2,invoices_v2,client_contacts_v2,quotes_v2,expenses_v2,credits_v2,recurring_invoices_v2,vendors_v2,vendor_contacts_v2,purchase_orders_v2,projects_v2,tasks_v2',
+            'body' => [
                 'query' => [
                     'bool' => [
-                        'must' => [
-                            'multi_match' => [
-                                'query' => $search,
-                                'fields' => ['*'],
-                                'fuzziness' => 'AUTO',
+                        'should' => [
+                            [
+                                'multi_match' => [
+                                    'query' => $search,
+                                    'fields' => ['*'],
+                                    'fuzziness' => 'AUTO',
+                                ]
+                            ],
+                            // Safe nested search that won't fail on missing fields
+                            [
+                                'nested' => [
+                                    'path' => 'line_items',
+                                    'query' => [
+                                        'multi_match' => [
+                                            'query' => $search,
+                                            'fields' => [
+                                                'line_items.product_key^2',
+                                                'line_items.notes^2',
+                                                'line_items.custom_value1',
+                                                'line_items.custom_value2',
+                                                'line_items.custom_value3',
+                                                'line_items.custom_value4'
+                                            ],
+                                            'fuzziness' => 'AUTO',
+                                        ]
+                                    ],
+                                    'ignore_unmapped' => true
+                                ]
                             ],
                         ],
+                        'minimum_should_match' => 1,
                         'filter' => [
                             'match' => [
                                 'company_key' => $company->company_key,
@@ -103,7 +136,10 @@ class SearchController extends Controller
             ],
         ];
 
+
         $results = $elastic->search($params);
+
+        // nlog($results['hits']);
 
         $this->mapResults($results['hits']['hits'] ?? []);
 
@@ -118,6 +154,8 @@ class SearchController extends Controller
             'vendors' => $this->vendors,
             'vendor_contacts' => $this->vendor_contacts,
             'purchase_orders' => $this->purchase_orders,
+            'projects' => $this->projects,
+            'tasks' => $this->tasks,
             'settings' => $this->settingsMap(),
         ], 200);
 
@@ -127,8 +165,8 @@ class SearchController extends Controller
     {
 
         foreach ($results as $result) {
-            switch ($result['_index']) {
-                case 'clients':
+            switch (true) {
+                case Str::startsWith($result['_index'], 'clients'):
 
                     if ($result['_source']['is_deleted']) { //do not return deleted results
                         break;
@@ -142,7 +180,7 @@ class SearchController extends Controller
                     ];
 
                     break;
-                case 'invoices':
+                case Str::startsWith($result['_index'], 'invoices'):
 
                     if ($result['_source']['is_deleted']) {  //do not return deleted invoices
                         break;
@@ -156,7 +194,7 @@ class SearchController extends Controller
                         'path' => "/invoices/{$result['_source']['hashed_id']}/edit"
                     ];
                     break;
-                case 'client_contacts':
+                case Str::startsWith($result['_index'], 'client_contacts'):
 
                     if ($result['_source']['__soft_deleted']) {
                         break;
@@ -169,7 +207,7 @@ class SearchController extends Controller
                         'path' => "/clients/{$result['_source']['client_id']}"
                     ];
                     break;
-                case 'quotes':
+                case Str::startsWith($result['_index'], 'quotes'):
 
                     if ($result['_source']['__soft_deleted']) {
                         break;
@@ -184,7 +222,7 @@ class SearchController extends Controller
 
                     break;
 
-                case 'expenses':
+                case Str::startsWith($result['_index'], 'expenses'):
 
                     if ($result['_source']['__soft_deleted']) {
                         break;
@@ -199,7 +237,7 @@ class SearchController extends Controller
 
                     break;
 
-                case 'credits':
+                case Str::startsWith($result['_index'], 'credits'):
 
                     if ($result['_source']['__soft_deleted']) {
                         break;
@@ -214,7 +252,7 @@ class SearchController extends Controller
 
                     break;
 
-                case 'recurring_invoices':
+                case Str::startsWith($result['_index'], 'recurring_invoices'):
 
                     if ($result['_source']['__soft_deleted']) {
                         break;
@@ -229,7 +267,7 @@ class SearchController extends Controller
 
                     break;
 
-                case 'vendors':
+                case Str::startsWith($result['_index'], 'vendors'):
 
                     if ($result['_source']['__soft_deleted']) {
                         break;
@@ -244,7 +282,7 @@ class SearchController extends Controller
 
                     break;
 
-                case 'vendor_contacts':
+                case Str::startsWith($result['_index'], 'vendor_contacts'):
 
                     if ($result['_source']['__soft_deleted']) {
                         break;
@@ -259,7 +297,7 @@ class SearchController extends Controller
 
                     break;
 
-                case 'purchase_orders':
+                case Str::startsWith($result['_index'], 'purchase_orders'):
 
                     if ($result['_source']['__soft_deleted']) {
                         break;
@@ -274,6 +312,34 @@ class SearchController extends Controller
 
                     break;
 
+                case Str::startsWith($result['_index'], 'projects'):
+
+                    if ($result['_source']['__soft_deleted']) {
+                        break;
+                    }
+
+                    $this->projects[] = [
+                        'name' => $result['_source']['name'],
+                        'type' => '/project',
+                        'id' => $result['_source']['hashed_id'],
+                        'path' => "/projects/{$result['_source']['hashed_id']}"
+                    ];
+
+                    break;
+                case Str::startsWith($result['_index'], 'tasks'):
+
+                    if ($result['_source']['is_deleted']) {
+                        break;
+                    }
+
+                    $this->tasks[] = [
+                        'name' => $result['_source']['name'],
+                        'type' => '/task',
+                        'id' => $result['_source']['hashed_id'],
+                        'path' => "/tasks/{$result['_source']['hashed_id']}/edit"
+                    ];
+
+                    break;
             }
         }
     }
@@ -310,6 +376,35 @@ class SearchController extends Controller
             });
         }
 
+
+    }
+
+    private function projectMap(User $user)
+    {
+
+        $projects = Project::query()
+                     ->withTrashed()
+                     ->company()
+                     ->with('client')
+                     ->where('is_deleted', 0)
+                     ->whereHas('client', function ($q) {
+                         $q->where('is_deleted', 0);
+                     })
+                     ->when(!$user->hasPermission('view_all') || !$user->hasPermission('view_invoice'), function ($query) use ($user) {
+                         $query->where('projects.user_id', $user->id);
+                     })
+                     ->orderBy('id', 'desc')
+                    ->take(3000)
+                    ->get();
+
+        foreach ($projects as $project) {
+            $this->projects[] = [
+                'name' => $project->name . ' - ' . $project->number,
+                'type' => '/project',
+                'id' => $project->hashed_id,
+                'path' => "/projects/{$project->hashed_id}"
+            ];
+        }
 
     }
 

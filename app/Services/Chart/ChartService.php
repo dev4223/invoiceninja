@@ -27,7 +27,7 @@ class ChartService
     use ChartQueries;
     use ChartCalculations;
 
-    public function __construct(public Company $company, private User $user, private bool $is_admin)
+    public function __construct(public Company $company, private User $user, private bool $is_admin, private bool $include_drafts = false)
     {
     }
 
@@ -93,7 +93,6 @@ class ChartService
             $data[$key]['payments'] = $this->getPaymentChartQuery($start_date, $end_date, $key);
             $data[$key]['expenses'] = $this->getExpenseChartQuery($start_date, $end_date, $key);
         }
-
 
         $data[999]['invoices'] = $this->getAggregateInvoiceChartQuery($start_date, $end_date);
         $data[999]['outstanding'] = $this->getAggregateOutstandingChartQuery($start_date, $end_date);

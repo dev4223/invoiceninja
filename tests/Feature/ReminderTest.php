@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -31,7 +32,7 @@ use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 
 /**
- * 
+ *
  *  App\Jobs\Util\ReminderJob
  */
 class ReminderTest extends TestCase
@@ -39,9 +40,6 @@ class ReminderTest extends TestCase
     use MakesHash;
     use DatabaseTransactions;
     use MockAccountData;
-
-    public $faker;
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -49,9 +47,6 @@ class ReminderTest extends TestCase
         $this->withoutMiddleware(
             ThrottleRequests::class
         );
-
-        $this->faker = \Faker\Factory::create();
-
         Model::reguard();
 
         $this->makeTestData();
@@ -87,10 +82,10 @@ class ReminderTest extends TestCase
         $this->user = User::factory()->create([
             'account_id' => $this->account->id,
             'confirmation_code' => 'xyz123',
-            'email' => $this->faker->unique()->safeEmail(),
+            'email' => \Illuminate\Support\Str::random(32)."@example.com",
         ]);
 
-        if(!$settings) {
+        if (!$settings) {
             $settings = CompanySettings::defaults();
             $settings->client_online_payment_notification = false;
             $settings->client_manual_payment_notification = false;
@@ -159,9 +154,131 @@ class ReminderTest extends TestCase
 
     }
 
+    public function testReminderScheduleIssue11160()
+    {
+
+        $settings = CompanySettings::defaults();
+        $settings->timezone_id = '42';
+        $settings->entity_send_time = 6;
+        $settings->payment_terms = '14';
+        $settings->send_reminders = true;
+        $settings->enable_reminder1 = true;
+        $settings->enable_reminder2 = true;
+        $settings->enable_reminder3 = true;
+        $settings->enable_reminder_endless = true;
+        $settings->schedule_reminder1 = 'before_due_date';
+        $settings->schedule_reminder2 = 'before_due_date';
+        $settings->schedule_reminder3 = 'before_due_date';
+        $settings->num_days_reminder1 = 14;
+        $settings->num_days_reminder2 = 7;
+        $settings->num_days_reminder3 = 1;
+        $settings->endless_reminder_frequency_id = '2';
+
+        $this->buildData($settings);
+
+        $this->travelTo(Carbon::parse('2024-09-01')->startOfDay()->addHours(1));
+
+        $invoice = Invoice::factory()->create([
+            'company_id' => $this->company->id,
+            'user_id' => $this->user->id,
+            'client_id' => $this->client->id,
+            'amount' => 10,
+            'balance' => 10,
+            'date' => '2024-09-01',
+            'number' => 'JJJ1-11-2024',
+            'due_date' => '2024-09-15',
+            'status_id' => 2,
+            'last_sent_date' => '19-09-2024',
+        ]);
+
+        $this->assertEquals(14, $invoice->company->settings->num_days_reminder1);
+
+        $invoice->service()->setReminder($settings)->save();
+
+        $this->assertEquals(10, $invoice->balance);
+        $this->assertEquals('2024-09-01', $invoice->next_send_date->format('Y-m-d'));
+
+
+        $x = false;
+        do {
+
+            $this->travelTo(now()->addHour());
+            (new ReminderJob())->handle();
+            $invoice = $invoice->fresh();
+
+            $x = (bool)$invoice->reminder1_sent;
+        } while ($x === false);
+
+        $this->assertNotNull($invoice->reminder_last_sent);
+        $this->assertEquals(now()->addDays(7), $invoice->next_send_date);
+
+        $this->assertNotNull($invoice->reminder1_sent);
+        $this->assertEquals('2024-09-01', \Carbon\Carbon::parse($invoice->reminder_last_sent)->format('Y-m-d'));
+        $this->assertEquals('2024-09-08', \Carbon\Carbon::parse($invoice->next_send_date)->format('Y-m-d'));
+
+        $this->travelTo(now()->addDays(7));
+
+        $x = false;
+        // $x = 0;
+        do {
+
+            $this->travelTo(now()->addHour());
+            (new ReminderJob())->handle();
+            $invoice = $invoice->fresh();
+
+            $x = (bool)$invoice->reminder2_sent;
+
+        } while ($x === false);
+
+        $this->assertNotNull($invoice->reminder2_sent);
+
+        $this->assertEquals('2024-09-08', \Carbon\Carbon::parse($invoice->reminder_last_sent)->format('Y-m-d'));
+        $this->assertEquals(now()->addDays(6)->format('Y-m-d'), \Carbon\Carbon::parse($invoice->next_send_date)->format('Y-m-d'));
+
+
+        $this->travelTo(now()->addDays(6));
+
+        $x = false;
+        // $x = 0;
+        do {
+
+            $this->travelTo(now()->addHour());
+            (new ReminderJob())->handle();
+            $invoice = $invoice->fresh();
+
+            $x = (bool)$invoice->reminder3_sent;
+
+        } while ($x === false);
+
+
+        $this->assertNotNull($invoice->reminder3_sent);
+
+        $this->assertEquals('2024-09-14', \Carbon\Carbon::parse($invoice->reminder_last_sent)->format('Y-m-d'));
+        $this->assertEquals(now()->addWeek()->format('Y-m-d'), \Carbon\Carbon::parse($invoice->next_send_date)->format('Y-m-d'));
+
+        $this->travelTo(now()->addDays(6));
+
+        // $x = false;
+        $x = 0;
+        do {
+
+            $this->travelTo(now()->addHour());
+            (new ReminderJob())->handle();
+            $invoice = $invoice->fresh();
+
+            $x++;
+        } while ($x < 24);
+
+        $this->assertEquals('2024-09-21', \Carbon\Carbon::parse($invoice->reminder_last_sent)->format('Y-m-d'));
+        $this->assertEquals(now()->addWeek()->format('Y-m-d'), \Carbon\Carbon::parse($invoice->next_send_date)->format('Y-m-d'));
+
+    }
+
+
+
     public function testReminderLogic()
     {
-        
+
         $account = Account::factory()->create([
             'hosted_client_count' => 1000,
             'hosted_company_count' => 1000,
@@ -173,7 +290,7 @@ class ReminderTest extends TestCase
         $user = User::factory()->create([
             'account_id' => $this->account->id,
             'confirmation_code' => 'xyz123',
-            'email' => $this->faker->unique()->safeEmail(),
+            'email' => \Illuminate\Support\Str::random(32)."@example.com",
         ]);
 
         $settings = CompanySettings::defaults();
@@ -238,7 +355,7 @@ class ReminderTest extends TestCase
 
     public function testReminderScheduleNy()
     {
-                
+
         $settings = CompanySettings::defaults();
         $settings->timezone_id = '15';
         $settings->entity_send_time = 6;
@@ -280,7 +397,7 @@ class ReminderTest extends TestCase
         $this->assertEquals(10, $invoice->balance);
         $this->assertEquals('2024-09-20', $invoice->next_send_date->format('Y-m-d'));
 
-        
+
         $x = false;
         do {
 
@@ -379,7 +496,7 @@ class ReminderTest extends TestCase
             $invoice = $invoice->fresh();
 
             $x = (bool)$invoice->reminder1_sent;
-        } while($x === false);
+        } while ($x === false);
 
         $this->assertNotNull($invoice->reminder_last_sent);
 
@@ -453,7 +570,7 @@ class ReminderTest extends TestCase
 
             $x = (bool)Carbon::parse($invoice->next_send_date)->gt(now()->addDays(2));
 
-        } while($x === false);
+        } while ($x === false);
 
 
         $this->assertEquals(now()->addDays(14), $invoice->next_send_date);
@@ -664,11 +781,11 @@ class ReminderTest extends TestCase
 
         $travel_date = Carbon::parse($this->invoice->next_send_date);
         $x = false;
-        for($x = 0; $x < 50; $x++) {
+        for ($x = 0; $x < 50; $x++) {
 
             (new ReminderJob())->handle();
 
-            if(now()->gt($travel_date) && !$x) {
+            if (now()->gt($travel_date) && !$x) {
 
 
                 $this->assertNotNull($this->invoice->reminder1_sent);
@@ -677,7 +794,7 @@ class ReminderTest extends TestCase
             }
 
 
-            if(!$x) {
+            if (!$x) {
                 $this->invoice = $this->invoice->fresh();
                 $this->assertNull($this->invoice->reminder1_sent);
                 $this->assertNull($this->invoice->reminder_last_sent);

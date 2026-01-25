@@ -40,6 +40,7 @@ use Laracasts\Presenter\PresentableTrait;
  * @property string|null $plan_expires
  * @property string|null $user_agent
  * @property string|null $key
+ * @property string|null $e_invoice_token
  * @property int|null $payment_id
  * @property int $default_company_id
  * @property string|null $trial_started
@@ -54,8 +55,8 @@ use Laracasts\Presenter\PresentableTrait;
  * @property string $latest_version
  * @property int $report_errors
  * @property string|null $referral_code
- * @property int|null $created_at
- * @property int|null $updated_at
+ * @property Carbon|int|null $created_at
+ * @property Carbon|int|null $updated_at
  * @property bool $is_scheduler_running
  * @property int|null $trial_duration
  * @property bool $is_onboarding
@@ -72,9 +73,11 @@ use Laracasts\Presenter\PresentableTrait;
  * @property string|null $account_sms_verification_number
  * @property bool $account_sms_verified
  * @property string|null $bank_integration_account_id
+ * @property string|null $e_invoicing_token
  * @property bool $is_trial
  * @property int $e_invoice_quota
  * @property int $docuninja_num_users
+ * @property string|null $e_invoicing_token
  * @property-read int|null $bank_integrations_count
  * @property-read int|null $companies_count
  * @property-read int|null $company_users_count
@@ -179,6 +182,11 @@ class Account extends BaseModel
     public function getEntityType()
     {
         return self::class;
+    }
+
+    public function activities()
+    {
+        return $this->hasMany(Activity::class);
     }
 
     public function users(): \Illuminate\Database\Eloquent\Relations\HasMany
@@ -520,7 +528,7 @@ class Account extends BaseModel
             $limit += Carbon::createFromTimestamp($this->created_at)->diffInMonths() * (20 * $multiplier);
         } else {
             $limit = $this->free_plan_email_quota;
-            $limit += Carbon::createFromTimestamp($this->created_at)->diffInMonths() * 1.5;
+            // $limit += Carbon::createFromTimestamp($this->created_at)->diffInMonths() * 1.5;
         }
 
         return min($limit, 1000);
@@ -553,7 +561,9 @@ class Account extends BaseModel
                     $nmo->company = $this->companies()->first();
                     $nmo->settings = $this->companies()->first()->settings;
                     $nmo->to_user = $this->companies()->first()->owner();
-                    NinjaMailerJob::dispatch($nmo, true);
+                    // NinjaMailerJob::dispatch($nmo, true);
+
+                    (new NinjaMailerJob($nmo, true))->handle();
 
                     Cache::put("throttle_notified:{$this->key}", true, 60 * 60 * 24);
 
@@ -643,6 +653,6 @@ class Account extends BaseModel
 
     public function canTrial(): bool
     {
-        return !$this->is_trial && empty($this->plan) && $this->created_at > time() - (60 * 60 * 24 * 14);
+        return !$this->is_trial && empty($this->plan) && $this->created_at > time() - (60 * 60 * 24 * 14); //@phpstan-ignore-line
     }
 }

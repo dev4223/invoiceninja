@@ -34,6 +34,7 @@ use App\Jobs\Ninja\BankTransactionSync;
 use App\Jobs\Cron\RecurringExpensesCron;
 use App\Jobs\Cron\RecurringInvoicesCron;
 use App\Jobs\EDocument\EInvoicePullDocs;
+use App\Jobs\Cron\InvoiceTaxSummary;
 use Illuminate\Console\Scheduling\Schedule;
 use App\Jobs\Invoice\InvoiceCheckLateWebhook;
 use App\Jobs\Subscription\CleanStaleInvoiceOrder;
@@ -71,6 +72,29 @@ class Kernel extends ConsoleKernel
 
         /* Checks for scheduled tasks */
         $schedule->job(new TaskScheduler())->hourlyAt(10)->withoutOverlapping()->name('task-scheduler-job')->onOneServer();
+
+        // Run hourly over 26-hour period for complete timezone coverage
+        $schedule->job(new InvoiceTaxSummary())
+            ->hourly()
+            ->when(function () {
+                $now = now();
+                $hour = $now->hour;
+                
+                // Run for 26 hours starting from UTC 10:00 on last day of month
+                // This covers the transition period when timezones move to next month
+                if ($now->isSameDay($now->copy()->endOfMonth())) {
+                    // Start at UTC 10:00 (when UTC+14 moves to next day)
+                    return $hour >= 10;
+                } elseif ($now->isSameDay($now->copy()->startOfMonth())) {
+                    // Continue until UTC 12:00 (when UTC-12 moves to next day)
+                    return $hour <= 12;
+                }
+                
+                return false;
+            })
+            ->withoutOverlapping()
+            ->name('invoice-tax-summary-26hour-coverage')
+            ->onOneServer();
 
         /* Checks Rotessa Transactions */
         $schedule->job(new TransactionReport())->dailyAt('01:48')->withoutOverlapping()->name('rotessa-transaction-report')->onOneServer();

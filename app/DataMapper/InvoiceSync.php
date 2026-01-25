@@ -13,6 +13,7 @@
 namespace App\DataMapper;
 
 use App\Casts\InvoiceSyncCast;
+use App\DataMapper\TaxReport\TaxReport;
 use Illuminate\Contracts\Database\Eloquent\Castable;
 
 /**
@@ -24,9 +25,7 @@ class InvoiceSync implements Castable
 
     public function __construct(array $attributes = [])
     {
-
         $this->qb_id = $attributes['qb_id'] ?? '';
-
     }
 
     /**
