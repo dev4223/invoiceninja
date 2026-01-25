@@ -1,4 +1,5 @@
 <?php
+
 /**
  * payment Ninja (https://paymentninja.com).
  *
@@ -11,11 +12,12 @@
 
 namespace App\Services\Payment;
 
-use App\Factory\PaymentFactory;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\PaymentHash;
+use App\Factory\PaymentFactory;
 use App\Utils\Traits\MakesHash;
+use App\Services\Payment\DeletePaymentV2;
 
 class PaymentService
 {
@@ -64,6 +66,7 @@ class PaymentService
                         ->updatePaidToDate($invoice->pivot->amount * -1)
                         ->setStatus(Invoice::STATUS_SENT)
                         ->save();
+
             }
         });
 
@@ -86,7 +89,7 @@ class PaymentService
 
     public function deletePayment($update_client_paid_to_date = true): ?Payment
     {
-        return (new DeletePayment($this->payment, $update_client_paid_to_date))->run();
+        return (new DeletePaymentV2($this->payment, $update_client_paid_to_date))->run();
     }
 
     public function updateInvoicePayment(PaymentHash $payment_hash): ?Payment

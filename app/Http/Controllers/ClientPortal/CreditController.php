@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -35,7 +36,7 @@ class CreditController extends Controller
 
         $data = [
             'credit' => $credit,
-            'key' => $invitation ? $invitation->key : false,
+            '_key' => $invitation ? $invitation->key : false,
             'invitation' => $invitation
         ];
 

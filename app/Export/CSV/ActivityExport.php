@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -15,8 +16,6 @@ use App\Libraries\MultiDB;
 use App\Models\Activity;
 use App\Models\Company;
 use App\Models\DateFormat;
-use App\Models\Task;
-use App\Transformers\ActivityTransformer;
 use App\Utils\Ninja;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -35,6 +34,7 @@ class ActivityExport extends BaseExport
         'date' => 'date',
         'activity' => 'activity',
         'address' => 'address',
+        'notes' => 'notes',
     ];
 
     public function __construct(Company $company, array $input)
@@ -54,7 +54,6 @@ class ActivityExport extends BaseExport
             return ['identifier' => $key, 'display_value' => $headerdisplay[$value]];
         })->toArray();
 
-
         $report = $query->cursor()
             ->map(function ($resource) {
                 /** @var \App\Models\Activity $resource */
@@ -71,7 +70,7 @@ class ActivityExport extends BaseExport
         Carbon::parse($activity->created_at)->format($this->date_format),
         ctrans("texts.activity_{$activity->activity_type_id}", [
             'payment_amount' => $activity->payment ? $activity->payment->amount : '',
-            'adjustment' => $activity->payment ? $activity->payment->refunded : '',
+            'adjustment' => $activity->getPaymentAdjustment($activity->payment),
             'client' => $activity->client ? $activity->client->present()->name() : '',
             'contact' => $activity->contact ? $activity->contact->present()->name() : '',
             'quote' => $activity->quote ? $activity->quote->number : '',
@@ -89,11 +88,12 @@ class ActivityExport extends BaseExport
             'recurring_expense' => $activity->recurring_expense ? $activity->recurring_expense->number : '',
         ]),
         $activity->ip,
+        $activity->notes,
         ];
 
     }
 
-    private function init(): Builder
+    public function init(): Builder
     {
         MultiDB::setDb($this->company->db);
         App::forgetInstance('translator');
@@ -115,6 +115,12 @@ class ActivityExport extends BaseExport
 
         $query = $this->addDateRange($query, 'activities');
 
+        $query = $this->filterByUserPermissions($query);
+
+        if ($this->input['activity_type_id'] ?? false) {
+            $query->where('activity_type_id', $this->input['activity_type_id']);
+        }
+
         return $query;
     }
 
@@ -123,18 +129,16 @@ class ActivityExport extends BaseExport
         $query = $this->init();
 
         //load the CSV document from a string
-        $this->csv = Writer::createFromString();
+        $this->csv = Writer::fromString();
         \League\Csv\CharsetConverter::addTo($this->csv, 'UTF-8', 'UTF-8');
 
         //insert the header
         $this->csv->insertOne($this->buildHeader());
 
-
         $query->cursor()
               ->each(function ($entity) {
 
                   /** @var \App\Models\Activity $entity */
-
                   $this->buildRow($entity);
               });
 

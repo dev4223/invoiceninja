@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -11,9 +12,11 @@
 
 namespace App\Repositories;
 
+use App\Models\Task;
+use App\Models\Project;
 use App\Factory\TaskFactory;
 use App\Jobs\Task\TaskAssigned;
-use App\Models\Task;
+use App\Utils\Traits\MakesHash;
 use App\Utils\Traits\GeneratesCounter;
 use Illuminate\Database\QueryException;
 
@@ -23,6 +26,7 @@ use Illuminate\Database\QueryException;
 class TaskRepository extends BaseRepository
 {
     use GeneratesCounter;
+    use MakesHash;
 
     public $new_task = true;
 
@@ -49,7 +53,7 @@ class TaskRepository extends BaseRepository
         if (!is_numeric($task->rate) && !isset($data['rate'])) {
             $data['rate'] = 0;
         }
-
+        
         $task->fill($data);
         $task->saveQuietly();
 
@@ -109,7 +113,9 @@ class TaskRepository extends BaseRepository
             $data['time_log'] = json_encode($timeLog);
         }
 
-        if (isset($data['time_log'])) {
+        if (isset($data['time_log']) && is_array($data['time_log'])) {
+            $time_log = $data['time_log'];
+        } elseif (isset($data['time_log'])) {
             $time_log = json_decode($data['time_log']);
         } elseif ($task->time_log) {
             $time_log = json_decode($task->time_log);
@@ -249,7 +255,7 @@ class TaskRepository extends BaseRepository
 
             $start_time = time();
 
-            $log = array_merge($log, [[$start_time, 0]]);
+            $log = array_merge($log, [[$start_time, 0, "", true]]);
             $task->time_log = json_encode($log);
             $task->calculated_start_date = \Carbon\Carbon::createFromTimestamp($start_time)->addSeconds($task->company->utc_offset());
 
@@ -261,7 +267,7 @@ class TaskRepository extends BaseRepository
         $last = end($log);
 
         if (is_array($last) && $last[1] !== 0) { // this line is a disaster
-            $new = [time(), 0];
+            $new = [time(), 0, "", true];
 
             $log = array_merge($log, [$new]);
             $task->time_log = json_encode($log);
@@ -423,6 +429,41 @@ class TaskRepository extends BaseRepository
 
         $this->calculateProjectDuration($task);
 
+    }
+
+
+    public function bulkUpdate(\Illuminate\Database\Eloquent\Builder $models, string $column, mixed $new_value): void
+    {
+
+        // First, filter out tasks that have been invoiced
+        $models->whereNull('invoice_id');
+
+        if(stripos($column, '_id') !== false) {
+            $new_value = $this->decodePrimaryKey($new_value);
+        }
+
+        if ($column === 'project_id') {
+            // Handle project_id updates with client_id synchronization
+            $project = Project::withTrashed()
+                ->where('id', $new_value)
+                ->company()
+                ->first();
+                
+            if ($project) {
+                /** @var \App\Models\Project $project */
+                $models->update([
+                    'project_id' => $project->id,
+                    'client_id' => $project->client_id,
+                ]);
+            }
+        } elseif ($column === 'client_id') { 
+            // If you are updating the client - we will unset the project id!
+            $models->update([$column => $new_value, 'project_id' => null]);
+        }
+        else {
+            // Assigned User
+            $models->update([$column => $new_value]);
+        }
     }
 
 }

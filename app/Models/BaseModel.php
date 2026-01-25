@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -106,23 +107,6 @@ class BaseModel extends Model
     {
         return (new Carbon($value))->format('Y-m-d');
     }
-
-    // public function __call($method, $params)
-    // {
-    //     $entity = strtolower(class_basename($this));
-
-    //     if ($entity) {
-    //         $configPath = "modules.relations.$entity.$method";
-
-    //         if (config()->has($configPath)) {
-    //             $function = config()->get($configPath);
-
-    //             return call_user_func_array([$this, $function[0]], $function[1]);
-    //         }
-    //     }
-
-    //     return parent::__call($method, $params);
-    // }
 
     /**
     * @param  \Illuminate\Database\Eloquent\Builder  $query
@@ -330,8 +314,13 @@ class BaseModel extends Model
         }
 
         // special catch here for einvoicing eventing
-        if ($event_id == Webhook::EVENT_SENT_INVOICE && ($this instanceof Invoice) && is_null($this->backup) && $this->client->peppolSendingEnabled()) {
-            \App\Services\EDocument\Jobs\SendEDocument::dispatch(get_class($this), $this->id, $this->company->db);
+        if ($event_id == Webhook::EVENT_SENT_INVOICE && ($this instanceof Invoice) && $this->backup->guid == "") {
+            if($this->client->peppolSendingEnabled()) {
+                \App\Services\EDocument\Jobs\SendEDocument::dispatch(get_class($this), $this->id, $this->company->db);
+            }
+            elseif($this->company->verifactuEnabled()) {
+                $this->service()->sendVerifactu();
+            }
         }
 
     }

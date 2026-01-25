@@ -12,15 +12,17 @@
 
 namespace Tests\Feature\Vendor;
 
-use App\Models\Account;
-use App\Models\Vendor;
-use App\Models\VendorContact;
-use App\Models\Company;
-use App\Models\User;
-use App\Utils\Traits\AppSetup;
 use Faker\Factory;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
+use App\Models\User;
+use App\Models\Vendor;
+use App\Models\Account;
+use App\Models\Company;
+use App\Models\Country;
+use App\Models\VendorContact;
+use App\Utils\Traits\AppSetup;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 
 class VendorMergeTest extends TestCase
 {
@@ -44,6 +46,10 @@ class VendorMergeTest extends TestCase
         parent::setUp();
 
         $this->faker = Factory::create();
+
+        if (Country::count() == 0) {
+            Artisan::call('migrate:fresh', ['--seed' => true]);
+        }
     }
 
     public function testSearchingForContacts()

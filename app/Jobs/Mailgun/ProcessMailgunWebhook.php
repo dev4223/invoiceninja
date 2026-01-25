@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -91,7 +92,7 @@ class ProcessMailgunWebhook implements ShouldQueue
     {
         nlog($this->request);
 
-        if (!$this->request['event-data']['tags'][0] ?? false) { //@phpstan-ignore-line
+        if (empty($this->request['event-data']['tags'][0])) { //@phpstan-ignore-line
             return;
         }
 
@@ -193,7 +194,7 @@ class ProcessMailgunWebhook implements ShouldQueue
             'bounce_id' => '',
             'recipient' => $this->request['event-data']['recipient'] ?? '',
             'status' => $this->request['event-data']['event'] ?? '',
-            'delivery_message' => collect($this->request['event-data']['client-info'])->implode(" ") ?? '',
+            'delivery_message' => collect($this->request['event-data']['geolocation'])->implode(" ") ?? '',
             'server' => collect($this->request['event-data']['geolocation'])->implode(" - ") ??  '',
             'server_ip' => $this->request['event-data']['ip'] ?? '',
             'date' => \Carbon\Carbon::parse($this->request['event-data']['timestamp'])->format('Y-m-d H:i:s') ?? '',

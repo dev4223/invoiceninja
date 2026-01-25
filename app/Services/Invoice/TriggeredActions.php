@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -37,7 +38,7 @@ class TriggeredActions extends AbstractService
                 $this->invoice->service()->autoBill();
             } catch (\Exception $e) {
                 nlog("Exception:: TriggeredActions::" . $e->getMessage());
-            } 
+            }
         }
 
         if ($this->request->has('paid') && $this->request->input('paid') == 'true') {
@@ -56,7 +57,15 @@ class TriggeredActions extends AbstractService
 
         if ($this->request->has('send_email') && $this->request->input('send_email') == 'true') {
             $this->invoice->service()->markSent()->save();
-            $this->sendEmail();
+
+            /** Check for VERIFACTU Sent Status */
+            if ($this->invoice->company->verifactuEnabled() && !$this->invoice->hasSentAeat()) {
+                $this->invoice->invitations()->update(['email_error' => 'primed']); // Flag the invitations as primed for AEAT submission
+                $this->invoice->service()->sendVerifactu();
+            } else {
+                $this->sendEmail();
+            }
+
             $this->updated = false;
         }
 
@@ -81,21 +90,25 @@ class TriggeredActions extends AbstractService
             $company->save();
         }
 
-        if($this->request->has('retry_e_send') && $this->request->input('retry_e_send') == 'true' && !isset($this->invoice->backup->guid) && $this->invoice->client->peppolSendingEnabled()) {    
-            \App\Services\EDocument\Jobs\SendEDocument::dispatch(get_class($this->invoice), $this->invoice->id, $this->invoice->company->db);
+        if ($this->request->has('retry_e_send') && $this->request->input('retry_e_send') == 'true' && strlen($this->invoice->backup->guid ?? '') == 0) {
+            if ($this->invoice->client->peppolSendingEnabled()) {
+                \App\Services\EDocument\Jobs\SendEDocument::dispatch(get_class($this->invoice), $this->invoice->id, $this->invoice->company->db);
+            } elseif ($this->invoice->company->verifactuEnabled()) {
+                $this->invoice->service()->sendVerifactu();
+            }
         }
 
-        if($this->request->has('redirect')) {
-        
+        if ($this->request->has('redirect')) {
+
             $redirectUrl = urldecode($this->request->input('redirect'));
 
             if (filter_var($redirectUrl, FILTER_VALIDATE_URL)) {
-                $backup = ($this->invoice->backup && is_object($this->invoice->backup)) ? $this->invoice->backup : new \stdClass();
-                $backup->redirect = $redirectUrl;
-                $this->invoice->backup = $backup;
+                // $backup = ($this->invoice->backup && is_object($this->invoice->backup)) ? $this->invoice->backup : new \stdClass();
+                // $backup->redirect = $redirectUrl;
+                $this->invoice->backup->redirect = $redirectUrl;
                 $this->invoice->saveQuietly();
             }
-            
+
         }
 
         if ($this->updated) {

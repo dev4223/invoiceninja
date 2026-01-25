@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -64,7 +65,7 @@ class ActivityRepository extends BaseRepository
         $activity->save();
 
         //rate limiter
-        if(!in_array($fields->activity_type_id, [Activity::EMAIL_INVOICE, Activity::EMAIL_CREDIT, Activity::EMAIL_QUOTE, Activity::EMAIL_PURCHASE_ORDER])){
+        if (!in_array($fields->activity_type_id, [Activity::EMAIL_INVOICE, Activity::EMAIL_CREDIT, Activity::EMAIL_QUOTE, Activity::EMAIL_PURCHASE_ORDER])) {
             $this->createBackup($entity, $activity);
         }
     }
@@ -118,7 +119,7 @@ class ActivityRepository extends BaseRepository
 
     public function getTokenId(array $event_vars)
     {
-        if ($event_vars['token']) {
+        if (isset($event_vars['token']) &&$event_vars['token']) {
             /** @var \App\Models\CompanyToken $company_token **/
             $company_token = CompanyToken::query()->where('token', $event_vars['token'])->first();
 
@@ -146,7 +147,7 @@ class ActivityRepository extends BaseRepository
         } elseif ($entity instanceof RecurringInvoice) {
             $entity_type = 'recurring_invoice';
             $entity_design_id = 'invoice_design_id';
-            
+
             $entity->load('client.company', 'invitations');
             $document_type = 'product';
         } elseif ($entity instanceof Quote) {

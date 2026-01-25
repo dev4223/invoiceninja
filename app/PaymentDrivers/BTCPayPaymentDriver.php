@@ -92,26 +92,22 @@ class BTCPayPaymentDriver extends BaseDriver
     public function processWebhookRequest()
     {
 
-
         $webhook_payload = file_get_contents('php://input');
 
         /** @var \stdClass $btcpayRep */
         $btcpayRep = json_decode($webhook_payload);
+
         if ($btcpayRep == null) {
-            throw new PaymentFailed('Empty data');
+            return response()->noContent();
         }
 
         if (empty($btcpayRep->invoiceId)) {
-            throw new PaymentFailed(
-                'Invalid BTCPayServer payment notification- did not receive invoice ID.'
-            );
+            return response()->json(['error' => 'Invalid BTCPayServer payment notification - did not receive invoice ID.'], 400);
         }
 
         if (!isset($btcpayRep->metadata->InvoiceNinjaPaymentHash)) {
 
-            throw new PaymentFailed(
-                'Invalid BTCPayServer payment notification- did not receive Payment Hashed ID.'
-            );
+            return response()->json(['error' => 'Invalid BTCPayServer payment notification - did not receive Payment Hashed ID.'], 400);
 
         }
 
@@ -139,9 +135,7 @@ class BTCPayPaymentDriver extends BaseDriver
         $webhookClient = new Webhook($this->btcpay_url, $this->api_key);
 
         if (!$webhookClient->isIncomingWebhookRequestValid($webhook_payload, $sig, $this->webhook_secret)) {
-            throw new \RuntimeException(
-                'Invalid BTCPayServer payment notification message received - signature did not match.'
-            );
+            return response()->json(['error' => 'Invalid BTCPayServer payment notification message received - signature did not match.'], 400);
         }
 
         $this->setPaymentMethod(GatewayType::CRYPTO);

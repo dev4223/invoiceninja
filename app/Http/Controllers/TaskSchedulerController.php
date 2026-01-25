@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -62,7 +63,6 @@ class TaskSchedulerController extends BaseController
 
         return $this->itemResponse($scheduler);
     }
-
 
     public function show(ShowSchedulerRequest $request, Scheduler $scheduler)
     {

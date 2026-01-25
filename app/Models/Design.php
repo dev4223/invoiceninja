@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -26,9 +27,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property object|null $design
  * @property bool $is_deleted
  * @property bool $is_template
+ * @property string|null $entities
  * @property int|null $created_at
  * @property int|null $updated_at
  * @property int|null $deleted_at
+ * @property string|null $entities
  * @property-read \App\Models\Company|null $company
  * @property-read string $hashed_id
  * @method static \Illuminate\Database\Eloquent\Builder|BaseModel company()

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -35,12 +36,17 @@ class Merge extends AbstractService
         nlog("balance pre {$this->client->balance}");
         nlog("paid_to_date pre {$this->client->paid_to_date}");
 
+        $mergeable_client = $this->mergable_client->present()->name();
+
         $this->client->balance += $this->mergable_client->balance;
         $this->client->paid_to_date += $this->mergable_client->paid_to_date;
         $this->client->save();
 
         nlog("balance post {$this->client->balance}");
         nlog("paid_to_date post {$this->client->paid_to_date}");
+
+        $event_vars = \App\Utils\Ninja::eventVars(auth()->user() ? auth()->user()->id : null);
+        $event_vars['client_hash'] = $this->mergable_client->client_hash;
 
         $this->updateLedger($this->mergable_client->balance);
 
@@ -54,6 +60,7 @@ class Merge extends AbstractService
         $this->mergable_client->projects()->update(['client_id' => $this->client->id]);
         $this->mergable_client->quotes()->update(['client_id' => $this->client->id]);
         $this->mergable_client->recurring_invoices()->update(['client_id' => $this->client->id]);
+        $this->mergable_client->recurring_expenses()->update(['client_id' => $this->client->id]);
         $this->mergable_client->tasks()->update(['client_id' => $this->client->id]);
         $this->mergable_client->documents()->update(['documentable_id' => $this->client->id]);
 
@@ -69,10 +76,13 @@ class Merge extends AbstractService
             }
         });
 
+
         $this->mergable_client->forceDelete();
 
         $this->client->credit_balance = $this->client->service()->getCreditBalance();
         $this->client->saveQuietly();
+
+        event(new \App\Events\Client\ClientWasMerged($mergeable_client, $this->client, $this->client->company, $event_vars));
 
         return $this->client;
     }

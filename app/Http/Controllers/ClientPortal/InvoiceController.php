@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -75,7 +76,7 @@ class InvoiceController extends Controller
         $data = [
             'invoice' => $invoice->service()->removeUnpaidGatewayFees()->save(),
             'invitation' => $invitation ?: $invoice->invitations->first(),
-            'key' => $invitation ? $invitation->key : false,
+            '_key' => $invitation ? $invitation->key : false,
             'hash' => $hash,
             'variables' => $variables,
             'invoices' => [$invoice->hashed_id],
@@ -98,7 +99,7 @@ class InvoiceController extends Controller
     {
         $data = Cache::get($hash);
 
-        for ($x = 0; $x < 3; $x++) {
+        for ($x = 0; $x < 18; $x++) {
 
             $data = Cache::get($hash);
 
@@ -106,11 +107,15 @@ class InvoiceController extends Controller
                 break;
             }
 
-            usleep(300000);
+            usleep(100000);
 
         }
 
         $invitation = false;
+
+        if(!isset($data['entity_type'])){
+            nlog(array_merge(["showBlob"], $data));
+        }
 
         match($data['entity_type'] ?? 'invoice') {
             'invoice' => $invitation = InvoiceInvitation::withTrashed()->find($data['invitation_id']), //@todo - sometimes this is false!!
@@ -126,7 +131,7 @@ class InvoiceController extends Controller
 
         $file = (new \App\Jobs\Entity\CreateRawPdf($invitation))->handle();
 
-        $headers = ['Content-Type' => 'application/pdf'];
+        $headers = ['Content-Type' => 'application/pdf', 'Content-Disposition' => 'inline'];
         return response()->make($file, 200, $headers);
 
     }

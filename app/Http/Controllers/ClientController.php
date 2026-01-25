@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -111,6 +112,13 @@ class ClientController extends BaseController
      */
     public function show(ShowClientRequest $request, Client $client)
     {
+        
+        if(auth()->user()->hasExcludedPermissions($this->client_excludable_permissions, $this->client_excludable_overrides)){
+            foreach($this->client_exclusion_fields as $field){
+                $client->{$field} = null;
+            }
+        }
+
         return $this->itemResponse($client);
     }
 
@@ -124,6 +132,14 @@ class ClientController extends BaseController
      */
     public function edit(EditClientRequest $request, Client $client)
     {
+                
+        if (auth()->user()->hasExcludedPermissions($this->client_excludable_permissions, $this->client_excludable_overrides)) {
+            foreach ($this->client_exclusion_fields as $field) {
+                $client->{$field} = null;
+            }
+        }
+
+
         return $this->itemResponse($client);
     }
 
@@ -313,7 +329,7 @@ class ClientController extends BaseController
         //delete all documents
         $client->documents->each(function ($document) {
             try {
-                Storage::disk(config('filesystems.default'))->delete($document->url);
+                Storage::disk($document->disk)->delete($document->url);
             } catch (\Exception $e) {
                 nlog($e->getMessage());
             }
@@ -421,8 +437,7 @@ class ClientController extends BaseController
             //2025-01-15 15:00:00 - unset the bounce ID here.
             $events = $record['history']['events'];
 
-            foreach($events as &$event)
-            {
+            foreach ($events as &$event) {
                 $event['bounce_id'] = "";
             }
             unset($event);
@@ -471,9 +486,29 @@ class ClientController extends BaseController
             })
             ->orWhereHasMorph('documentable', [Client::class], function ($query) use ($client) {
                 $query->where('id', $client->id);
+            })
+            ->when(strlen($request->input('filter','')) > 1, function ($query) use ($request) {
+                $query->where('name', 'like', '%'.$request->input('filter','').'%');
+            })
+            ->when(strlen($request->input('sort','')) > 1, function ($query) use ($request) {
+             
+                $sort_col = explode('|', $request->input('sort',''));
+             
+                if (!is_array($sort_col) || count($sort_col) != 2 || !in_array($sort_col[0], \Illuminate\Support\Facades\Schema::getColumnListing($query->getModel()->getTable()))) {
+                    return $query;
+                }
+
+                $dir = ($sort_col[1] == 'asc') ? 'asc' : 'desc';
+                return $query->orderBy($sort_col[0], $dir);
+
             });
 
         return $this->listResponse($documents);
 
+    }
+
+    public function showSettings(ShowClientRequest $request, Client $client)
+    {
+        return response()->json($client->service()->showSettingsMap(), 200); 
     }
 }

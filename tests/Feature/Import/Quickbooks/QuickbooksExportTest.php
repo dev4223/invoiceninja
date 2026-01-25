@@ -36,15 +36,16 @@ class QuickbooksExportTest extends TestCase
 
     protected function setUp(): void
     {
-        parent::setUp();      
-        
-        if(config('ninja.is_travis') || !config('services.quickbooks.client_id')){
+        parent::setUp();
+
+
+        if (config('ninja.testvars.travis') || !config('services.quickbooks.client_id')) {
             $this->markTestSkipped('No Quickbooks Client ID found');
         }
 
         $company = Company::find(1);
 
-        if(!$company){
+        if (!$company) {
             $this->markTestSkipped('No company found');
         }
 
@@ -62,8 +63,7 @@ class QuickbooksExportTest extends TestCase
             // 'sales' => 'SalesReceipt',
         ];
 
-        foreach($entities as $key => $entity)
-        {
+        foreach ($entities as $key => $entity) {
             $records = $this->qb->sdk()->fetchRecords($entity);
 
             $this->assertNotNull($records);

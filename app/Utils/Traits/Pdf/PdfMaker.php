@@ -71,7 +71,7 @@ trait PdfMaker
             '--disable-device-discovery-notifications',
             '--disable-reading-from-canvas',
             '--safebrowsing-disable-auto-update',
-            '--disable-features=SharedArrayBuffer,OutOfBlinkCors',
+            '--disable-features=SharedArrayBuffer,OutOfBlinkCors,PerformanceManager,InterestCohort',
 
             // '--wait-for-network-idle',
             '--font-render-hinting=medium',
@@ -81,9 +81,9 @@ trait PdfMaker
         ];
 
         // if (config('ninja.snappdf_chromium_arguments')) {
-            // $pdf->clearChromiumArguments();
-            // $pdf->addChromiumArguments(config('ninja.snappdf_chromium_arguments'));
-            $pdf->addChromiumArguments(implode(' ', $chrome_flags));
+        // $pdf->clearChromiumArguments();
+        // $pdf->addChromiumArguments(config('ninja.snappdf_chromium_arguments'));
+        $pdf->addChromiumArguments(implode(' ', $chrome_flags));
         // }
 
         if (config('ninja.snappdf_chromium_path')) {
@@ -91,7 +91,7 @@ trait PdfMaker
         }
 
         $html = str_ireplace(['file:/', 'iframe', '<embed', '&lt;embed', '&lt;object', '<object', '127.0.0.1', 'localhost', '<?xml encoding="UTF-8">', '/etc/'], '', $html);
-// nlog($html);
+        // nlog($html);
         $generated = $pdf
                         ->setHtml($html)
                         ->generate();

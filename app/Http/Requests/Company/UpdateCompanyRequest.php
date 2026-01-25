@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -21,6 +22,7 @@ use App\Http\ValidationRules\ValidSettingsRule;
 use App\Http\ValidationRules\Company\ValidSubdomain;
 use App\Http\ValidationRules\Company\ValidExpenseMailbox;
 use App\Http\ValidationRules\EInvoice\ValidCompanyScheme;
+use App\Rules\CommaSeparatedEmails;
 
 class UpdateCompanyRequest extends Request
 {
@@ -109,6 +111,13 @@ class UpdateCompanyRequest extends Request
         //         },
         //     ];
 
+        $rules['settings.ses_secret_key'] = 'required_if:settings.email_sending_method,client_ses'; //ses specific rules
+        $rules['settings.ses_access_key'] = 'required_if:settings.email_sending_method,client_ses'; //ses specific rules
+        $rules['settings.ses_region'] = 'required_if:settings.email_sending_method,client_ses'; //ses specific rules
+        $rules['settings.ses_from_address'] = 'required_if:settings.email_sending_method,client_ses'; //ses specific rules
+        $rules['settings.reply_to_email'] = 'sometimes|nullable|email'; // ensures that the reply to email address is a valid email address
+        $rules['settings.bcc_email'] = ['sometimes', 'nullable', new \App\Rules\CommaSeparatedEmails]; //ensure that the BCC's are valid comma separated emails
+
         return $rules;
     }
 
@@ -159,7 +168,7 @@ class UpdateCompanyRequest extends Request
             $input['e_invoice'] = $this->company->filterNullsRecursive($input['e_invoice']);
         }
 
-        if(isset($input['calculate_taxes']) && $input['calculate_taxes'] == true) {
+        if (isset($input['calculate_taxes']) && $input['calculate_taxes'] == true) {
             $input['settings']['tax_name1'] = '';
             $input['settings']['tax_rate1'] = 0;
             $input['settings']['tax_name2'] = '';
@@ -170,7 +179,7 @@ class UpdateCompanyRequest extends Request
             $input['enabled_item_tax_rates'] = 1;
         }
 
-        if(isset($input['session_timeout']) && $input['session_timeout'] < 0) {
+        if (isset($input['session_timeout']) && $input['session_timeout'] < 0) {
             $input['session_timeout'] = 0;
         }
 
@@ -200,10 +209,19 @@ class UpdateCompanyRequest extends Request
         if (Ninja::isHosted()) {
             foreach ($this->protected_input as $protected_var) {
 
-                if(isset($settings[$protected_var])) {
+                if (isset($settings[$protected_var])) {
                     $settings[$protected_var] = str_replace("script", "", $settings[$protected_var]);
                 }
             }
+
+            if($this->company->getSetting('e_invoice_type') == 'VERIFACTU') {
+                $settings['e_invoice_type'] = 'VERIFACTU';
+            }
+
+        }
+
+        if(isset($settings['e_invoice_type']) && $settings['e_invoice_type'] == 'VERIFACTU' && $this->company->verifactuEnabled()) {
+            $settings['lock_invoices'] = 'when_sent';
         }
 
         if (isset($settings['email_style_custom'])) {

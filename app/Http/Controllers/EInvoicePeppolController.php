@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -11,17 +12,18 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
-use App\Http\Requests\EInvoice\Peppol\StoreEntityRequest;
+use Illuminate\Http\JsonResponse;
+use App\Services\EDocument\Jobs\SendEDocument;
+use App\Http\Requests\EInvoice\Peppol\RetrySendRequest;
 use App\Services\EDocument\Gateway\Storecove\Storecove;
 use App\Http\Requests\EInvoice\Peppol\DisconnectRequest;
+use App\Http\Requests\EInvoice\Peppol\ShowEntityRequest;
+use App\Http\Requests\EInvoice\Peppol\StoreEntityRequest;
+use App\Http\Requests\EInvoice\Peppol\UpdateEntityRequest;
+use App\Services\EDocument\Standards\Verifactu\SendToAeat;
 use App\Http\Requests\EInvoice\Peppol\AddTaxIdentifierRequest;
 use App\Http\Requests\EInvoice\Peppol\RemoveTaxIdentifierRequest;
-use App\Http\Requests\EInvoice\Peppol\RetrySendRequest;
-use App\Http\Requests\EInvoice\Peppol\ShowEntityRequest;
-use App\Http\Requests\EInvoice\Peppol\UpdateEntityRequest;
-use App\Services\EDocument\Jobs\SendEDocument;
 
 class EInvoicePeppolController extends BaseController
 {
@@ -50,6 +52,7 @@ class EInvoicePeppolController extends BaseController
      */
     public function setup(StoreEntityRequest $request, Storecove $storecove): Response|JsonResponse
     {
+        
         /**
          * @var \App\Models\Company
          */
@@ -60,7 +63,7 @@ class EInvoicePeppolController extends BaseController
             ->setCompany($company)
             ->setup($request->validated());
 
-            nlog($response);
+        nlog($response);
 
         if (data_get($response, 'status') === 'error') {
             return response()->json(data_get($response, 'message'), status: $response['code']);
@@ -89,7 +92,7 @@ class EInvoicePeppolController extends BaseController
         $settings->tax_rate2 = 0;
         $settings->tax_name3 = '';
         $settings->tax_rate3 = 0;
-        
+
         $settings->e_invoice_type = 'PEPPOL';
         // $settings->vat_number = $request->vat_number ?? $company->settings->vat_number;
         $settings->id_number = $request->id_number ?? $company->settings->id_number;
@@ -264,8 +267,12 @@ class EInvoicePeppolController extends BaseController
 
     public function retrySend(RetrySendRequest $request)
     {
-        
-        SendEDocument::dispatch($request->entity, $request->entity_id, auth()->user()->company()->db);
+        if(auth()->user()->company()->verifactuEnabled()) {
+            SendToAeat::dispatch($request->entity_id, auth()->user()->company(), 'create');
+        }
+        else {
+            SendEDocument::dispatch($request->entity, $request->entity_id, auth()->user()->company()->db);
+        }
 
         return response()->json(['message' => 'trying....'], 200);
     }

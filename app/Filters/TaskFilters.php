@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -35,6 +36,7 @@ class TaskFilters extends QueryFilters
 
         return  $this->builder->where(function ($query) use ($filter) {
             $query->where('description', 'like', '%'.$filter.'%')
+                          ->orWhere("number", 'like', '%'.$filter.'%')
                           ->orWhere('time_log', 'like', '%'.$filter.'%')
                           ->orWhere('custom_value1', 'like', '%'.$filter.'%')
                           ->orWhere('custom_value2', 'like', '%'.$filter.'%')

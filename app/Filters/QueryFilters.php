@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -146,12 +147,12 @@ abstract class QueryFilters
 
         return $this->builder->where(function ($query) use ($filters) {
             if (in_array(self::STATUS_ACTIVE, $filters)) {
-                $query = $query->orWhereNull('deleted_at');
+                $query = $query->orWhereNull($this->builder->getModel()->getTable() . '.deleted_at');
             }
 
             if (in_array(self::STATUS_ARCHIVED, $filters)) {
                 $query = $query->orWhere(function ($q) {
-                    $q->whereNotNull('deleted_at')->where('is_deleted', 0);
+                    $q->whereNotNull($this->builder->getModel()->getTable() . '.deleted_at')->where('is_deleted', 0);
                 });
             }
 
@@ -222,7 +223,7 @@ abstract class QueryFilters
 
     public function updated_at($value = '')
     {
-        if ($value == '') {
+        if (is_null($value) || $value == '') {
             return $this->builder;
         }
 
@@ -241,11 +242,15 @@ abstract class QueryFilters
 
     /**
      *
-     * @param string $value
+     * @param ?string $value
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function is_deleted($value = 'true')
     {
+        if (is_null($value)) {
+            return $this->builder;
+        }
+
         if ($value == 'true') {
             return $this->builder->where('is_deleted', $value)->withTrashed();
         }

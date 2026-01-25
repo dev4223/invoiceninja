@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -42,19 +43,11 @@ class StoreClientRequest extends Request
         /** @var  \App\Models\User $user */
         $user = auth()->user();
 
-        if ($this->file('documents') && is_array($this->file('documents'))) {
-            $rules['documents.*'] = $this->fileValidation();
-        } elseif ($this->file('documents')) {
-            $rules['documents'] = $this->fileValidation();
-        } else {
-            $rules['documents'] = 'bail|sometimes|array';
-        }
-
-        if ($this->file('file') && is_array($this->file('file'))) {
-            $rules['file.*'] = $this->fileValidation();
-        } elseif ($this->file('file')) {
-            $rules['file'] = $this->fileValidation();
-        }
+        $rules['name'] = 'bail|sometimes|nullable|string';
+        $rules['file'] = 'bail|sometimes|array';
+        $rules['file.*'] = $this->fileValidation();
+        $rules['documents'] = 'bail|sometimes|array';
+        $rules['documents.*'] = $this->fileValidation();
 
         /* Ensure we have a client name, and that all emails are unique*/
         //$rules['name'] = 'required|min:1';
@@ -83,8 +76,42 @@ class StoreClientRequest extends Request
         $rules['shipping_country_id'] = 'integer|nullable|exists:countries,id';
         $rules['number'] = ['sometimes', 'nullable', 'bail', Rule::unique('clients')->where('company_id', $user->company()->id)];
         $rules['country_id'] = 'integer|nullable|exists:countries,id';
+        $rules['custom_value1'] = ['bail','nullable','sometimes',function ($attribute, $value, $fail) {
+            if (is_array($value)) {
+                    $fail("The $attribute must not be an array.");
+                }
+            }];
+        $rules['custom_value2'] = ['bail','nullable','sometimes',function ($attribute, $value, $fail) {
+            if (is_array($value)) {
+                    $fail("The $attribute must not be an array.");
+                }
+            }];
+        $rules['custom_value3'] = ['bail','nullable','sometimes',function ($attribute, $value, $fail) {
+            if (is_array($value)) {
+                    $fail("The $attribute must not be an array.");
+                }
+            }];
+        $rules['custom_value4'] = ['bail','nullable','sometimes',function ($attribute, $value, $fail) {
+            if (is_array($value)) {
+                    $fail("The $attribute must not be an array.");
+                }
+            }];
 
         return $rules;
+    }
+
+    public function withValidator($validator)
+    {
+        $validator->after(function ($validator) {
+            
+            $user = auth()->user();
+            $company = $user->company();
+
+            if(isset($this->settings['lock_invoices']) && $company->verifactuEnabled() && $this->settings['lock_invoices'] != 'when_sent'){
+                $validator->errors()->add('settings.lock_invoices', 'Locked Invoices Cannot Be Disabled');
+            }
+            
+        });
     }
 
     public function prepareForValidation()
@@ -93,11 +120,19 @@ class StoreClientRequest extends Request
         /** @var \App\Models\User $user */
         $user = auth()->user();
 
+        if ($this->file('documents') instanceof \Illuminate\Http\UploadedFile) {
+            $this->files->set('documents', [$this->file('documents')]);
+        }
+
+        if ($this->file('file') instanceof \Illuminate\Http\UploadedFile) {
+            $this->files->set('file', [$this->file('file')]);
+        }
+
         /* Default settings */
         $settings = (array)ClientSettings::defaults();
 
         /* Stub settings if they don't exist */
-        if (!array_key_exists('settings', $input)) {
+        if (!array_key_exists('settings', $input) || is_null($input['settings'])) {
             $input['settings'] = [];
         } elseif (is_object($input['settings'])) {
             $input['settings'] = (array)$input['settings'];
@@ -165,7 +200,7 @@ class StoreClientRequest extends Request
         }
 
         // prevent xss injection
-        if (array_key_exists('name', $input)) {
+        if (array_key_exists('name', $input) && is_string($input['name'])) {
             $input['name'] = strip_tags($input['name']);
         }
 
@@ -188,9 +223,7 @@ class StoreClientRequest extends Request
         /** @var \Illuminate\Support\Collection<\App\Models\Language> */
         $languages = app('languages');
 
-        $language = $languages->first(function ($item) use ($language_code) {
-            return $item->locale == $language_code;
-        });
+        $language = $languages->firstWhere('locale', $language_code);
 
         return $language ? (string)$language->id : '';
 

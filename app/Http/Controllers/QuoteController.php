@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -528,7 +529,7 @@ class QuoteController extends BaseController
         if (Ninja::isHosted() && $user->account->emailQuotaExceeded()) {
             return response(['message' => ctrans('texts.email_quota_exceeded_subject')], 400);
         }
-                
+
         if ($user->hasExactPermission('disable_emails') && (stripos($action, 'email') !== false)) {
             return response(['message' => ctrans('texts.disable_emails_error')], 400);
         }
@@ -560,7 +561,8 @@ class QuoteController extends BaseController
 
             $quotes->each(function ($quote, $key) use ($user) {
                 if ($user->can('edit', $quote) && $quote->service()->isConvertable()) {
-                    $quote->service()->convertToInvoice();
+                    // $quote->service()->convertToInvoice();
+                    $quote->service()->convert()->save();
                 }
             });
 
@@ -568,16 +570,6 @@ class QuoteController extends BaseController
         }
 
         if ($action == 'bulk_print' && $user->can('view', $quotes->first())) {
-            // $paths = $quotes->map(function ($quote) {
-            //     return (new \App\Jobs\Entity\CreateRawPdf($quote->invitations->first()))->handle();
-            // });
-
-            // $merge = (new PdfMerge($paths->toArray()))->run();
-
-            // return response()->streamDownload(function () use ($merge) {
-            //     echo($merge);
-            // }, 'print.pdf', ['Content-Type' => 'application/pdf']);
-
 
             $start = microtime(true);
 
@@ -588,7 +580,7 @@ class QuoteController extends BaseController
             $finished = false;
 
             do {
-                usleep(500000);
+                usleep(200000);
                 $batch = \Illuminate\Support\Facades\Bus::findBatch($batch_id);
                 $finished = $batch->finished();
             } while (!$finished);

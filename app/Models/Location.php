@@ -17,27 +17,14 @@ use Illuminate\Support\Facades\App;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * App\Models\Client
+ * App\Models\Location
  *
  * @property int $id
  * @property int $company_id
  * @property int $user_id
- * @property int|null $assigned_user_id
+ * @property int|null $vendor_id
+ * @property int|null $client_id
  * @property string|null $name
- * @property string|null $website
- * @property string|null $private_notes
- * @property string|null $public_notes
- * @property string|null $client_hash
- * @property string|null $logo
- * @property string|null $phone
- * @property string|null $routing_id
- * @property float $balance
- * @property float $paid_to_date
- * @property float $credit_balance
- * @property int|null $last_login
- * @property int|null $industry_id
- * @property int|null $size_id
- * @property object|array|null $e_invoice
  * @property string|null $address1
  * @property string|null $address2
  * @property string|null $city
@@ -50,22 +37,21 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string|null $custom_value4
  * @property bool $is_deleted
  * @property bool $is_shipping_location
- * @property object|array|null $tax_data
  * @property int|null $created_at
  * @property int|null $updated_at
  * @property int|null $deleted_at
+ * @property object|array|null $tax_data
  * @property-read mixed $hashed_id
  * @property-read \App\Models\User $user
  * @property-read \App\Models\Client|null $client
  * @property-read \App\Models\Vendor|null $vendor
  * @property-read \App\Models\Company $company
  * @property-read \App\Models\Country|null $country
- * 
+ *
  * @mixin \Eloquent
  */
 class Location extends BaseModel
 {
-    
     use SoftDeletes;
     use Filterable;
     use Excludable;
@@ -100,6 +86,7 @@ class Location extends BaseModel
         'created_at' => 'timestamp',
         'deleted_at' => 'timestamp',
         'is_deleted' => 'bool',
+        'is_shipping_locaiton',
     ];
 
     protected $touches = [];

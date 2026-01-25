@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -28,6 +29,7 @@ class PreviewReport implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
+    public $tries = 1;
     /**
      * Create a new job instance
      */
@@ -39,20 +41,31 @@ class PreviewReport implements ShouldQueue
     {
         MultiDB::setDb($this->company->db);
 
-        /** @var \App\Export\CSV\CreditExport $export */
+        /** @var \App\Export\CSV\BaseExport $export */
         $export = new $this->report_class($this->company, $this->request);
 
         if (isset($this->request['output']) && $this->request['output'] == 'json') {
             $report = $export->returnJson();
-        } else {
-            $report = $export->run();
+        } 
+        elseif(!empty($this->request['template_id'])){
+            $builder = $export->init();
+            $report = $export->exportTemplate($builder, $this->request['template_id']);
+            $report = base64_encode($report);
+        }
+        else {
+            $report = base64_encode($export->run());
         }
 
         Cache::put($this->hash, $report, 60 * 60);
     }
 
-    public function middleware()
+    /**
+     * Handle a job failure.
+     */
+    public function failed(?\Throwable $exception)
     {
-        return [new WithoutOverlapping("report-{$this->company->company_key}")];
+        if($exception) {
+            nlog("EXCEPTION:: PreviewReport:: could not preview report for " . $exception->getMessage());
+        }
     }
 }

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -33,7 +34,7 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 
 /**
- * 
+ *
  *   App\Utils\Traits\GeneratesCounter
  */
 class GeneratesCounterTest extends TestCase
@@ -42,15 +43,11 @@ class GeneratesCounterTest extends TestCase
     use DatabaseTransactions;
     use MakesHash;
     use MockAccountData;
-
-    public $faker;
-
     protected function setUp(): void
     {
         parent::setUp();
 
         Session::start();
-        $this->faker = \Faker\Factory::create();
         Model::reguard();
 
         $this->makeTestData();
@@ -90,32 +87,35 @@ class GeneratesCounterTest extends TestCase
         $invoice->number = null;
         $invoice->status_id = Invoice::STATUS_DRAFT;
         $invoice->save();
+        $invoice->calc()->getInvoice();
 
-            $this->travelTo('2025-02-01');
+        $this->travelTo('2025-02-01');
 
-            $invoice->number = null;
-            $invoice->status_id = Invoice::STATUS_DRAFT;
-            $invoice->save();
+        $invoice->number = null;
+        $invoice->status_id = Invoice::STATUS_DRAFT;
+        $invoice->save();
 
-            $invoice = $invoice->service()->markSent()->save();
+        $invoice = $invoice->service()->markSent()->save();
 
-            $this->assertNotNull($invoice->number);
+        $this->assertNotNull($invoice->number);
 
-            $this->assertEquals("IDNUMBER/2025-0001", $invoice->number);
+        $this->assertEquals("IDNUMBER/2025-0001", $invoice->number);
 
-            $this->travelTo('2026-02-01');
+        $this->travelTo('2026-02-01');
 
-            $invoice = Invoice::factory()->create([
-                        'client_id' => $client->id,
-                        'company_id' => $company->id,
-                        'user_id' => $this->user->id,
-                    ]);
+        $invoice = Invoice::factory()->create([
+                    'client_id' => $client->id,
+                    'company_id' => $company->id,
+                    'user_id' => $this->user->id,
+                ]);
 
-            $invoice->number = null;
-            $invoice->status_id = Invoice::STATUS_DRAFT;
-            $invoice->save();
+        $invoice->number = null;
+        $invoice->status_id = Invoice::STATUS_DRAFT;
+        $invoice->save();
 
-            $invoice = $invoice->service()->markSent()->save();
+        $invoice->calc()->getInvoice();
+
+        $invoice = $invoice->service()->markSent()->save();
 
         $this->assertEquals("IDNUMBER/2026-0001", $invoice->number);
 
@@ -125,7 +125,7 @@ class GeneratesCounterTest extends TestCase
     public function testAnnualCounterResetLogic()
     {
         $settings = CompanySettings::defaults();
-        
+
         $settings->reset_counter_date = "2026-01-01";
         $settings->reset_counter_frequency_id = "10";
         $settings->invoice_number_pattern = '{$year}-{$counter}';
@@ -155,8 +155,10 @@ class GeneratesCounterTest extends TestCase
         $invoice->status_id = Invoice::STATUS_DRAFT;
         $invoice->save();
 
+        $invoice->calc()->getInvoice();
+
         $invoice = $invoice->service()->markSent()->save();
-        
+
         $this->assertNotNull($invoice->number);
 
         $this->assertEquals("2025-0001", $invoice->number);
@@ -172,6 +174,8 @@ class GeneratesCounterTest extends TestCase
         $invoice->number = null;
         $invoice->status_id = Invoice::STATUS_DRAFT;
         $invoice->save();
+
+        $invoice->calc()->getInvoice();
 
         $invoice = $invoice->service()->markSent()->save();
 
@@ -415,13 +419,16 @@ class GeneratesCounterTest extends TestCase
 
     public function testInvoiceNumberValue()
     {
-        $invoice_number = $this->getNextInvoiceNumber($this->client->fresh(), $this->invoice->fresh());
 
-        $this->assertEquals($invoice_number, '0002');
+        $this->assertEquals('0002', $this->invoice->fresh()->number);
 
         $invoice_number = $this->getNextInvoiceNumber($this->client->fresh(), $this->invoice->fresh());
 
         $this->assertEquals($invoice_number, '0003');
+
+        $invoice_number = $this->getNextInvoiceNumber($this->client->fresh(), $this->invoice->fresh());
+
+        $this->assertEquals($invoice_number, '0004');
     }
 
     public function testQuoteNumberValue()
@@ -598,11 +605,13 @@ class GeneratesCounterTest extends TestCase
 
         $invoice_number = $this->getNextInvoiceNumber($cliz->fresh(), $this->invoice);
 
-        $this->assertEquals($invoice_number, '0002');
+        $this->assertEquals('0002', $this->invoice->fresh()->number);
+
+        $this->assertEquals('0003', $invoice_number);
 
         $invoice_number = $this->getNextInvoiceNumber($cliz->fresh(), $this->invoice);
 
-        $this->assertEquals($invoice_number, '0003');
+        $this->assertEquals('0004', $invoice_number);
     }
 
     public function testClientNumber()

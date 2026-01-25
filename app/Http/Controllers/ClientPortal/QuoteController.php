@@ -59,7 +59,7 @@ class QuoteController extends Controller
 
         $data = [
             'quote' => $quote,
-            'key' => $invitation ? $invitation->key : false,
+            '_key' => $invitation ? $invitation->key : false,
             'invitation' => $invitation,
             'variables' => $variables,
         ];
@@ -178,6 +178,7 @@ class QuoteController extends Controller
             ->where('client_id', auth()->guard('contact')->user()->client->id)
             ->where('company_id', auth()->guard('contact')->user()->client->company_id)
             ->whereIn('status_id', [Quote::STATUS_DRAFT, Quote::STATUS_SENT])
+            ->whereNull('invoice_id')
             ->where(function ($q) {
                 $q->whereNull('due_date')->orWhere('due_date', '>=', now());
             })

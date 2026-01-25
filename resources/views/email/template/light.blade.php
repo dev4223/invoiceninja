@@ -1,7 +1,7 @@
 @component('email.template.master', ['design' => 'light', 'settings' => $settings, 'whitelabel' => $whitelabel])
 
 @slot('header')
-    @include('email.components.header', ['logo' => $company->present()->logo($settings)])
+    @include('email.components.header', ['logo' => $company->present()->logo($settings), 'company_name' => $company->present()->name()])
 @endslot
 
 {!! $body !!}

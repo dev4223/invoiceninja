@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -233,12 +234,16 @@ class User extends Authenticatable implements MustVerifyEmail
             return $truth->getCompanyToken();
         }
 
-        // if (request()->header('X-API-TOKEN')) {
         if (request()->header('X-API-TOKEN')) {
-            return CompanyToken::with(['cu'])->where('token', request()->header('X-API-TOKEN'))->first();
+            
+            $token = CompanyToken::with(['cu'])->where('token', request()->header('X-API-TOKEN'))->first();
+            if ($token) {
+                return $token;
+            }
+
         }
 
-        return $this->tokens()->first();
+        return $this->tokens()->with(['cu'])->first();
     }
 
     /**
@@ -466,10 +471,10 @@ class User extends Authenticatable implements MustVerifyEmail
         }
 
         return  $this->isSuperUser() ||
-                (stripos($this->token()->cu->permissions, $permission) !== false) ||
-                (stripos($this->token()->cu->permissions, $all_permission) !== false) ||
-                (stripos($this->token()->cu->permissions, $edit_all) !== false) ||
-                (stripos($this->token()->cu->permissions, $edit_entity) !== false);
+                (stripos($this->token()->cu->permissions ?? '', $permission) !== false) ||
+                (stripos($this->token()->cu->permissions ?? '', $all_permission) !== false) ||
+                (stripos($this->token()->cu->permissions ?? '', $edit_all) !== false) ||
+                (stripos($this->token()->cu->permissions ?? '', $edit_entity) !== false);
     }
 
     /**
@@ -570,8 +575,8 @@ class User extends Authenticatable implements MustVerifyEmail
      *
      * Note, returning FALSE here means the user does NOT have the permission we want to exclude
      *
-     * @param  array $matched_permission
-     * @param  array $excluded_permissions
+     * @param  array $matched_permission = []
+     * @param  array $excluded_permissions = []
      * @return bool
      */
     public function hasExcludedPermissions(array $matched_permission = [], array $excluded_permissions = []): bool
@@ -730,7 +735,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function updateReferral(ReferralEarning $entity)
     {
-        
+
         $earnings = collect($this->referral_earnings);
 
         $updated_earnings = $earnings->map(function ($earning) use ($entity) {

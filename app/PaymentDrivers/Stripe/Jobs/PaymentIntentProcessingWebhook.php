@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -147,6 +148,11 @@ class PaymentIntentProcessingWebhook implements ShouldQueue
         $payment_hash = PaymentHash::where('hash', $hash)->first();
 
         if (!$payment_hash) {
+            return;
+        }
+
+        if($payment_hash->payment){
+            nlog("payment found");
             return;
         }
 

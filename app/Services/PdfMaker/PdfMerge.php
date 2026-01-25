@@ -32,7 +32,7 @@ class PdfMerge
         $pdf = new FPDI();
 
         foreach ($this->files as $file) {
-            
+
             $pageCount = 0;
 
             try {
@@ -41,10 +41,10 @@ class PdfMerge
             } catch (\setasign\Fpdi\PdfParser\PdfParserException $e) {
                 // If FPDI fails, try downgrading the PDF
 
-                if(class_exists(\Modules\Admin\Services\PdfParse::class)){
-                    
+                if (class_exists(\Modules\Admin\Services\PdfParse::class)) {
+
                     $downgradedPdf = \Modules\Admin\Services\PdfParse::downgrade($file);
-                    
+
                     $pageCount = $pdf->setSourceFile(StreamReader::createByString($downgradedPdf));
                 }
 
@@ -52,7 +52,12 @@ class PdfMerge
 
             for ($i = 0; $i < $pageCount; $i++) {
                 $tpl = $pdf->importPage($i + 1, '/MediaBox');
-                $pdf->addPage();
+                $size = $pdf->getTemplateSize($tpl);
+
+                // Preserve original page orientation and dimensions
+                $orientation = $size['width'] > $size['height'] ? 'L' : 'P';
+                $pdf->addPage($orientation, [$size['width'], $size['height']]);
+
                 $pdf->useTemplate($tpl);
             }
         }

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -184,6 +185,19 @@ class Mutator implements MutatorInterface
         $this->mutator_util->setPaymentMeans(true);
 
         return $this;
+    }
+
+    public function DK(): self
+    {
+        //Block that handle CVR for Denmark
+        $companyID = new \InvoiceNinja\EInvoice\Models\Peppol\IdentifierType\CompanyID();
+        $companyID->schemeID = "0184";
+        $companyID->value = $this->override_vat_number ?? preg_replace("/[^a-zA-Z0-9]/", "", $this->invoice->company->settings->id_number);
+
+        $this->p_invoice->AccountingSupplierParty->Party->PartyLegalEntity[0]->CompanyID = $companyID;
+
+        return $this;
+
     }
 
     /**
@@ -593,7 +607,11 @@ class Mutator implements MutatorInterface
         }
 
         //Regardless, always include the client email address as a route - Storecove will only use this as a fallback.
-        $this->setEmailRouting($this->getIndividualEmailRoute());
+        $client_email = $this->getIndividualEmailRoute();
+
+        if (strlen($client_email) > 2) {
+            $this->setEmailRouting($client_email);
+        }
 
         $code = $this->getClientRoutingCode();
         $identifier = false;
@@ -612,12 +630,23 @@ class Mutator implements MutatorInterface
             $identifier = $this->getClientPublicIdentifier($code);
         }
 
-        $identifier = str_ireplace(["FR","BE"],"", $identifier);
+        $identifier = str_ireplace(["FR", "BE"], "", $identifier);
         $identifier = preg_replace("/[^a-zA-Z0-9]/", "", $identifier);
+
+        //Check the recipient is on the network, and perhaps, adjust the identifier accordingly
+        // if(!$this->storecove->exists($identifier, $code) && $this->invoice->client->country->iso_3166_2 == "BE"){
+
+        //     nlog("identifier not found, adjusting for BE");
+        //     $code = "BE:VAT";
+        //     $identifier = "BE".$identifier;
+
+        // }
+
 
         $this->setStorecoveMeta($this->buildRouting([
                 ["scheme" => $code, "id" => $identifier]
             ]));
+
 
         return $this;
     }

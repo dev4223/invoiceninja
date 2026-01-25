@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -221,6 +222,7 @@ class InvoiceItemSum
 
     private function push(): self
     {
+        
         $this->sub_total += round($this->getLineTotal(), $this->currency->precision);
 
         $this->gross_sub_total += $this->getGrossLineTotal();
@@ -294,6 +296,7 @@ class InvoiceItemSum
      */
     private function calcTaxes()
     {
+
         if ($this->calc_tax) {
             $this->calcTaxesAutomatically();
         }
@@ -350,7 +353,7 @@ class InvoiceItemSum
         if (!$this->client->getSetting('enable_e_invoice')) {
             return $this;
         }
-        
+
         collect($this->invoice->line_items)
             ->flatMap(function ($item) {
                 return collect([1, 2, 3])
@@ -367,23 +370,27 @@ class InvoiceItemSum
 
                 $tax_component = 0;
 
+                $amount = 0;
+
                 if ($this->invoice->custom_surcharge1) {
                     $tax_component += round($this->invoice->custom_surcharge1 * ($tax['percentage'] / 100), 2);
+                    $amount += $this->invoice->custom_surcharge1;
                 }
 
                 if ($this->invoice->custom_surcharge2) {
                     $tax_component += round($this->invoice->custom_surcharge2 * ($tax['percentage'] / 100), 2);
+                    $amount += $this->invoice->custom_surcharge2;
                 }
 
                 if ($this->invoice->custom_surcharge3) {
                     $tax_component += round($this->invoice->custom_surcharge3 * ($tax['percentage'] / 100), 2);
+                    $amount += $this->invoice->custom_surcharge3;
                 }
 
                 if ($this->invoice->custom_surcharge4) {
                     $tax_component += round($this->invoice->custom_surcharge4 * ($tax['percentage'] / 100), 2);
+                    $amount += $this->invoice->custom_surcharge4;
                 }
-
-                $amount = $this->invoice->custom_surcharge4 + $this->invoice->custom_surcharge3 + $this->invoice->custom_surcharge2 + $this->invoice->custom_surcharge1;
 
                 if ($tax_component > 0) {
                     $this->groupTax($tax['name'], $tax['percentage'], $tax_component, $amount, $tax['tax_id']);
@@ -401,8 +408,9 @@ class InvoiceItemSum
         $key = str_replace(' ', '', $tax_name.$tax_rate);
 
         //Handles an edge case where a blank line is entered.
-        if($tax_rate > 0 && $amount == 0)
+        if ($tax_rate > 0 && $amount == 0) {
             return;
+        }
 
         $group_tax = ['key' => $key, 'total' => $tax_total, 'tax_name' => $tax_name.' '.Number::formatValueNoTrailingZeroes(floatval($tax_rate), $this->client).'%', 'tax_id' => $tax_id, 'tax_rate' => $tax_rate, 'base_amount' => $amount];
 
@@ -428,7 +436,7 @@ class InvoiceItemSum
 
     public function setLineTotal($total)
     {   //Here we go! Epsilon in PHP, who would have thunk it....
-        $this->item->line_total = round(((float) $total + 0.000000000000004),2);
+        $this->item->line_total = round(((float) $total + 0.000000000000004), 2);
 
         return $this;
     }

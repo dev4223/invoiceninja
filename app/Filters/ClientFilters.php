@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -164,16 +165,18 @@ class ClientFilters extends QueryFilters
     {
         $sort_col = explode('|', $sort);
 
-        if (!is_array($sort_col) || count($sort_col) != 2 || !in_array($sort_col[0], \Illuminate\Support\Facades\Schema::getColumnListing($this->builder->getModel()->getTable()))) {
-            return $this->builder;
-        }
-            
-        if ($sort_col[0] == 'documents') {
+        if (isset($sort_col[0]) && $sort_col[0] == 'documents') {
             return $this->builder;
         }
 
-        if ($sort_col[0] == 'display_name') {
+        if (isset($sort_col[0]) && $sort_col[0] == 'display_name') {
             $sort_col[0] = 'name';
+        }
+
+        if(is_array($sort_col) && $sort_col[0] == 'contacts'){   
+        }
+        elseif (!is_array($sort_col) || count($sort_col) != 2 || !in_array($sort_col[0], \Illuminate\Support\Facades\Schema::getColumnListing($this->builder->getModel()->getTable()))) {
+            return $this->builder;
         }
 
         $dir = ($sort_col[1] == 'asc') ? 'asc' : 'desc';
@@ -182,6 +185,53 @@ class ClientFilters extends QueryFilters
             return $this->builder->orderByRaw("REGEXP_REPLACE(number,'[^0-9]+','')+0 " . $dir);
         }
 
+        if ($sort_col[0] == 'name') {
+            // Use a raw subquery in the ORDER BY instead of adding it to SELECT
+            // This avoids conflicts with the Excludable trait
+            return $this->builder->orderByRaw("
+                COALESCE(
+                    NULLIF(clients.name, ''), 
+                    (
+                        SELECT COALESCE(NULLIF(first_name, ''), email) 
+                        FROM client_contacts 
+                        WHERE client_contacts.client_id = clients.id 
+                        AND client_contacts.deleted_at IS NULL 
+                        LIMIT 1
+                    )
+                ) " . $dir
+            );
+        }
+
+        if($sort_col[0] == 'contacts'){
+            return $this->builder->orderByRaw("
+                (
+                    SELECT 
+                        CASE 
+                            WHEN first_name IS NOT NULL AND first_name != '' AND last_name IS NOT NULL AND last_name != '' 
+                            THEN CONCAT(first_name, ' ', last_name)
+                            WHEN first_name IS NOT NULL AND first_name != '' 
+                            THEN first_name
+                            WHEN last_name IS NOT NULL AND last_name != '' 
+                            THEN last_name
+                            ELSE email
+                        END
+                    FROM client_contacts 
+                    WHERE client_contacts.client_id = clients.id 
+                    AND client_contacts.deleted_at IS NULL
+                    ORDER BY
+                        CASE 
+                            WHEN first_name IS NOT NULL AND first_name != '' AND last_name IS NOT NULL AND last_name != '' THEN 1
+                            WHEN first_name IS NOT NULL AND first_name != '' THEN 2
+                            WHEN last_name IS NOT NULL AND last_name != '' THEN 3
+                            ELSE 4
+                        END,
+                        first_name ASC,
+                        last_name ASC,
+                        email ASC
+                    LIMIT 1
+                ) " . $dir
+            );
+        }
         return $this->builder->orderBy($sort_col[0], $dir);
     }
 

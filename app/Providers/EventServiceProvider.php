@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -57,18 +58,26 @@ use App\Observers\ProposalObserver;
 use App\Events\Quote\QuoteWasViewed;
 use App\Events\Task\TaskWasArchived;
 use App\Events\Task\TaskWasRestored;
+use App\Events\User\UserLoginFailed;
 use App\Events\User\UserWasArchived;
 use App\Events\User\UserWasRestored;
+use App\Listeners\LogRequestSending;
 use App\Events\Quote\QuoteWasCreated;
 use App\Events\Quote\QuoteWasDeleted;
 use App\Events\Quote\QuoteWasEmailed;
 use App\Events\Quote\QuoteWasUpdated;
 use App\Events\Account\AccountCreated;
+use App\Events\Account\AccountDeleted;
+use App\Events\Client\ClientWasMerged;
+use App\Events\Client\ClientWasPurged;
 use App\Events\Credit\CreditWasViewed;
 use App\Events\Invoice\InvoiceWasPaid;
 use App\Events\Quote\QuoteWasApproved;
 use App\Events\Quote\QuoteWasArchived;
 use App\Events\Quote\QuoteWasRestored;
+use App\Events\Vendor\VendorWasMerged;
+use App\Listeners\LogResponseReceived;
+use Illuminate\Queue\Events\JobFailed;
 use App\Events\Client\ClientWasCreated;
 use App\Events\Client\ClientWasDeleted;
 use App\Events\Client\ClientWasUpdated;
@@ -146,6 +155,7 @@ use App\Events\Statement\StatementWasEmailed;
 use App\Listeners\Credit\CreditEmailActivity;
 use App\Listeners\Quote\QuoteApprovedWebhook;
 use App\Listeners\Quote\QuoteDeletedActivity;
+use App\Listeners\User\UpdateUserLoginFailed;
 use App\Events\Invoice\InvoiceAutoBillSuccess;
 use App\Listeners\Credit\CreditViewedActivity;
 use App\Listeners\Invoice\InvoicePaidActivity;
@@ -161,18 +171,22 @@ use App\Listeners\Activity\TaskUpdatedActivity;
 use App\Listeners\Invoice\InvoiceEmailActivity;
 use App\Listeners\SendVerificationNotification;
 use App\Events\Credit\CreditWasEmailedAndFailed;
+use App\Listeners\Activity\ClientMergedActivity;
+use App\Listeners\Activity\ClientPurgedActivity;
 use App\Listeners\Activity\CreatedQuoteActivity;
 use App\Listeners\Activity\DeleteClientActivity;
 use App\Listeners\Activity\DeleteCreditActivity;
 use App\Listeners\Activity\QuoteUpdatedActivity;
 use App\Listeners\Activity\TaskArchivedActivity;
 use App\Listeners\Activity\TaskRestoredActivity;
+use App\Listeners\Activity\VendorMergedActivity;
 use App\Listeners\Credit\CreditRestoredActivity;
 use App\Listeners\Invoice\CreateInvoiceActivity;
 use App\Listeners\Invoice\InvoiceViewedActivity;
 use App\Listeners\Invoice\UpdateInvoiceActivity;
 use App\Listeners\Misc\InvitationViewedListener;
 use App\Events\Invoice\InvoiceReminderWasEmailed;
+use App\Listeners\Account\AccountDeletedListener;
 use App\Listeners\Activity\ClientUpdatedActivity;
 use App\Listeners\Activity\CreatedClientActivity;
 use App\Listeners\Activity\CreatedCreditActivity;
@@ -188,6 +202,7 @@ use App\Listeners\Payment\PaymentBalanceActivity;
 use App\Listeners\Payment\PaymentEmailedActivity;
 use App\Listeners\Quote\QuoteCreatedNotification;
 use App\Listeners\Quote\QuoteEmailedNotification;
+use Illuminate\Http\Client\Events\RequestSending;
 use App\Events\Invoice\InvoiceWasEmailedAndFailed;
 use App\Events\Payment\PaymentWasEmailedAndFailed;
 use App\Listeners\Activity\ArchivedClientActivity;
@@ -206,6 +221,8 @@ use App\Listeners\Invoice\InvoiceRestoredActivity;
 use App\Listeners\Invoice\InvoiceReversedActivity;
 use App\Listeners\Payment\PaymentRestoredActivity;
 use App\Listeners\Quote\QuoteApprovedNotification;
+use SocialiteProviders\Apple\AppleExtendSocialite;
+use SocialiteProviders\Manager\SocialiteWasCalled;
 use App\Events\Subscription\SubscriptionWasCreated;
 use App\Events\Subscription\SubscriptionWasDeleted;
 use App\Events\Subscription\SubscriptionWasUpdated;
@@ -217,6 +234,7 @@ use App\Listeners\Credit\CreditCreatedNotification;
 use App\Listeners\Credit\CreditEmailedNotification;
 use App\Listeners\Invoice\InvoiceCancelledActivity;
 use App\Listeners\Quote\QuoteReminderEmailActivity;
+use Illuminate\Http\Client\Events\ResponseReceived;
 use App\Events\PurchaseOrder\PurchaseOrderWasViewed;
 use App\Events\Subscription\SubscriptionWasArchived;
 use App\Events\Subscription\SubscriptionWasRestored;
@@ -232,6 +250,7 @@ use App\Listeners\Statement\StatementEmailedActivity;
 use App\Events\PurchaseOrder\PurchaseOrderWasAccepted;
 use App\Events\PurchaseOrder\PurchaseOrderWasArchived;
 use App\Events\PurchaseOrder\PurchaseOrderWasRestored;
+use App\Listeners\Payment\PaymentEmailFailureActivity;
 use App\Listeners\Vendor\UpdateVendorContactLastLogin;
 use App\Events\RecurringQuote\RecurringQuoteWasCreated;
 use App\Events\RecurringQuote\RecurringQuoteWasDeleted;
@@ -248,6 +267,7 @@ use App\Listeners\Activity\SubscriptionRestoredActivity;
 use App\Listeners\Invoice\InvoiceAutoBillFailedActivity;
 use App\Listeners\Invoice\InvoiceAutoBillSuccessActivity;
 use App\Listeners\Invoice\InvoiceFailedEmailNotification;
+use SocialiteProviders\Microsoft\MicrosoftExtendSocialite;
 use App\Events\RecurringExpense\RecurringExpenseWasCreated;
 use App\Events\RecurringExpense\RecurringExpenseWasDeleted;
 use App\Events\RecurringExpense\RecurringExpenseWasUpdated;
@@ -300,6 +320,9 @@ class EventServiceProvider extends ServiceProvider
         // ResponseReceived::class => [
         //     LogResponseReceived::class,
         // ],
+        AccountDeleted::class => [
+            AccountDeletedListener::class,
+        ],
         AccountCreated::class => [
         ],
         MessageSending::class => [
@@ -319,6 +342,9 @@ class EventServiceProvider extends ServiceProvider
         ],
         UserLoggedIn::class => [
             UpdateUserLastLogin::class,
+        ],
+        UserLoginFailed::class => [
+            UpdateUserLoginFailed::class,
         ],
         UserWasUpdated::class => [
             UpdatedUserActivity::class,
@@ -372,6 +398,12 @@ class EventServiceProvider extends ServiceProvider
         ],
         ClientWasRestored::class => [
             RestoreClientActivity::class,
+        ],
+        ClientWasMerged::class => [
+            ClientMergedActivity::class,
+        ],
+        ClientWasPurged::class => [
+            ClientPurgedActivity::class,
         ],
         // Documents
         DocumentWasCreated::class => [
@@ -489,6 +521,8 @@ class EventServiceProvider extends ServiceProvider
         ],
         InvitationWasViewed::class => [
             InvitationViewedListener::class,
+        ],
+        JobFailed::class => [
         ],
         PaymentWasEmailed::class => [
             PaymentEmailedActivity::class,
@@ -656,6 +690,9 @@ class EventServiceProvider extends ServiceProvider
         ],
         VendorContactLoggedIn::class => [
             UpdateVendorContactLastLogin::class,
+        ],
+        VendorWasMerged::class => [
+            VendorMergedActivity::class,
         ],
         \SocialiteProviders\Manager\SocialiteWasCalled::class => [
             // ... Manager won't register drivers that are not added to this listener.

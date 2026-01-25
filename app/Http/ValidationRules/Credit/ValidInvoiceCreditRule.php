@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Credit Ninja (https://creditninja.com).
  *
@@ -50,9 +51,23 @@ class ValidInvoiceCreditRule implements Rule
     {
         $invoice = Invoice::withTrashed()->find($value);
 
-        if ($invoice->balance >= $invoice->amount) {
+        if (!$invoice) {
+
+            $this->error_message = 'Invoice not found.';
+
+            return false;
+
+        } elseif ($invoice->balance >= $invoice->amount) {
             $this->error_message = 'Cannot reverse an invoice with no payment applied.';
 
+            return false;
+        }
+        else if($invoice->status_id == Invoice::STATUS_REVERSED) {
+            $this->error_message = 'Cannot reverse an invoice that has already been reversed.';
+            return false;
+        }
+        else if($invoice->is_deleted) {
+            $this->error_message = 'Cannot reverse an invoice that has already been deleted.';
             return false;
         }
 
@@ -72,6 +87,7 @@ class ValidInvoiceCreditRule implements Rule
         $cost = 0;
 
         foreach (request()->input('line_items') as $item) {
+            $item = (array)$item;
             $cost += $item['cost'] * $item['quantity'];
         }
 

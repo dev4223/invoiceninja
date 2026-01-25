@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -45,19 +46,10 @@ class StoreRecurringInvoiceRequest extends Request
 
         $rules = [];
 
-        if ($this->file('documents') && is_array($this->file('documents'))) {
-            $rules['documents.*'] = $this->fileValidation();
-        } elseif ($this->file('documents')) {
-            $rules['documents'] = $this->fileValidation();
-        } else {
-            $rules['documents'] = 'bail|sometimes|array';
-        }
-
-        if ($this->file('file') && is_array($this->file('file'))) {
-            $rules['file.*'] = $this->fileValidation();
-        } elseif ($this->file('file')) {
-            $rules['file'] = $this->fileValidation();
-        }
+        $rules['file'] = 'bail|sometimes|array';
+        $rules['file.*'] = $this->fileValidation();
+        $rules['documents'] = 'bail|sometimes|array';
+        $rules['documents.*'] = $this->fileValidation();
 
         $rules['client_id'] = 'required|exists:clients,id,company_id,'.$user->company()->id;
 
@@ -78,9 +70,10 @@ class StoreRecurringInvoiceRequest extends Request
         $rules['tax_name3'] = 'bail|sometimes|string|nullable';
         $rules['due_date_days'] = 'bail|sometimes|string';
         $rules['exchange_rate'] = 'bail|sometimes|numeric';
-        $rules['next_send_date'] = 'bail|required|date|after:yesterday';
+        $rules['next_send_date'] = 'bail|required|date|after_or_equal:yesterday';
         $rules['amount'] = ['sometimes', 'bail', 'numeric', 'max:99999999999999'];
         $rules['location_id'] = ['nullable', 'sometimes','bail', Rule::exists('locations', 'id')->where('company_id', $user->company()->id)->where('client_id', $this->client_id)];
+        $rules['vendor_id'] = ['nullable', 'sometimes','bail', Rule::exists('vendors', 'id')->where('company_id', $user->company()->id)];
 
         return $rules;
     }
@@ -90,6 +83,15 @@ class StoreRecurringInvoiceRequest extends Request
         $input = $this->all();
         $input['amount'] = 0;
         $input['balance'] = 0;
+
+        if ($this->file('documents') instanceof \Illuminate\Http\UploadedFile) {
+            $this->files->set('documents', [$this->file('documents')]);
+        }
+
+        if ($this->file('file') instanceof \Illuminate\Http\UploadedFile) {
+            $this->files->set('file', [$this->file('file')]);
+        }
+
 
         if (array_key_exists('due_date_days', $input) && is_null($input['due_date_days'])) {
             $input['due_date_days'] = 'terms';
@@ -117,6 +119,11 @@ class StoreRecurringInvoiceRequest extends Request
 
         if (array_key_exists('vendor_id', $input) && is_string($input['vendor_id'])) {
             $input['vendor_id'] = $this->decodePrimaryKey($input['vendor_id']);
+        }
+
+
+        if (array_key_exists('location_id', $input) && is_string($input['location_id'])) {
+            $input['location_id'] = $this->decodePrimaryKey($input['location_id']);
         }
 
         if (array_key_exists('project_id', $input) && is_string($input['project_id'])) {
@@ -170,7 +177,7 @@ class StoreRecurringInvoiceRequest extends Request
         if (array_key_exists('exchange_rate', $input) && (is_null($input['exchange_rate']) || $input['exchange_rate'] == 0)) {
             $input['exchange_rate'] = 1;
         }
-
+        
         $this->replace($input);
     }
 

@@ -173,15 +173,15 @@ class PaymentMethodController extends Controller
         /** @var \App\Models\ClientContact auth()->guard('contact')->user() **/
         $client_contact = auth()->guard('contact')->user();
 
-        if (request()->query('method') == GatewayType::CREDIT_CARD) {
+        if ((string)request()->query('method') === (string)GatewayType::CREDIT_CARD) {
             return $client_contact->client->getCreditCardGateway();
         }
-        if (request()->query('method') == GatewayType::BACS) {
+        if ((string)request()->query('method') === (string)GatewayType::BACS) {
             return $client_contact->client->getBACSGateway();
         }
 
         if (in_array(request()->query('method'), [GatewayType::BANK_TRANSFER, GatewayType::DIRECT_DEBIT, GatewayType::SEPA, GatewayType::ACSS])) {
-            return $client_contact->client->getBankTransferGateway();
+            return $client_contact->client->getBankTransferGateway(true); //Required to allow rotessa to be used when adding a payment method.
         }
 
         abort(404, 'Gateway not found.');

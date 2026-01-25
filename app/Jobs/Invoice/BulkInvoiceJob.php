@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -79,6 +80,12 @@ class BulkInvoiceJob implements ShouldQueue
                 ->each(function ($invoice) {
 
                     $invoice->service()->markSent()->save();
+
+                    if($invoice->company->verifactuEnabled() && !$invoice->hasSentAeat()) {
+                        $invoice->invitations()->update(['email_error' => 'primed']); // Flag the invitations as primed for AEAT submission
+                        $invoice->service()->sendVerifactu();
+                        return false;
+                    }
 
                     $invoice->invitations->each(function ($invitation) {
 

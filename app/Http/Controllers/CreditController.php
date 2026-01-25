@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -211,9 +212,41 @@ class CreditController extends BaseController
                          ->triggeredActions($request)
                          ->save();
 
+        /** 2025-09-24
+         * 
+         * Handling invoice reversals needs stricter boundary checks:
+         * 
+         * On the reversal of a paid invoice creates a credit note. However if this credit note is deleted the original payment becomes a dangling record.
+         * 
+         * In order to avoid this, we link the payment to the credit note. This allows us to preserve the relation of the payment to the subsequent credit note.
+         * 
+         * Now on Credit or Payment deletion we can correctly maintain the relation of the payment to the credit note.
+         */
         if ($credit->invoice_id) {
             $credit = $credit->service()->markSent()->save();
-            $credit->client->service()->updatePaidToDate(-1 * $credit->balance)->save();
+            $credit->client->service()->updateBalanceAndPaidToDate(-1 * ($credit->invoice->balance ?? 0), -1 * $credit->balance)->save();
+            
+            $invoice = \App\Models\Invoice::withTrashed()->find($credit->invoice_id);
+            if ($invoice) {
+                $invoice->status_id = Invoice::STATUS_REVERSED;
+                $invoice->save();
+                                    
+                //2025-08-25 after convert to a credit note, we need to delete the payments associated with the invoice.
+                //2025-09-25 this logic is flawed as unlinking the invoice then prevents a valid refund from taking place.
+                // $invoice->payments()->each(function ($p) use ($credit) {
+                //     // $p->pivot->forceDelete();
+                //     $p->invoices()->each(function ($i) use ($credit) {
+                //         // $i->pivot->forceDelete();
+                //         $pivot = $i->pivot;
+                //         $pivot->paymentable_id = $credit->id;
+                //         $pivot->paymentable_type = Credit::class;
+                //         $pivot->save();
+
+                //     });
+                // });
+
+            }
+
         }
 
         event(new CreditWasCreated($credit, $credit->company, Ninja::eventVars($user->id)));
@@ -520,7 +553,7 @@ class CreditController extends BaseController
         if (Ninja::isHosted()  && $user->account->emailQuotaExceeded()) {
             return response(['message' => ctrans('texts.email_quota_exceeded_subject')], 400);
         }
-        
+
         if ($user->hasExactPermission('disable_emails') && (stripos($action, 'email') !== false)) {
             return response(['message' => ctrans('texts.disable_emails_error')], 400);
         }

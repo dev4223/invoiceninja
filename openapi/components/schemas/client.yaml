@@ -72,6 +72,7 @@
           type: number
           format: integer
           example: '1'
+          $ref: '#/components/schemas/CountryType'
         custom_value1:
           description: 'A custom field for storing additional information'
           type: string
@@ -189,4 +190,12 @@
           readOnly: true
         settings:
           $ref: '#/components/schemas/ClientSettings'
+        classification:
+          description: 'Classification or category label for organizational purposes'
+          type: string
+          example: 'VIP'
+        public_notes:
+          description: 'Notes that are visible to the client'
+          type: string
+          example: 'These are public notes visible to clients'
       type: object

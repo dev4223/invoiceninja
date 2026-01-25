@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -85,12 +86,15 @@ class RecurringInvoiceFilters extends QueryFilters
         }
 
         $recurring_filters = [];
+        
+        if (in_array('draft', $status_parameters)) {
+            $recurring_filters[] = RecurringInvoice::STATUS_DRAFT;
+        }
 
         if (in_array('active', $status_parameters)) {
             $recurring_filters[] = RecurringInvoice::STATUS_ACTIVE;
         }
-
-
+        
         if (in_array('paused', $status_parameters)) {
             $recurring_filters[] = RecurringInvoice::STATUS_PAUSED;
         }
@@ -125,7 +129,7 @@ class RecurringInvoiceFilters extends QueryFilters
     {
 
         $sort_col = explode('|', $sort);
-        
+
         if ($sort_col[0] == 'next_send_datetime') {
             $sort_col[0] = 'next_send_date';
         }
@@ -137,7 +141,8 @@ class RecurringInvoiceFilters extends QueryFilters
         $dir = ($sort_col[1] == 'asc') ? 'asc' : 'desc';
 
         if ($sort_col[0] == 'client_id') {
-            return $this->builder->orderBy(\App\Models\Client::select('name')
+            return $this->builder->orderByRaw('ISNULL(client_id), client_id '. $dir)
+                    ->orderBy(\App\Models\Client::select('name')
                     ->whereColumn('clients.id', 'recurring_invoices.client_id'), $dir);
         }
 
@@ -200,7 +205,13 @@ class RecurringInvoiceFilters extends QueryFilters
         $parts = explode('|', $range);
 
         if (!isset($parts[0]) || !isset($parts[1])) {
-            return $this->builder;
+
+            $parts = explode(',', $range);
+            
+            if (!isset($parts[0]) || !isset($parts[1])){
+                return $this->builder;
+            }
+            
         }
 
         if (is_numeric($parts[0])) {

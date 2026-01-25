@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -31,7 +32,7 @@ class ProjectRepository extends BaseRepository
 
         $lines = [];
 
-        foreach($projects as $project) {
+        foreach ($projects as $project) {
             $project->tasks()
                     ->withTrashed()
                     ->whereNull('invoice_id')
@@ -39,19 +40,16 @@ class ProjectRepository extends BaseRepository
                     ->cursor()
                     ->each(function ($task, $key) use (&$lines) {
 
-                        if (!$task->isRunning())
-                        { 
+                        if (!$task->isRunning() && $task->calcDuration(true) > 0) {
                             if ($key == 0 && $task->company->invoice_task_project) {
                                 $body = '<div class="project-header">'.$task->project->name.'</div>' .$task->project?->public_notes ?? ''; //@phpstan-ignore-line
                                 $body .= '<div class="task-time-details">'.$task->description().'</div>';
-                            }
-                            elseif(!$task->company->invoice_task_hours && !$task->company->invoice_task_timelog && !$task->company->invoice_task_datelog && !$task->company->invoice_task_item_description) {
+                            } elseif (!$task->company->invoice_task_hours && !$task->company->invoice_task_timelog && !$task->company->invoice_task_datelog && !$task->company->invoice_task_item_description) {
                                 $body = $task->description ?? '';
-                            }
-                            else {
+                            } else {
                                 $body = '<div class="task-time-details">'.$task->description().'</div>';
                             }
-                            
+
                             $item = new InvoiceItem();
                             $item->quantity = $task->getQuantity();
                             $item->cost = $task->getRate();
@@ -60,10 +58,13 @@ class ProjectRepository extends BaseRepository
                             $item->task_id = $task->hashed_id;
                             $item->tax_id = (string) Product::PRODUCT_TYPE_SERVICE;
                             $item->type_id = '2';
-
+                            $item->custom_value1 = $task->custom_value1;
+                            $item->custom_value2 = $task->custom_value2;
+                            $item->custom_value3 = $task->custom_value3;
+                            $item->custom_value4 = $task->custom_value4;
                             $lines[] = $item;
                         }
-                        
+
                     });
 
             $project->expenses()
@@ -88,6 +89,10 @@ class ProjectRepository extends BaseRepository
                     $item->tax_id = (string) Product::PRODUCT_TYPE_PHYSICAL;
                     $item->expense_id = $expense->hashed_id;
                     $item->type_id = '1';
+                    $item->custom_value1 = $expense->custom_value1;
+                    $item->custom_value2 = $expense->custom_value2;
+                    $item->custom_value3 = $expense->custom_value3;
+                    $item->custom_value4 = $expense->custom_value4;
 
                     $lines[] = $item;
                 });
@@ -96,7 +101,7 @@ class ProjectRepository extends BaseRepository
 
         $invoice->uses_inclusive_taxes = $project->company->settings->inclusive_taxes ?? false;
         $invoice->line_items = $lines;
-        
+
         return $invoice;
 
     }

@@ -53,7 +53,7 @@ return [
     ],
 
     'microsoft' => [
-        'client_id' => env('MICROSOFT_CLIENT_ID'),
+        'client_id' => env('MICROSOFT_CLIENT_ID',false),
         'client_secret' => env('MICROSOFT_CLIENT_SECRET'),
         'redirect' => env('MICROSOFT_REDIRECT_URI'),
     ],
@@ -73,9 +73,13 @@ return [
     ],
 
     'ses' => [
-        'key' => env('AWS_ACCESS_KEY_ID'),
-        'secret' => env('AWS_SECRET_ACCESS_KEY'),
+        'key' => env('SES_AWS_ACCESS_KEY_ID'),
+        'secret' => env('SES_AWS_SECRET_ACCESS_KEY'),
         'region' => env('SES_REGION', 'us-east-1'),
+        'topic_arn' => env('SES_TOPIC_ARN', ''),
+        'from' => [
+            'address' => env('SES_FROM_ADDRESS', ''),
+        ],
     ],
 
     'sparkpost' => [
@@ -141,19 +145,21 @@ return [
     'gocardless' => [
         'client_id' => env('GOCARDLESS_CLIENT_ID', null),
         'client_secret' => env('GOCARDLESS_CLIENT_SECRET', null),
-        'environment' => env('GOCARDLESS_ENVIRONMENT', 'production'),
-        'redirect_uri' => env('GOCARDLESS_REDIRECT_URI', 'https://invoicing.co/gocardless/oauth/connect/confirm'),
-        'testing_company' => env('GOCARDLESS_TESTING_COMPANY', null),
-        'webhook_secret' => env('GOCARDLESS_WEBHOOK_SECRET', null),
-    ],
-    'quickbooks' => [
-        'client_id' => env('QUICKBOOKS_CLIENT_ID', false),
-        'client_secret' => env('QUICKBOOKS_CLIENT_SECRET', false),
-        'redirect' => env('QUICKBOOKS_REDIRECT_URI'),
-        'env' => env('QUICKBOOKS_ENV'),
         'debug' => env('APP_DEBUG',false)
     ],
     'quickbooks_webhook' => [
         'verifier_token' => env('QUICKBOOKS_VERIFIER_TOKEN', false),
     ],
+    'verifactu' => [
+        'sender_nif' => env('VERIFACTU_SENDER_NIF', ''),
+        'certificate' => env('VERIFACTU_CERTIFICATE', ''),
+        'ssl_key' => env('VERIFACTU_SSL_KEY', ''),
+        'sender_name' => env('VERIFACTU_SENDER_NAME', 'CERTIFICADO FISICA PRUEBAS'),
+        'test_mode' => env('VERIFACTU_TEST_MODE', false),
+    ],
+    'cloudflare' => [
+        'zone_id' => env('CLOUDFLARE_SAAS_ZONE_ID', false),
+        'api_token' => env('CLOUDFLARE_SAAS_API_TOKEN', false),
+        'email' => env('CLOUDFLARE_SAAS_EMAIL', false),
+    ]
 ];

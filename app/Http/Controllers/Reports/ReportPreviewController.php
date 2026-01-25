@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -29,7 +30,7 @@ class ReportPreviewController extends BaseController
     {
 
         $report = Cache::get($hash);
-
+        
         if (!$report) {
             return response()->json(['message' => 'Still working.....'], 409);
         }

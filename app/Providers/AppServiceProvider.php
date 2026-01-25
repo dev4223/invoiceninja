@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -77,15 +78,14 @@ class AppServiceProvider extends ServiceProvider
 
         Livewire::setUpdateRoute(function ($handle) {
             return Route::post('/livewire/update', $handle)
-                ->middleware('client');
+                ->middleware(['client','throttle:1000,1']);
         });
 
         /* Ensure we don't have stale state in jobs */
         Queue::before(function (JobProcessing $event) {
-            App::forgetInstance('truthsource');
+            App::forgetInstance(TruthSource::class);
         });
 
-        /* Always init a new instance everytime the container boots */
         app()->instance(TruthSource::class, new TruthSource());
 
         /* Extension for custom mailers */
@@ -121,6 +121,7 @@ class AppServiceProvider extends ServiceProvider
             return $this;
         });
 
+        
         Mail::extend('brevo', function () {
             return (new BrevoTransportFactory())->create(
                 new Dsn(
@@ -145,6 +146,25 @@ class AppServiceProvider extends ServiceProvider
             return $this;
         });
 
+        // Macro to configure SES with runtime credentials
+        Mailer::macro('ses_config', function (string $key, string $secret, string $region = 'us-east-1', ?string $topic_arn = null) {
+            $config = [
+                'transport' => 'ses',
+                'key' => $key,
+                'secret' => $secret,
+                'region' => $region,
+            ];
+            
+            if ($topic_arn) {
+                $config['configuration_set'] = $topic_arn;
+            }
+            
+            // @phpstan-ignore /** @phpstan-ignore-next-line **/
+            Mailer::setSymfonyTransport(app('mail.manager')->createSymfonyTransport($config));
+
+            return $this;
+        });
+
 
         //Prevents destructive commands from being run in hosted environments
         \DB::prohibitDestructiveCommands(Ninja::isHosted());
@@ -154,5 +174,6 @@ class AppServiceProvider extends ServiceProvider
 
     public function register(): void
     {
+        
     }
 }

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -13,7 +14,7 @@ namespace App\Models;
 
 use App\Utils\Ninja;
 use Illuminate\Support\Str;
-use Laravel\Scout\Searchable;
+use Elastic\ScoutDriverPlus\Searchable;
 use App\Jobs\Mail\NinjaMailer;
 use App\Utils\Traits\AppSetup;
 use App\Utils\Traits\MakesHash;
@@ -168,12 +169,17 @@ class ClientContact extends Authenticatable implements HasLocalePreference
         'email',
     ];
 
+    public function searchableAs(): string
+    {
+        return 'client_contacts';
+    }
+
     public function toSearchableArray()
     {
         return [
-            'id' => $this->id,
+            'id' => $this->company->db.":".$this->id,
             'name' => $this->present()->search_display(),
-            'hashed_id' => $this->client->hashed_id,
+            'hashed_id' => $this->hashed_id,
             'email' => $this->email,
             'first_name' => $this->first_name,
             'last_name' => $this->last_name,
@@ -183,12 +189,13 @@ class ClientContact extends Authenticatable implements HasLocalePreference
             'custom_value3' => $this->custom_value3,
             'custom_value4' => $this->custom_value4,
             'company_key' => $this->company->company_key,
+            'client_id' => $this->client->hashed_id,
         ];
     }
 
     public function getScoutKey()
     {
-        return $this->hashed_id;
+        return $this->company->db.":".$this->id;
     }
 
     /*
@@ -297,13 +304,16 @@ class ClientContact extends Authenticatable implements HasLocalePreference
 
     public function preferredLocale()
     {
+        return once(function () {
+            /** @var \Illuminate\Support\Collection<\App\Models\Language> */
+            $languages = app('languages');
 
-        /** @var \Illuminate\Support\Collection<\App\Models\Language> */
-        $languages = app('languages');
+            $language_id = $this->client->getSetting('language_id');
 
-        return $languages->first(function ($item) {
-            return $item->id == $this->client->getSetting('language_id');
-        })->locale ?? 'en';
+            return $languages->first(function ($item) use ($language_id) {
+                    return $item->id == $language_id;
+                })->locale ?? 'en';
+        });
     }
 
     public function routeNotificationForMail($notification)

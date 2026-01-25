@@ -29,7 +29,7 @@ class RetrySendRequest extends Request
             return true;
         }
 
-        return $user->account->isPaid() && $user->isAdmin() && $user->company()->legal_entity_id != null;
+        return $user->account->isPaid() && $user->isAdmin() && ($user->company()->legal_entity_id != null || $user->company()->verifactuEnabled());
     }
 
     /**
@@ -48,10 +48,10 @@ class RetrySendRequest extends Request
 
     public function prepareForValidation()
     {
-        
+
         $input = $this->all();
 
-        
+
         if (array_key_exists('entity_id', $input)) {
             $input['entity_id'] = $this->decodePrimaryKey($input['entity_id']);
         }

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -11,6 +12,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\Cache\Atomic;
 use App\Events\Payment\PaymentWasUpdated;
 use App\Factory\PaymentFactory;
 use App\Filters\PaymentFilters;
@@ -213,6 +215,8 @@ class PaymentController extends BaseController
 
         event('eloquent.created: App\Models\Payment', $payment);
 
+        Atomic::del($request->lock_key);
+        
         return $this->itemResponse($payment);
     }
 

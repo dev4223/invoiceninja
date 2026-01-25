@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -92,6 +93,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Document> $documents
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Invoice> $invoices
  * @property \Illuminate\Database\Eloquent\Collection<int, \App\Models\Payment>|\Illuminate\Support\Collection $paymentables
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Activity> $activities
  * @mixin \Eloquent
  */
 class Payment extends BaseModel
@@ -219,6 +221,11 @@ class Payment extends BaseModel
         return $this->morphMany(Document::class, 'documentable');
     }
 
+    public function activities(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Activity::class)->where('company_id', $this->company_id)->take(50)->orderBy('id', 'desc');
+    }
+    
     /**
      * @return \Illuminate\Database\Eloquent\Relations\MorphToMany
      */
@@ -326,10 +333,9 @@ class Payment extends BaseModel
                 return '<h6><span class="badge badge-danger">'.ctrans('texts.payment_status_3').'</span></h6>';
             case self::STATUS_COMPLETED:
 
-                if($this->applied == 0){
+                if ($this->applied == 0) {
                     return '<h6><span class="badge badge-info">' . ctrans('texts.unapplied') . '</span></h6>';
-                }
-                elseif ($this->amount > $this->applied) {
+                } elseif ($this->amount > $this->applied) {
                     return '<h6><span class="badge badge-info">' . ctrans('texts.partially_unapplied') . '</span></h6>';
                 }
 
@@ -470,25 +476,10 @@ class Payment extends BaseModel
         if (Ninja::isHosted()) {
             $domain = $this->company->domain();
         } else {
-            $domain = strlen($this->company->portal_domain) > 5 ? $this->company->portal_domain : config('ninja.app_url');
+            $domain = strlen($this->company->portal_domain ?? '') > 5 ? $this->company->portal_domain : config('ninja.app_url');
         }
 
         return $domain.'/client/payment/'.$this->client->contacts()->first()->contact_key.'/'.$this->hashed_id.'?next=/client/payments/'.$this->hashed_id;
-    }
-
-    public function transaction_event()
-    {
-        $payment = $this->fresh();
-
-        return [
-            'payment_id' => $payment->id,
-            'payment_amount' => $payment->amount ?: 0,
-            'payment_applied' => $payment->applied ?: 0,
-            'payment_refunded' => $payment->refunded ?: 0,
-            'payment_status' => $payment->status_id ?: 1,
-            'paymentables' => $payment->paymentables->toArray(),
-            'payment_request' => [],
-        ];
     }
 
     public function translate_entity(): string

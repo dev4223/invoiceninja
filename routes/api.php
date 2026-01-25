@@ -11,6 +11,7 @@
 |
 */
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\SNSController;
 use App\Http\Controllers\BaseController;
 use App\Http\Controllers\PingController;
 use App\Http\Controllers\SmtpController;
@@ -49,6 +50,7 @@ use App\Http\Controllers\WebhookController;
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\EInvoiceController;
+use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\PostMarkController;
 use App\Http\Controllers\TemplateController;
@@ -108,12 +110,14 @@ use App\Http\Controllers\Reports\InvoiceReportController;
 use App\Http\Controllers\Reports\PaymentReportController;
 use App\Http\Controllers\Reports\ProductReportController;
 use App\Http\Controllers\Reports\ProfitAndLossController;
+use App\Http\Controllers\Reports\ProjectReportController;
 use App\Http\Controllers\Reports\ReportPreviewController;
 use App\Http\Controllers\Reports\ActivityReportController;
 use App\Http\Controllers\Reports\ARDetailReportController;
 use App\Http\Controllers\Reports\DocumentReportController;
 use App\Http\Controllers\Reports\ARSummaryReportController;
 use App\Http\Controllers\Reports\QuoteItemReportController;
+use App\Http\Controllers\Reports\TaxPeriodReportController;
 use App\Http\Controllers\Reports\UserSalesReportController;
 use App\Http\Controllers\Reports\TaxSummaryReportController;
 use App\Http\Controllers\Support\Messages\SendingController;
@@ -126,9 +130,10 @@ use App\Http\Controllers\Reports\ClientContactReportController;
 use App\Http\Controllers\Reports\PurchaseOrderReportController;
 use App\Http\Controllers\Reports\RecurringInvoiceReportController;
 use App\Http\Controllers\Reports\PurchaseOrderItemReportController;
+use App\Http\Controllers\Reports\RecurringInvoiceItemReportController;
 
 Route::group(['middleware' => ['throttle:api', 'api_secret_check']], function () {
-    Route::post('api/v1/signup', [AccountController::class, 'store'])->name('signup.submit');
+    Route::post('api/v1/signup', [AccountController::class, 'store'])->name('signup.submit')->middleware('throttle:1,1');
     Route::post('api/v1/oauth_login', [LoginController::class, 'oauthApiLogin']);
 });
 
@@ -137,7 +142,7 @@ Route::group(['middleware' => ['throttle:login', 'api_secret_check', 'email_db']
     Route::post('api/v1/reset_password', [ForgotPasswordController::class, 'sendResetLinkEmail']);
 });
 
-Route::group(['middleware' => ['throttle:api', 'api_db', 'token_auth', 'locale'], 'prefix' => 'api/v1', 'as' => 'api.'], function () {
+Route::group(['middleware' => ['throttle:api', 'token_auth', 'valid_json','locale'], 'prefix' => 'api/v1', 'as' => 'api.'], function () {
 
     Route::post('password_timeout', PasswordTimeoutController::class)->name('password_timeout');
     Route::put('accounts/{account}', [AccountController::class, 'update'])->name('account.update');
@@ -182,11 +187,12 @@ Route::group(['middleware' => ['throttle:api', 'api_db', 'token_auth', 'locale']
     Route::post('clients/{client}/{mergeable_client}/merge', [ClientController::class, 'merge'])->name('clients.merge')->middleware('password_protected');
     Route::post('clients/bulk', [ClientController::class, 'bulk'])->name('clients.bulk');
     Route::post('clients/{client}/documents', [ClientController::class, 'documents'])->name('clients.documents');
+    Route::post('clients/{client}/show_settings', [ClientController::class, 'showSettings'])->name('clients.show_settings');
 
     Route::post('reactivate_email/{bounce_id}', [ClientController::class, 'reactivateEmail'])->name('clients.reactivate_email');
 
+    Route::post('feedback', FeedbackController::class)->name('feedback');
     Route::post('filters/{entity}', [FilterController::class, 'index'])->name('filters');
-
 
     Route::resource('client_gateway_tokens', ClientGatewayTokenController::class);
     Route::post('client_gateway_tokens/{client_gateway_token}/setAsDefault', [ClientGatewayTokenController::class, 'setAsDefault'])->name('client_gateway_tokens.set_as_default');
@@ -212,6 +218,7 @@ Route::group(['middleware' => ['throttle:api', 'api_db', 'token_auth', 'locale']
 
     Route::post('company_gateways/bulk', [CompanyGatewayController::class, 'bulk'])->name('company_gateways.bulk');
     Route::post('company_gateways/{company_gateway}/test', [CompanyGatewayController::class, 'test'])->name('company_gateways.test');
+    Route::post('company_gateways/{company_gateway}/clone', [CompanyGatewayController::class, 'clone'])->name('company_gateways.clone');
     Route::post('company_gateways/{company_gateway}/import_customers', [CompanyGatewayController::class, 'importCustomers'])->name('company_gateways.import_customers');
 
     Route::put('company_users/{user}', [CompanyUserController::class, 'update']);
@@ -234,7 +241,7 @@ Route::group(['middleware' => ['throttle:api', 'api_db', 'token_auth', 'locale']
 
     Route::post('einvoice/validateEntity', [EInvoiceController::class, 'validateEntity'])->name('einvoice.validateEntity');
     Route::post('einvoice/configurations', [EInvoiceController::class, 'configurations'])->name('einvoice.configurations');
-    
+
     Route::post('einvoice/peppol/legal_entity', [EInvoicePeppolController::class, 'show'])->name('einvoice.peppol.legal_entity');
     Route::post('einvoice/peppol/setup', [EInvoicePeppolController::class, 'setup'])->name('einvoice.peppol.setup');
     Route::post('einvoice/peppol/disconnect', [EInvoicePeppolController::class, 'disconnect'])->name('einvoice.peppol.disconnect');
@@ -267,11 +274,13 @@ Route::group(['middleware' => ['throttle:api', 'api_db', 'token_auth', 'locale']
     Route::post('import', [ImportController::class, 'import'])->name('import.import');
     Route::post('import_json', [ImportJsonController::class, 'import'])->name('import.import_json');
     Route::post('preimport', [ImportController::class, 'preimport'])->name('import.preimport');
-    
+
     Route::resource('invoices', InvoiceController::class); // name = (invoices. index / create / show / update / destroy / edit
     Route::get('invoices/{invoice}/delivery_note', [InvoiceController::class, 'deliveryNote'])->name('invoices.delivery_note');
     Route::get('invoices/{invoice}/{action}', [InvoiceController::class, 'action'])->name('invoices.action');
     Route::put('invoices/{invoice}/upload', [InvoiceController::class, 'upload'])->name('invoices.upload');
+    Route::post('invoices/{invoice}/payment_schedule', [InvoiceController::class, 'paymentSchedule'])->name('invoices.payment_schedule');
+    Route::delete('invoices/{invoice}/payment_schedule', [InvoiceController::class, 'deletePaymentSchedule'])->name('invoices.delete_payment_schedule');
     Route::get('invoice/{invitation_key}/download', [InvoiceController::class, 'downloadPdf'])->name('invoices.downloadPdf');
     Route::get('invoice/{invitation_key}/download_e_invoice', [InvoiceController::class, 'downloadEInvoice'])->name('invoices.downloadEInvoice');
     Route::post('invoices/bulk', [InvoiceController::class, 'bulk'])->name('invoices.bulk');
@@ -312,7 +321,7 @@ Route::group(['middleware' => ['throttle:api', 'api_db', 'token_auth', 'locale']
     Route::resource('projects', ProjectController::class); // name = (projects. index / create / show / update / destroy / edit
     Route::post('projects/bulk', [ProjectController::class, 'bulk'])->name('projects.bulk');
     Route::put('projects/{project}/upload', [ProjectController::class, 'upload'])->name('projects.upload');
-    
+
     Route::resource('purchase_orders', PurchaseOrderController::class);
     Route::post('purchase_orders/bulk', [PurchaseOrderController::class, 'bulk'])->name('purchase_orders.bulk');
     Route::put('purchase_orders/{purchase_order}/upload', [PurchaseOrderController::class, 'upload']);
@@ -354,6 +363,7 @@ Route::group(['middleware' => ['throttle:api', 'api_db', 'token_auth', 'locale']
     Route::post('reports/quotes', QuoteReportController::class)->middleware('throttle:20,1');
     Route::post('reports/quote_items', QuoteItemReportController::class)->middleware('throttle:20,1');
     Route::post('reports/recurring_invoices', RecurringInvoiceReportController::class)->middleware('throttle:20,1');
+    Route::post('reports/recurring_invoice_items', RecurringInvoiceItemReportController::class)->middleware('throttle:20,1');
     Route::post('reports/payments', PaymentReportController::class)->middleware('throttle:20,1');
     Route::post('reports/products', ProductReportController::class)->middleware('throttle:20,1');
     Route::post('reports/product_sales', ProductSalesReportController::class)->middleware('throttle:20,1');
@@ -365,7 +375,9 @@ Route::group(['middleware' => ['throttle:api', 'api_db', 'token_auth', 'locale']
     Route::post('reports/client_balance_report', ClientBalanceReportController::class);
     Route::post('reports/client_sales_report', ClientSalesReportController::class);
     Route::post('reports/tax_summary_report', TaxSummaryReportController::class);
+    Route::post('reports/tax_period_report', TaxPeriodReportController::class);
     Route::post('reports/user_sales_report', UserSalesReportController::class);
+    Route::post('reports/projects', ProjectReportController::class);
     Route::post('reports/preview/{hash}', ReportPreviewController::class);
     Route::post('exports/preview/{hash}', ReportExportController::class);
 
@@ -403,8 +415,8 @@ Route::group(['middleware' => ['throttle:api', 'api_db', 'token_auth', 'locale']
     Route::post('settings/enable_two_factor', [TwoFactorController::class, 'enableTwoFactor']);
     Route::post('settings/disable_two_factor', [TwoFactorController::class, 'disableTwoFactor']);
 
-    Route::post('verify', [TwilioController::class, 'generate'])->name('verify.generate')->middleware('throttle:3,1');
-    Route::post('verify/confirm', [TwilioController::class, 'confirm'])->name('verify.confirm');
+    Route::post('verify', [TwilioController::class, 'generate'])->name('verify.generate')->middleware('throttle:daily-verify');
+    Route::post('verify/confirm', [TwilioController::class, 'confirm'])->name('verify.confirm')->middleware('throttle:daily-verify');
 
     Route::resource('vendors', VendorController::class); // name = (vendors. index / create / show / update / destroy / edit
     Route::post('vendors/bulk', [VendorController::class, 'bulk'])->name('vendors.bulk');
@@ -456,8 +468,8 @@ Route::group(['middleware' => ['throttle:api', 'api_db', 'token_auth', 'locale']
 
 });
 
-Route::post('api/v1/sms_reset', [TwilioController::class, 'generate2faResetCode'])->name('sms_reset.generate')->middleware('throttle:3,1');
-Route::post('api/v1/sms_reset/confirm', [TwilioController::class, 'confirm2faResetCode'])->name('sms_reset.confirm')->middleware('throttle:3,1');
+Route::post('api/v1/sms_reset', [TwilioController::class, 'generate2faResetCode'])->name('sms_reset.generate')->middleware('throttle:daily-verify');
+Route::post('api/v1/sms_reset/confirm', [TwilioController::class, 'confirm2faResetCode'])->name('sms_reset.confirm')->middleware('throttle:daily-verify');
 
 Route::match(['get', 'post'], 'payment_webhook/{company_key}/{company_gateway_id}', PaymentWebhookController::class)
     ->middleware('throttle:1000,1')
@@ -467,8 +479,8 @@ Route::match(['get', 'post'], 'payment_notification_webhook/{company_key}/{compa
     ->middleware('throttle:1000,1')
     ->name('payment_notification_webhook');
 
-
 Route::post('api/v1/postmark_webhook', [PostMarkController::class, 'webhook'])->middleware('throttle:5000,1');
+Route::post('api/v1/sns_webhook', [SNSController::class, 'webhook'])->middleware('throttle:5000,1');
 Route::post('api/v1/postmark_inbound_webhook', [PostMarkController::class, 'inboundWebhook'])->middleware('throttle:1000,1');
 Route::post('api/v1/mailgun_webhook', [MailgunController::class, 'webhook'])->middleware('throttle:1000,1');
 Route::post('api/v1/mailgun_inbound_webhook', [MailgunController::class, 'inboundWebhook'])->middleware('throttle:1000,1');
@@ -494,3 +506,10 @@ Route::get('quickbooks/authorize/{token}', [ImportQuickbooksController::class, '
 Route::get('quickbooks/authorized', [ImportQuickbooksController::class, 'onAuthorized'])->name('quickbooks.authorized');
 
 Route::fallback([BaseController::class, 'notFound'])->middleware('throttle:404');
+
+Route::get('/health', function () {
+    return response()->json([
+        'status' => 'ok',
+        'message' => 'API is healthy',
+    ]);
+})->middleware('throttle:20,1');

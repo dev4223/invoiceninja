@@ -49,6 +49,8 @@ class BlockonomicsPaymentDriver extends BaseDriver
     public $BASE_URL = 'https://www.blockonomics.co';
     public $NEW_ADDRESS_URL = 'https://www.blockonomics.co/api/new_address';
     public $PRICE_URL = 'https://www.blockonomics.co/api/price';
+    public $STORES_URL = 'https://www.blockonomics.co/api/v2/stores';
+    private string $test_txid = 'WarningThisIsAGeneratedTestPaymentAndNotARealBitcoinTransaction';
 
     public function init()
     {
@@ -89,55 +91,56 @@ class BlockonomicsPaymentDriver extends BaseDriver
 
     public function processWebhookRequest(PaymentWebhookRequest $request)
     {
-
         $company = $request->getCompany();
 
-        $url_callback_secret = $request->secret;
-        $db_callback_secret = $this->company_gateway->getConfigField('callbackSecret');
+        // Re-introduce secret in a later stage if needed.
+        // $url_callback_secret = $request->secret;
+        // $db_callback_secret = $this->company_gateway->getConfigField('callbackSecret');
 
-        if ($url_callback_secret != $db_callback_secret) {
-            throw new PaymentFailed('Secret does not match');
-        }
+        // if ($url_callback_secret != $db_callback_secret) {
+        //     throw new PaymentFailed('Secret does not match');
+        // }
 
-        $txid = $request->txid;
-        $value = $request->value;
+        $txid   = $request->txid;
+        $value  = $request->value;
         $status = $request->status;
-        $addr = $request->addr;
+        $addr   = $request->addr;
 
-        $payment = Payment::query()
-                            ->where('company_id', $company->id)
-                            ->where('transaction_reference', $txid)
-                            ->firstOrFail();
+        $payment = ($txid === $this->test_txid)
+            ? Payment::query()
+                ->where('company_id', $company->id)
+                ->where('private_notes', "$addr - $value")
+                ->first()
+            : Payment::query()
+                ->where('company_id', $company->id)
+                ->where('transaction_reference', $txid)
+                ->first();
 
+        // If payment doesn't exist yet, let paymentResponse handle creation
         if (!$payment) {
-            return response()->json([], 200);
-            // TODO: Implement logic to create new payment in case user sends payment to the address after closing the payment page
+            return response()->json(['message' => 'Payment not found'], 200);
         }
 
-        $statusId = Payment::STATUS_PENDING;
-
-        switch ($status) {
-            case 0:
-                $statusId = Payment::STATUS_PENDING;
-                break;
-            case 1:
-                $statusId = Payment::STATUS_PENDING;
-                break;
-            case 2:
-                $statusId = Payment::STATUS_COMPLETED;
-                break;
+        // // If payment is already completed, no need to process again
+        if ($payment->status_id == Payment::STATUS_COMPLETED) {
+            return response()->json(['message' => 'Payment already completed'], 200);
         }
 
-        if ($payment->status_id == $statusId) {
-            return response()->json([], 200);
-        } else {
-            $payment->status_id = $statusId;
-            $payment->save();
-
-            return response()->json([], 200);
+        // Only process confirmed payments (status 2)
+        if ((int) $status !== 2) {
+            return response()->json(['message' => 'Only confirmed payments processed'], 200);
         }
+
+        // Update payment to completed
+        $payment->status_id = Payment::STATUS_COMPLETED;
+        $payment->save();
+
+        $this->payment_hash = PaymentHash::where('payment_id', $payment->id)->firstOrFail();
+
+        return response()->json([
+            'message' => 'Payment confirmed successfully',
+        ], 200);
     }
-
 
     public function refund(Payment $payment, $amount, $return_client_response = false)
     {
@@ -145,20 +148,72 @@ class BlockonomicsPaymentDriver extends BaseDriver
         return $this->payment_method->refund($payment, $amount); //this is your custom implementation from here
     }
 
-    public function auth(): bool
+    public function checkStores($stores): string
+    {
+        if (empty($stores['data'])) {
+            return "Please add a store to your Blockonomics' account";
+        }
+
+        $invoice_ninja_callback_url = $this->company_gateway->webhookUrl();
+
+        $matching_store = null;
+        $store_without_callback = null;
+        $partial_match_store = null;
+
+        foreach ($stores['data'] as $store) {
+            if ($store['http_callback'] === $invoice_ninja_callback_url) {
+                $matching_store = $store;
+                break;
+            }
+            if (empty($store['http_callback'])) {
+                $store_without_callback = $store;
+                continue;
+            }
+            // Check for partial match - only secret or protocol differs
+            // TODO: Implement logic for updating partial matches
+            $store_base_url = preg_replace('/https?:\/\//', '', $store['http_callback']);
+            if (strpos($store_base_url, $invoice_ninja_callback_url) === 0) {
+                $partial_match_store = $store;
+            }
+        }
+
+        if ($matching_store) {
+            $matching_store_wallet = $matching_store['wallets'];
+            if (empty($matching_store_wallet)) {
+                return 'Please add a wallet to your Blockonomics store';
+            }
+            return 'ok';
+        }
+        return "Copy your Invoice Ninja Webhook URL and set it as your callback URL in Blockonomics";
+    }
+
+    public function auth(): string
     {
         try {
-        
             $api_key = $this->company_gateway->getConfigField('apiKey');
-            $url = $this->NEW_ADDRESS_URL . '?reset=1';
-            $response = Http::withToken($api_key)
-                ->post($url, []);
-            if($response->successful()) {
-                return true;
+
+            if (!$api_key) {
+                return 'No API Key';
             }
-            return false;
+            $get_stores_response = Http::withToken($api_key)
+                ->get($this->STORES_URL, ['wallets' => 'true']);
+            $get_stores_response_status = $get_stores_response->status();
+
+            if ($get_stores_response_status == 401) {
+                return 'API Key is incorrect';
+            }
+
+
+            if (!$get_stores_response || $get_stores_response_status !== 200) {
+                return 'Could not connect to Blockonomics API';
+            }
+
+            $stores = $get_stores_response->json();
+            $stores_check_result = $this->checkStores($stores);
+
+            return $stores_check_result;
         } catch (\Exception $e) {
-            return false;
+            return $e->getMessage();
         }
 
     }

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -63,7 +64,7 @@ class DocumentExport extends BaseExport
         return array_merge(['columns' => $header], $report);
     }
 
-    private function init(): Builder
+    public function init(): Builder
     {
 
         MultiDB::setDb($this->company->db);
@@ -80,6 +81,8 @@ class DocumentExport extends BaseExport
 
         $query = $this->addDateRange($query, 'documents');
 
+        $query = $this->filterByUserPermissions($query);
+
         if ($this->input['document_email_attachment'] ?? false) {
             $this->queueDocuments($query);
         }
@@ -93,7 +96,7 @@ class DocumentExport extends BaseExport
         $query = $this->init();
 
         //load the CSV document from a string
-        $this->csv = Writer::createFromString();
+        $this->csv = Writer::fromString();
         \League\Csv\CharsetConverter::addTo($this->csv, 'UTF-8', 'UTF-8');
 
         //insert the header
@@ -131,6 +134,10 @@ class DocumentExport extends BaseExport
     {
         if (in_array('record_type', $this->input['report_keys'])) {
             $entity['record_type'] = class_basename($document->documentable);
+        }
+
+        if (in_array('created_at', $this->input['report_keys'])) {
+            $entity['created_at'] = \Carbon\Carbon::createFromTimestamp($document->created_at)->format('Y-m-d H:i:s');
         }
 
         // if(in_array('record_name', $this->input['report_keys']))

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -185,28 +186,28 @@ class UblEDocument extends AbstractService
 
         $expense = $repo->save($data, $expense);
 
-                
-        if ($expense->company->account->hasFeature(\App\Models\Account::FEATURE_DOCUMENTS)) {
 
-            foreach ($attachments as $attachment) {
+        // if ($expense->company->account->hasFeature(\App\Models\Account::FEATURE_DOCUMENTS)) {
+
+        foreach ($attachments as $attachment) {
 
 
-                $a = data_get($attachment, 'Attachment.EmbeddedDocumentBinaryObject', false);
+            $a = data_get($attachment, 'Attachment.EmbeddedDocumentBinaryObject', false);
 
-                if(!$a) {
-                    continue;
-                }
+            if (!$a) {
+                continue;
+            }
 
-                $doc_name = data_get($a, '@filename', "doc.pdf");
-                $mime_type = data_get($a, '@mimeCode', "application/pdf");
-                $document_data = data_get($a, '#', false);
+            $doc_name = data_get($a, '@filename', "doc.pdf");
+            $mime_type = data_get($a, '@mimeCode', "application/pdf");
+            $document_data = data_get($a, '#', false);
 
-                if($document_data) {
-                    $document = \App\Utils\TempFile::UploadedFileFromBase64($document_data, $doc_name, $mime_type);
-                    $this->saveDocument($document, $expense);
-                }
+            if ($document_data) {
+                $document = \App\Utils\TempFile::UploadedFileFromBase64($document_data, $doc_name, $mime_type);
+                $this->saveDocument($document, $expense, true);
             }
         }
+        // }
 
         return $expense;
 

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -66,11 +67,11 @@ class QueryLogging
             $ip = '';
 
             if ($request->hasHeader('Cf-Connecting-Ip')) {
-                $ip = $request->header('Cf-Connecting-Ip');
+                $ip = $request->header('Cf-Connecting-Ip') ?? '';
             } elseif ($request->hasHeader('X-Forwarded-For')) {
-                $ip = $request->header('Cf-Connecting-Ip');
+                $ip = $request->header('Cf-Connecting-Ip') ?? '';
             } else {
-                $ip = $request->ip();
+                $ip = $request->ip() ?? '';
             }
 
             $client_version = $request->server('HTTP_USER_AGENT');

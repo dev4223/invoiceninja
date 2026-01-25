@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -39,6 +40,8 @@ use Illuminate\Support\Facades\Cache;
 class BaseTransformer
 {
     protected $company;
+
+    public array $error_array = [];
 
     public function __construct($company)
     {
@@ -137,6 +140,10 @@ class BaseTransformer
     public function getFrequency($frequency = RecurringInvoice::FREQUENCY_MONTHLY): int
     {
 
+        // if(is_string($frequency)){
+        //     $frequency = strtolower(trim($frequency));
+        // }
+        
         switch ($frequency) {
             case RecurringInvoice::FREQUENCY_DAILY:
             case 'daily':
@@ -240,6 +247,18 @@ class BaseTransformer
             if ($contacts->count() >= 1) {
                 return $contacts->first()->client_id;
             }
+        }
+
+        $is_free_hosted_client = $this->company->account->isFreeHostedClient();
+        $hosted_client_count = $this->company->account->hosted_client_count;
+
+        if ($is_free_hosted_client && ($this->company->clients()->count() > $hosted_client_count)) {
+            $this->error_array['invoice'][] = [
+                'invoice' => '',
+                'error' => "Error, you are attempting to import more clients than your plan allows ({$hosted_client_count})",
+            ];
+
+            throw new \App\Import\ImportException("Error, you are attempting to import more clients than your plan allows ({$hosted_client_count})");
         }
 
         $client_repository = app()->make(ClientRepository::class);
@@ -347,7 +366,7 @@ class BaseTransformer
      */
     public function getFloat($data, $field)
     {
-
+        
         if (array_key_exists($field, $data)) {
 
             if ($this->company->use_comma_as_decimal_place) {
@@ -380,7 +399,7 @@ class BaseTransformer
 
         // Convert to float and apply negative sign if necessary
         $result = (float) $amount;
-        
+
         return $isNegative ? -$result : $result;
 
 

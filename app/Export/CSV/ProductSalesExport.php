@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -84,7 +85,7 @@ class ProductSalesExport extends BaseExport
             $query->where(function ($q) use ($keys) {
 
                 foreach ($keys as $key) {
-                    $q->orWhereJsonContains('line_items', ['product_key' => $key]);
+                    $q->orWhereJsonContains('line_items', ['product_key' => trim($key, "'")]);
                 }
 
             });
@@ -106,7 +107,7 @@ class ProductSalesExport extends BaseExport
         $this->products = Product::query()->where('company_id', $this->company->id)->withTrashed()->get();
 
         //load the CSV document from a string
-        $this->csv = Writer::createFromString();
+        $this->csv = Writer::fromString();
         \League\Csv\CharsetConverter::addTo($this->csv, 'UTF-8', 'UTF-8');
 
         if (count($this->input['report_keys']) == 0) {
@@ -127,6 +128,8 @@ class ProductSalesExport extends BaseExport
 
         $query = $this->filterByClients($query);
 
+        $query = $this->filterByUserPermissions($query);
+
         $query = $this->filterByProducts($query);
 
         $this->csv->insertOne($this->buildHeader());
@@ -135,6 +138,11 @@ class ProductSalesExport extends BaseExport
 
         if ($product_keys) {
             $product_keys = explode(",", $product_keys);
+            
+            $product_keys = array_map(function ($product) {
+                return trim($product, "'");
+            }, $product_keys);
+
         }
 
         $query->cursor()

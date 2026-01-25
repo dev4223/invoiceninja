@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -83,7 +84,7 @@ class BaseImport
             )
             : null;
 
-        auth()->login($this->company->owner(), true);
+        auth()->login($this->company->owner(), false);
 
         /** @var \App\Models\User $user */
         $user = auth()->user();
@@ -93,9 +94,6 @@ class BaseImport
 
     public function getCsvData($entity_type)
     {
-        if (! ini_get('auto_detect_line_endings')) {
-            ini_set('auto_detect_line_endings', '1');
-        }
 
         /** @var string $base64_encoded_csv */
         $base64_encoded_csv = Cache::get($this->hash.'-'.$entity_type);
@@ -107,7 +105,7 @@ class BaseImport
         nlog("found {$entity_type}");
 
         $csv = base64_decode($base64_encoded_csv);
-        $csv = mb_convert_encoding($csv, 'UTF-8', 'UTF-8');
+        // $csv = mb_convert_encoding($csv, 'UTF-8', 'UTF-8');
 
         $csv = Reader::createFromString($csv);
         $csvdelimiter = self::detectDelimiter($csv);
@@ -196,8 +194,14 @@ class BaseImport
 
     public function groupClients($csvData, $key)
     {
-        if (!$key || !isset($csvData[0][$key])) {
-            return $csvData;
+        if (!($key && isset($csvData[0][$key]))) {
+            // Transform the flat array to match the expected grouped structure
+            // Each row becomes its own group to maintain consistency
+            $grouped = [];
+            foreach ($csvData as $index => $item) {
+                $grouped[$index] = [$item];
+            }
+            return $grouped;
         }
 
         $grouped = [];
@@ -218,12 +222,15 @@ class BaseImport
 
         return $grouped;
 
-
     }
 
     private function groupInvoices($csvData, $key)
     {
         if (! $key) {
+            return $csvData;
+        }
+
+        if(is_array($csvData) && !isset($csvData[0][$key])) {
             return $csvData;
         }
 
@@ -648,7 +655,10 @@ class BaseImport
                                 $invoice_data['payments'] as $payment_data
                             ) {
 
-                                if ($payment_data['amount'] == 0 && $invoice_data['status_id'] == 4) {
+                                if($invoice->status_id == \App\Models\Invoice::STATUS_DRAFT)
+                                    continue;
+
+                                if ($payment_data['amount'] == 0 && $invoice->status_id == \App\Models\Invoice::STATUS_PAID) {
                                     $payment_data['amount'] = $invoice->amount;
                                 }
 
@@ -663,7 +673,8 @@ class BaseImport
                                 ];
 
                                 /* Make sure we don't apply any payments to invoices with a Zero Amount*/
-                                if ($invoice->amount > 0 && $payment_data['amount'] > 0) {
+                                // if ($invoice->amount > 0 && $payment_data['amount'] > 0) {
+                                if ($invoice->amount > 0) {
 
                                     $payment = $payment_repository->save(
                                         $payment_data,
@@ -741,6 +752,7 @@ class BaseImport
         $invoice = $invoice
             ->service()
             ->markSent()
+            ->fillDefaults()
             ->save();
 
         if ($invoice->status_id <= Invoice::STATUS_SENT && $invoice->amount > 0) {
@@ -849,6 +861,11 @@ class BaseImport
                     if (! empty($quote_data['status_id'])) {
                         $quote->status_id = $quote_data['status_id'];
                     }
+                    
+                    if (array_key_exists('payments', $quote_data)) {
+                        unset($quote_data['payments']);
+                    }
+
                     $quote_repository->save($quote_data, $quote);
 
                     $count++;
@@ -967,7 +984,7 @@ class BaseImport
                 $key_keys = array_slice($key_keys, 0, count($row_keys));
                 // Rebuild the $keys array with only the kept columns
                 $keys = array_intersect_key($keys, array_flip($key_keys));
-            }else if (!empty($diff)) {
+            } elseif (!empty($diff)) {
                 return false;
             }
 

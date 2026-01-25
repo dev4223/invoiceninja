@@ -101,8 +101,11 @@ class Nordigen
             return Arr::first(
                 $this->client->endUserAgreement->getEndUserAgreements()['results'],
                 function (array $eua) use ($institutionId, $requiredScopes, $accessDays, $txDays): bool {
+                    $isNotExpired = !isset($eua['status']) || $eua['status'] !== 'EXPIRED';
+                    
                     return $eua['institution_id'] === $institutionId
                         && $eua['accepted'] === null
+                        && $isNotExpired
                         && $eua['max_historical_days'] >= $txDays
                         && $eua['access_valid_for_days'] >= $accessDays
                         && !array_diff($requiredScopes, $eua['access_scope'] ?? []);
@@ -174,6 +177,30 @@ class Nordigen
         );
     }
 
+    
+    /**
+     * validAgreement
+     * @param string $institution_id
+     * @param array $_accounts
+     * @return array|null
+     * @todo - very expensive!
+     */
+    public function validAgreement($institution_id, $_accounts)
+    {
+
+        $nc = new \App\Helpers\Bank\Nordigen\Http\NordigenClient($this->client->getAccessToken());
+        $requisitions = $nc->getAllRequisitions();
+
+        $requisition = $requisitions->filter(function($requisition) use ($institution_id, $_accounts){
+            if($requisition['institution_id'] == $institution_id && !empty(array_intersect($requisition['accounts'], $_accounts))){
+                return $requisition;
+            }
+        });
+
+        return $requisition->first()->toArray() ??  null;
+        
+    }
+
     public function getRequisition(string $requisitionId)
     {
         try {
@@ -193,10 +220,29 @@ class Nordigen
         try {
             $out = new \stdClass();
 
-            $out->data = $this->client->account($account_id)->getAccountDetails()['account'];
             $out->metadata = $this->client->account($account_id)->getAccountMetaData();
-            $out->balances = $this->client->account($account_id)->getAccountBalances()['balances'];
             $out->institution = $this->client->institution->getInstitution($out->metadata['institution_id']);
+
+            // if($out->metadata['status'] == 'READY'){
+            //     $out->data = $this->client->account($account_id)->getAccountDetails()['account'];
+            //     $out->balances = $this->client->account($account_id)->getAccountBalances()['balances'];
+            // }
+            // else{
+
+                $out->data = [
+                    'iban' => $out->metadata['iban'],
+                    'ownerName' => $out->metadata['owner_name'],
+                ];
+                $out->balances = [
+                    [
+                        'balanceType' => '',
+                        'balanceAmount' => [
+                            'amount' => 0,
+                            'currency' => '',
+                        ],
+                    ],
+                ];
+            // }
 
             $it = new AccountTransformer();
             return $it->transform($out);
@@ -207,12 +253,12 @@ class Nordigen
 
             if ($statusCode === 429) {
                 nlog("Nordigen Rate Limit hit for account {$account_id}");
-                return ['error' => 'Nordigen Institution Rate Limit Reached'];
+                return ['error' => 'Nordigen Institution Rate Limit Reached', 'code' => 429];
             }
         } catch (\Exception $e) {
 
             nlog("Nordigen getAccount() failed => {$account_id} => " . $e->getMessage());
-            return ['error' => $e->getMessage(), 'requisition' => true];
+            return ['error' => $e->getMessage(), 'requisition' => true, 'code' => 401];
 
         }
     }
@@ -221,29 +267,28 @@ class Nordigen
      * isAccountActive
      *
      * @param  string $account_id
-     * @return bool
+     * @return array
      */
-    public function isAccountActive(string $account_id): bool
+    public function isAccountActive(string $account_id): array
     {
         try {
             $account = $this->client->account($account_id)->getAccountMetaData();
 
             if ($account['status'] != 'READY') {
                 nlog("Nordigen account '{$account_id}' is not ready (status={$account['status']})");
-
-                return false;
             }
 
-            return true;
+            return $account;
+
         } catch (\Exception $e) {
 
             nlog("Nordigen:: AccountActiveStatus:: {$e->getMessage()} {$e->getCode()}");
 
             if (strpos($e->getMessage(), 'Invalid Account ID') !== false) {
-                return false;
+                ['status' => 'Invalid Account ID'];
             }
 
-            throw $e;
+            return ['status' => 'EXPIRED'];
         }
     }
 
@@ -271,6 +316,8 @@ class Nordigen
             return;
         }
 
+        Cache::put($cache_key, true, 60 * 60 * 24);
+
         App::setLocale($bank_integration->company->getLocale());
 
         $mo = new EmailObject();
@@ -285,7 +332,7 @@ class Nordigen
 
         Email::dispatch($mo, $bank_integration->company);
 
-        Cache::put($cache_key, true, 60 * 60 * 24);
+
 
     }
 

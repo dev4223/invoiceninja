@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -48,7 +49,7 @@ class ClientContactRepository extends BaseRepository
         }
 
         /* Set first record to primary - always */
-        $contacts = $contacts->sortByDesc('is_primary')->filter(function ($contact){
+        $contacts = $contacts->sortByDesc('is_primary')->filter(function ($contact) {
             return is_array($contact);
         })->map(function ($contact) {
             $contact['is_primary'] = $this->is_primary;
@@ -84,7 +85,7 @@ class ClientContactRepository extends BaseRepository
 
             $update_contact->fill($contact);
 
-            if (array_key_exists('password', $contact) && strlen($contact['password']) > 1 && strlen($update_contact->email) > 3) { //updating on a blank contact email will cause large table scanning
+            if (array_key_exists('password', $contact) && strlen($contact['password'] ?? '') > 1 && strlen($update_contact->email ?? '') > 3) { //updating on a blank contact email will cause large table scanning
                 $update_contact->password = Hash::make($contact['password']);
 
                 ClientContact::withTrashed()

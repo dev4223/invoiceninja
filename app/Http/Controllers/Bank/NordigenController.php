@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -77,14 +78,14 @@ class NordigenController extends BaseController
         }))[0];
 
         try {
-            $txDays = $data['tx_days'] ?? 0; //@phpstan-ignore-line
+            $txDays = $data['tx_days'] ?? $institution['transaction_total_days'] ?? 90; //@phpstan-ignore-line
+            
+            $agreement = $nordigen->createAgreement($institution, $institution['max_access_valid_for_days'], $txDays);//@2025-07-01: this is the correct way to get the access days
 
-            $agreement = $nordigen->firstValidAgreement($institution['id'], $data['access_days'] ?? 0, $txDays)
-                      ?? $nordigen->createAgreement($institution, $data['access_days'] ?? 9999, $txDays);
         } catch (\Exception $e) {
             $debug = "{$e->getMessage()} ({$e->getCode()})";
 
-            nlog("Nordigen: Could not create an agreement with ${institution['name']}: {$debug}");
+            nlog("Nordigen: Could not create an agreement with {$institution['name']}: {$debug}");
 
             return $this->failed('eua-failure', $context, $company);
         }
@@ -94,7 +95,7 @@ class NordigenController extends BaseController
             $requisition = $nordigen->createRequisition(
                 config('ninja.app_url') . '/nordigen/confirm',
                 $institution,
-                $agreement,
+                $agreement, //@phpstan-ignore-line
                 $request->token,
                 $lang,
             );
@@ -174,7 +175,7 @@ class NordigenController extends BaseController
             if (isset($nordigen_account['error'])) {
                 continue;
             }
-            
+
             $bank_integration = false;
 
             try {
@@ -198,8 +199,7 @@ class NordigenController extends BaseController
                 $bank_integration->currency = $nordigen_account['account_currency'];
             } finally {
 
-                if($bank_integration)
-                { 
+                if ($bank_integration) {
 
                     $bank_integration->auto_sync = true;
                     $bank_integration->disabled_upstream = false;
@@ -219,7 +219,7 @@ class NordigenController extends BaseController
             ->where('integration_type', BankIntegration::INTEGRATION_TYPE_NORDIGEN)
             ->where('auto_sync', true)
             ->each(function ($bank_integration) {
-                ProcessBankTransactionsNordigen::dispatch($bank_integration);
+                ProcessBankTransactionsNordigen::dispatch($bank_integration)->delay(now()->addHour());
             });
 
         // prevent rerun of this method with same ref

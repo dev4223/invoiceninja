@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -75,6 +76,10 @@ class OneTimeTokenController extends BaseController
 
         if ($request->institution_id) {
             $data['institution_id'] = $request->institution_id;
+        }
+
+        if($request->provider_id) {
+            $data['provider_id'] = $request->provider_id;
         }
 
         Cache::put($hash, $data, 3600);

@@ -159,6 +159,7 @@ class NinjaPlanController extends Controller
             $account->hosted_company_count = 10;
             $account->trial_started = now();
             $account->trial_plan = 'pro';
+            $account->created_at = now();
             $account->save();
         }
 
@@ -245,10 +246,6 @@ class NinjaPlanController extends Controller
                                            ->orderBy('id', 'DESC')
                                            ->first();
 
-                    //account status means user cannot perform upgrades until they pay their account.
-                    // $data['late_invoice'] = $late_invoice;
-
-                    //14-01-2022 remove late invoices from blocking upgrades
                     $data['late_invoice'] = false;
                 }
 

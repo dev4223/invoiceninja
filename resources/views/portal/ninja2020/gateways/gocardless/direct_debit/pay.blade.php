@@ -22,8 +22,7 @@
                     <label class="mr-4 block my-2">
                         <input type="radio" data-token="{{ $token->token }}" name="payment-type"
                             class="form-radio cursor-pointer toggle-payment-with-token" />
-                        <span class="ml-1 cursor-pointer">{{ App\Models\GatewayType::getAlias($token->gateway_type_id) }}
-                            (#{{ $token->token }})</span>
+                        <span class="ml-1 cursor-pointer">{{ App\Models\GatewayType::getAlias($token->gateway_type_id) }} {{ $token->getGatewayAccountName() }}</span>
                     </label>
                 @endforeach
             @endisset

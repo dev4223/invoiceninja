@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -24,4 +25,5 @@ class DestroyPaymentRequest extends Request
     {
         return auth()->user()->can('edit', $this->payment) && $this->payment->is_deleted === false;
     }
+
 }

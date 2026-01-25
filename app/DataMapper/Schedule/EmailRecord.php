@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -33,4 +34,5 @@ class EmailRecord
      * @var string
      */
     public string $entity_id = '';
+
 }

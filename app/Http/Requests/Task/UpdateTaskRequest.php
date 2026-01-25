@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -73,9 +74,41 @@ class UpdateTaskRequest extends Request
                 return;
             }
 
-            foreach ($values as $k) {
+            foreach ($values as $key => $k) {
+                
+                // Check if this is an array
+                if (!is_array($k)) {
+                    return $fail('Time log entry at position '.$key.' must be an array.');
+                }
+                
+                // Check for associative array (has string keys)
+                if (array_keys($k) !== range(0, count($k) - 1)) {
+                    return $fail('Time log entry at position '.$key.' uses invalid format. Expected: [unix_start, unix_end, description, billable]. Received associative array with keys: '.implode(', ', array_keys($k)));
+                }
+                
+                // Ensure minimum required elements exist
+                if (!isset($k[0]) || !isset($k[1])) {
+                    return $fail('Time log entry at position '.$key.' must have at least 2 elements: [start_timestamp, end_timestamp].');
+                }
+                
+                // Validate types for required elements
                 if (!is_int($k[0]) || !is_int($k[1])) {
-                    return $fail('The '.$attribute.' - '.print_r($k, true).' is invalid. Unix timestamps only.');
+                    return $fail('Time log entry at position '.$key.' is invalid. Elements [0] and [1] must be Unix timestamps (integers). Received: '.print_r($k, true));
+                }
+
+                // Validate max elements
+                if(count($k) > 4) {
+                    return $fail('Time log entry at position '.$key.' can only have up to 4 elements. Received '.count($k).' elements.');
+                }
+
+                // Validate optional element [2] (description)
+                if (isset($k[2]) && !is_string($k[2])) {
+                    return $fail('Time log entry at position '.$key.': element [2] (description) must be a string. Received: '.gettype($k[2]));
+                }
+                
+                // Validate optional element [3] (billable)
+                if(isset($k[3]) && !is_bool($k[3])) {
+                    return $fail('Time log entry at position '.$key.': element [3] (billable) must be a boolean. Received: '.gettype($k[3]));
                 }
             }
 
@@ -84,19 +117,9 @@ class UpdateTaskRequest extends Request
             }
         }];
 
-        if ($this->file('documents') && is_array($this->file('documents'))) {
-            $rules['documents.*'] = $this->fileValidation();
-        } elseif ($this->file('documents')) {
-            $rules['documents'] = $this->fileValidation();
-        } else {
-            $rules['documents'] = 'bail|sometimes|array';
-        }
-
-        if ($this->file('file') && is_array($this->file('file'))) {
-            $rules['file.*'] = $this->fileValidation();
-        } elseif ($this->file('file')) {
-            $rules['file'] = $this->fileValidation();
-        }
+        $rules['file'] = 'bail|sometimes|array';
+        $rules['file.*'] = $this->fileValidation();
+        
 
         return $this->globalRules($rules);
     }
@@ -105,8 +128,16 @@ class UpdateTaskRequest extends Request
     {
         $input = $this->decodePrimaryKeys($this->all());
 
+        if ($this->file('file') instanceof \Illuminate\Http\UploadedFile) {
+            $this->files->set('file', [$this->file('file')]);
+        }
+
         if (array_key_exists('status_id', $input) && is_string($input['status_id'])) {
             $input['status_id'] = $this->decodePrimaryKey($input['status_id']);
+        }
+
+        if (isset($input['documents'])) {
+            unset($input['documents']);
         }
 
         /* Ensure the project is related */
@@ -124,6 +155,32 @@ class UpdateTaskRequest extends Request
             $input['color'] = '';
         }
 
+
+        if(isset($input['time_log']) &&is_string($input['time_log'])) {
+            $input['time_log'] = json_decode($input['time_log'], true);
+        }
+
+        if(isset($input['time_log']) && is_array($input['time_log'])) {
+        
+            $time_logs = $input['time_log'];
+
+            foreach($time_logs as &$time_log) {
+ 
+                if (is_string($time_log)) {
+                    continue; //catch if it isn't even a proper time log  
+                }
+
+                $time_log[0] = intval($time_log[0] ?? 0);
+                $time_log[1] = intval($time_log[1] ?? 0);
+                $time_log[2] = strval($time_log[2] ?? '');
+                $time_log[3] = boolval($time_log[3] ?? true);
+
+            }
+
+            $input['time_log'] = json_encode($time_logs);
+
+        }
+        
         if (isset($input['project_id']) && isset($input['client_id'])) {
             $search_project_with_client = Project::withTrashed()->where('id', $input['project_id'])->where('client_id', $input['client_id'])->company()->doesntExist();
 

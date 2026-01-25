@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Quote Ninja (https://invoiceninja.com).
  *
@@ -81,6 +82,7 @@ class QuoteItemExport extends BaseExport
         if ($clients) {
             $query = $this->addClientFilter($query, $clients);
         }
+        $query = $this->filterByUserPermissions($query);
 
         $query = $this->addQuoteStatusFilter($query, $this->input['status'] ?? '');
 
@@ -125,7 +127,7 @@ class QuoteItemExport extends BaseExport
     {
 
         //load the CSV document from a string
-        $this->csv = Writer::createFromString();
+        $this->csv = Writer::fromString();
         \League\Csv\CharsetConverter::addTo($this->csv, 'UTF-8', 'UTF-8');
 
         $query = $this->init();
@@ -147,6 +149,26 @@ class QuoteItemExport extends BaseExport
 
     }
 
+    private function filterItems(array $items): array
+    {
+        
+        //if we have product filters in place, we will also need to filter the items at this level:
+        if (isset($this->input['product_key'])) {
+            
+            $products = str_getcsv($this->input['product_key'], ',', "'");
+
+            $products = array_map(function($product) {
+                return trim($product, "'");
+            }, $products);
+
+            $items = array_filter($items, function ($item) use ($products) {
+                return in_array($item->product_key, $products);
+            });
+        }
+
+        return $items;
+    }
+
     private function iterateItems(Quote $quote)
     {
         $transformed_quote = $this->buildRow($quote);
@@ -154,7 +176,7 @@ class QuoteItemExport extends BaseExport
         $transformed_items = [];
         $currency = $this->company->currency();
 
-        foreach ($quote->line_items as $item) {
+        foreach ($this->filterItems($quote->line_items) as $item) {
             $item_array = [];
 
             foreach (array_values(array_intersect($this->input['report_keys'], $this->item_report_keys)) as $key) { //items iterator produces item array
@@ -163,9 +185,9 @@ class QuoteItemExport extends BaseExport
 
                     $tmp_key = str_replace("item.", "", $key);
 
-                    if ($tmp_key == 'type_id') {
-                        $tmp_key = 'type';
-                    }
+                    // if ($tmp_key == 'type_id') {
+                    //     $tmp_key = 'type';
+                    // }
 
                     if ($tmp_key == 'tax_id') {
                         $tmp_key = 'tax_category';

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -108,8 +109,14 @@ class ACH implements MethodInterface, LivewireMethodInterface
 
                 return redirect()->route('client.payment_methods.index')->withMessage(ctrans('texts.payment_method_added'));
             } catch (\Exception $e) {
+                nlog($e->getMessage());
                 return $this->braintree->processInternallyFailedPayment($this->braintree, $e);
             }
+        }
+        
+        if ($result instanceof \Braintree\Result\Error && $result->message) {
+            session()->flash('ach_error', $result->message);
+            return back()->withInput();
         }
 
         return back()->withMessage(ctrans('texts.unable_to_verify_payment_method'));
@@ -140,6 +147,10 @@ class ACH implements MethodInterface, LivewireMethodInterface
             ->where('id', $this->decodePrimaryKey($request->source))
             ->firstOrFail();
 
+        $total_taxes = \App\Models\Invoice::query()->whereIn('id', $this->transformKeys(array_column($this->braintree->payment_hash->invoices(), 'invoice_id')))->withTrashed()->sum('total_taxes');
+        $invoice = $this->braintree->payment_hash->fee_invoice;
+        $po_number = $invoice->po_number ?? $invoice->number ?? '';
+
         $result = $this->braintree->gateway->transaction()->sale([
             'amount' => $this->braintree->payment_hash->data->amount_with_fee,
             'paymentMethodToken' => $token->token,
@@ -147,6 +158,8 @@ class ACH implements MethodInterface, LivewireMethodInterface
             'options' => [
                 'submitForSettlement' => true,
             ],
+            'taxAmount' => $total_taxes,
+            'purchaseOrderNumber' => substr($po_number, 0, 16),
         ]);
 
         if ($result->success) {
@@ -185,7 +198,7 @@ class ACH implements MethodInterface, LivewireMethodInterface
 
     private function processUnsuccessfulPayment($response)
     {
-        $this->braintree->sendFailureMail($response->transaction->additionalProcessorResponse);
+        $this->braintree->sendFailureMail($response->transaction->additionalProcessorResponse ?? 'Unknown error occurred');
 
         $message = [
             'server_response' => $response,
@@ -200,6 +213,10 @@ class ACH implements MethodInterface, LivewireMethodInterface
             $this->braintree->client,
             $this->braintree->client->company,
         );
+
+        if ($response instanceof \Braintree\Result\Error && $response->message) {
+            throw new PaymentFailed($response->message, 400);
+        }
 
         throw new PaymentFailed($response->transaction->additionalProcessorResponse, $response->transaction->processorResponseCode);
     }

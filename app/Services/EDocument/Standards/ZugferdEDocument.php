@@ -37,6 +37,13 @@ class ZugferdEDocument extends AbstractService
     private Client $client;
 
     private InvoiceSum | InvoiceSumInclusive $calc;
+
+    private ?string $tax_code = null;
+
+    private ?string $exemption_reason_code = null;
+
+    private ?string $temp_file_path = null;
+
     /**
      * __construct
      *
@@ -79,6 +86,7 @@ class ZugferdEDocument extends AbstractService
             ->setDocumentInformation()
             ->setPoNumber()
             ->setRoutingNumber()
+            ->setIdNumber()
             ->setDeliveryAddress()
             ->setDocumentTaxes()        // 1. First set taxes
             ->setPaymentMeans()         // 2. Then payment means
@@ -86,6 +94,7 @@ class ZugferdEDocument extends AbstractService
             ->setLineItems()            // 4. Then line items
             ->setCustomSurcharges()     // 4a. Surcharges
             ->setDocumentSummation();   // 5. Finally document summation
+        // ->setAdditionalReferencedDocument();   // 6. Additional referenced document
 
         return $this;
 
@@ -93,43 +102,125 @@ class ZugferdEDocument extends AbstractService
 
     private function setCustomSurcharges(): self
     {
-        $item = $this->calc->getTaxMap()->first();
+        $item = $this->calc->getTaxMap()->first() ?: ['tax_rate' => 0, 'tax_id' => null];
 
-        if($this->document->custom_surcharge1 > 0){
+        $tax_code = $item['tax_id'] ? $this->getTaxType($item["tax_id"] ?? '2') : $this->tax_code;
+
+        if ($this->document->custom_surcharge1 > 0) {
             $surcharge = $this->document->uses_inclusive_taxes ? ($this->document->custom_surcharge1 / (1 + ($item["tax_rate"] / 100))) : $this->document->custom_surcharge1;
-            $this->xdocument->addDocumentAllowanceCharge($surcharge, true, $this->getTaxType($item["tax_id"] ?? '2'), "VAT", $item["tax_rate"]);
+            $this->xdocument->addDocumentAllowanceCharge($surcharge, true, $tax_code, "VAT", $item["tax_rate"], null, null, null, null, null, null, ctrans('texts.surcharge'));
         }
 
-        if($this->document->custom_surcharge2 > 0){
+        if ($this->document->custom_surcharge2 > 0) {
             $surcharge = $this->document->uses_inclusive_taxes ? ($this->document->custom_surcharge2 / (1 + ($item["tax_rate"] / 100))) : $this->document->custom_surcharge2;
-            $this->xdocument->addDocumentAllowanceCharge($surcharge, true, $this->getTaxType($item["tax_id"] ?? '2'), "VAT", $item["tax_rate"]);
+            $this->xdocument->addDocumentAllowanceCharge($surcharge, true, $tax_code, "VAT", $item["tax_rate"], null, null, null, null, null, null, ctrans('texts.surcharge'));
         }
 
-        if($this->document->custom_surcharge3 > 0){
+        if ($this->document->custom_surcharge3 > 0) {
             $surcharge = $this->document->uses_inclusive_taxes ? ($this->document->custom_surcharge3 / (1 + ($item["tax_rate"] / 100))) : $this->document->custom_surcharge3;
-            $this->xdocument->addDocumentAllowanceCharge($surcharge, true, $this->getTaxType($item["tax_id"] ?? '2'), "VAT", $item["tax_rate"]);
+            $this->xdocument->addDocumentAllowanceCharge($surcharge, true, $tax_code, "VAT", $item["tax_rate"], null, null, null, null, null, null, ctrans('texts.surcharge'));
         }
 
-        if($this->document->custom_surcharge4 > 0){
-            $surcharge = $this->document->uses_inclusive_taxes ?  ($this->document->custom_surcharge4 / (1 + ($item["tax_rate"] / 100))) : $this->document->custom_surcharge4;
-            $this->xdocument->addDocumentAllowanceCharge($surcharge, true, $this->getTaxType($item["tax_id"] ?? '2'), "VAT", $item["tax_rate"]);
+        if ($this->document->custom_surcharge4 > 0) {
+            $surcharge = $this->document->uses_inclusive_taxes ? ($this->document->custom_surcharge4 / (1 + ($item["tax_rate"] / 100))) : $this->document->custom_surcharge4;
+            $this->xdocument->addDocumentAllowanceCharge($surcharge, true, $tax_code, "VAT", $item["tax_rate"], null, null, null, null, null, null, ctrans('texts.surcharge'));
         }
 
         return $this;
     }
 
+    /**
+     * setAdditionalReferencedDocument
+     *
+     * circular reference causing the file to never be created.
+     * PDF => xml => PDF => xml
+     *
+     * Need to abstract the insertion of the base64 document into the XML.
+     *
+     * @return self
+     */
+    // private function setAdditionalReferencedDocument(): self
+    // {
+    //     if($this->document->client->getSetting('merge_e_invoice_to_pdf')) {
+    //         return $this;
+    //     }
+
+    //     $invitation = $this->document->invitations()->first();
+    //     $pdf = (new \App\Jobs\Entity\CreateRawPdf($invitation))->handle();
+    //     $file_name = $this->document->numberFormatter().'.pdf';
+
+    //     $this->temp_file_path = \App\Utils\TempFile::filePath($pdf, $file_name);
+
+    //     $this->xdocument->addDocumentInvoiceSupportingDocumentWithFile(
+    //         $this->document->number,
+    //         $this->temp_file_path,
+    //         $file_name,
+    //     );
+
+    //     return $this;
+    // }
+
+    /**
+     * setDocumentTaxes
+     *
+     * VATEX-EU-143     - Article 143 - Exemptions on importation
+     * VATEX-EU-146     - Article 146 - Exemptions on exportation
+     * VATEX-EU-148     - Article 148 - Exemptions for international transport
+     * VATEX-EU-151     - Article 151 - Exemptions for certain transactions
+     * VATEX-EU-169     - Article 169 - Right of deduction
+     * VATEX-EU-AE      - Reverse charge - VAT to be paid by the recipient
+     * VATEX-EU-D       - Triangulation rule - Intra-EU supply
+     * VATEX-EU-F       - Free export item, tax not charged
+     * VATEX-EU-G       - Export outside the EU
+     * VATEX-EU-IC      - Intra-Community supply
+     * VATEX-EU-O       - Outside scope of tax
+     * VATEX-EU-IC-SC   - Intra-Community supply of services to customer in another member state
+     * VATEX-EU-AE-SC   - Services to customer outside the EU
+     * VATEX-EU-NOT-TAX - Not subject to VAT
+     *
+     * @return self
+     */
     private function setDocumentTaxes(): self
     {
-        if ($this->document->total_taxes == 0) {
+
+        if ((string) $this->document->total_taxes == '0') {
+
+            $base_amount = 0;
+            $tax_amount = 0;
+            $tax_rate = 0;
+
+            if (in_array($this->tax_code, [ZugferdDutyTaxFeeCategories::VAT_REVERSE_CHARGE, ZugferdDutyTaxFeeCategories::EXEMPT_FROM_TAX])) { //reverse charge
+                $base_amount = $this->document->amount;
+            }
+
             $this->xdocument->addDocumentTax(
-                ZugferdDutyTaxFeeCategories::EXEMPT_FROM_TAX,
+                $this->tax_code,
                 "VAT",
-                0,
-                0,
-                0,
-                ctrans('texts.vat_not_registered'),
-                "VATNOTREG"
+                $base_amount,
+                $tax_amount,
+                $tax_rate,
+                null,
+                $this->exemption_reason_code
             );
+
+
+            if ($this->calc->getTotalDiscount() > 0) {
+
+                $this->xdocument->addDocumentAllowanceCharge(
+                    $this->calc->getTotalDiscount(),
+                    false,
+                    $this->tax_code,
+                    "VAT",
+                    0,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    ctrans('texts.discount')
+                );
+            }
 
             return $this;
         }
@@ -141,7 +232,7 @@ class ZugferdEDocument extends AbstractService
         $taxable_amount = $this->document->amount - $total_tax;
 
         //taxable amount and net subtotal should be the same
-        $adjustment = round($taxable_amount-$net_subtotal,2);
+        $adjustment = round($taxable_amount - $net_subtotal, 2);
 
         // Process each tax rate group
         foreach ($tax_map as $item) {
@@ -150,14 +241,14 @@ class ZugferdEDocument extends AbstractService
             $this->xdocument->addDocumentTax(
                 $tax_type,
                 "VAT",
-                $item["base_amount"]+$adjustment, // Taxable amount after discount
+                $item["base_amount"] + $adjustment, // Taxable amount after discount
                 $item["total"],
                 $item["tax_rate"],
                 $tax_type == ZugferdDutyTaxFeeCategories::VAT_EXEMPT_FOR_EEA_INTRACOMMUNITY_SUPPLY_OF_GOODS_AND_SERVICES
                     ? ctrans('texts.intracommunity_tax_info')
                     : ''
             );
-                
+
             if ($this->calc->getTotalDiscount() > 0) {
 
                 $ratio = $item["base_amount"] / $net_subtotal;
@@ -165,9 +256,16 @@ class ZugferdEDocument extends AbstractService
                 $this->xdocument->addDocumentAllowanceCharge(
                     round($this->calc->getTotalDiscount() * $ratio, 2),
                     false,
-                    $tax_type,
+                    $this->getTaxType($item["tax_id"] ?? '2'),
                     "VAT",
-                    $item["tax_rate"]
+                    $item["tax_rate"],
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    ctrans('texts.discount')
                 );
             }
 
@@ -198,7 +296,14 @@ class ZugferdEDocument extends AbstractService
 
     public function getXml(): string
     {
-        return $this->xdocument->getContent();
+        $xml = $this->xdocument->getContent();
+
+        //used if we are embedding the document within the PDF
+        if ($this->temp_file_path) {
+            unlink($this->temp_file_path);
+        }
+
+        return $xml;
     }
 
     private function bootFlags(): self
@@ -206,38 +311,61 @@ class ZugferdEDocument extends AbstractService
 
         $this->calc = $this->document->calc();
 
+        $br = new \App\DataMapper\Tax\BaseRule();
+        $eu_states = $br->eu_country_codes;
+
+        $item = $this->document->line_items[0] ?? null;
+
+        if (is_null($item)) {
+            $this->tax_code = ZugferdDutyTaxFeeCategories::EXEMPT_FROM_TAX;
+            return $this;
+        }
+
+        if (!in_array($this->document->client->country->iso_3166_2, $eu_states)) {
+            $this->tax_code = ZugferdDutyTaxFeeCategories::FREE_EXPORT_ITEM_TAX_NOT_CHARGED;
+            $exemption_reason_code = "VATEX-EU-G";
+        } elseif ($this->client->is_tax_exempt || $item->tax_id == '5' || $item->tax_id == '8') {
+            $this->tax_code =  ZugferdDutyTaxFeeCategories::EXEMPT_FROM_TAX;
+            // $this->exemption_reason_code = "VATEX-EU-NOT-TAX";
+            $this->exemption_reason_code = "VATEX-EU-O";
+            // nlog("exemption_reason_code: {$this->exemption_reason_code}");
+        } elseif ($item->tax_id == '9') { //reverse charge
+            $this->tax_code = ZugferdDutyTaxFeeCategories::VAT_REVERSE_CHARGE;
+            $this->exemption_reason_code = "VATEX-EU-AE";
+        } elseif ($item->tax_id == '10') { //intra-community
+            $this->tax_code = ZugferdDutyTaxFeeCategories::VAT_EXEMPT_FOR_EEA_INTRACOMMUNITY_SUPPLY_OF_GOODS_AND_SERVICES;
+            $this->exemption_reason_code = "VATEX-EU-IC";
+        } else {
+            $this->tax_code = ZugferdDutyTaxFeeCategories::EXEMPT_FROM_TAX;
+            $this->exemption_reason_code = "VATEX-EU-O";
+        }
+
         return $this;
+
     }
 
     private function setDocumentSummation(): self
     {
         $document_discount = $this->calc->getTotalDiscount();
-        $total_tax = round($this->calc->getTotalTaxes(),2);
+        $total_tax = round($this->calc->getTotalTaxes(), 2);
         $taxable_amount = $this->document->amount - $total_tax;
         $base_taxable_amount = $this->calc->getTaxMap()->sum('base_amount');
 
         $subtotal = $this->document->uses_inclusive_taxes ? ($this->calc->getTotal() - $total_tax - $this->calc->getTotalNetSurcharges() + $this->calc->getTotalDiscount()) : ($this->calc->getSubTotal());
 
-        // nlog($this->calc->getTotalTaxes());
-        // nlog($this->calc->getSubTotal());
-        // nlog($this->calc->getTotalSurcharges());
+        // nlog([
+        //      $this->document->amount,                    // Total amount with VAT
+        //     $this->document->balance,                   // Amount due
+        //     $subtotal,                                  // Sum before tax
+        //     $this->calc->getTotalSurcharges(),         // Total charges
+        //     $document_discount,                         // Total allowances
+        //     $taxable_amount,                           // Tax basis total (net)
+        //     $total_tax,                                // Total tax amount
+        //     0,
+        //     // round($this->document->amount - ($base_taxable_amount+$total_tax),2),                                       // Total prepaid amount
+        //     $this->document->amount - $this->document->balance,
+        // ]);
 
-        // nlog($this->calc->getSubTotal() - $this->calc->getTotalSurcharges() - $this->calc->getTotalTaxes());
-        // nlog($this->document->total_taxes);
-        
-        nlog([
-             $this->document->amount,                    // Total amount with VAT
-            $this->document->balance,                   // Amount due
-            $subtotal,                                  // Sum before tax
-            $this->calc->getTotalSurcharges(),         // Total charges
-            $document_discount,                         // Total allowances
-            $taxable_amount,                           // Tax basis total (net)
-            $total_tax,                                // Total tax amount
-            0,
-            // round($this->document->amount - ($base_taxable_amount+$total_tax),2),                                       // Total prepaid amount
-            $this->document->amount - $this->document->balance, 
-        ]);
-        
         $this->xdocument->setDocumentSummation(
             $this->document->amount,                    // Total amount with VAT
             $this->document->balance,                   // Amount due
@@ -245,40 +373,40 @@ class ZugferdEDocument extends AbstractService
             $this->document->uses_inclusive_taxes ? $this->calc->getTotalNetSurcharges() : $this->calc->getTotalSurcharges(),         // Total charges
             $document_discount,                         // Total allowances
             $taxable_amount,                           // Tax basis total (net)
-            round($total_tax,2),                       // Total tax amount
-            0,            
+            round($total_tax, 2),                       // Total tax amount
+            0,
             // round($this->document->amount - ($base_taxable_amount+$total_tax),2),                                       // Total rounding amount
             $this->document->amount - $this->document->balance  // Amount already paid
         );
 
         return $this;
     }
-        
+
     private function setLineItems(): self
     {
         foreach ($this->document->line_items as $index => $item) {
             /** @var InvoiceItem $item **/
-            
-            $position_id = (string) ($index+1);
+
+            $position_id = (string) ($index + 1);
             // 1. Start new position and set basic details
             $this->xdocument->addNewPosition($position_id)
                 ->setDocumentPositionProductDetails(
-                    strlen($item->product_key ?? '') >= 1 ? $item->product_key : "no product name defined", 
+                    strlen($item->product_key ?? '') >= 1 ? $item->product_key : "no product name defined",
                     $item->notes
                 )
                 ->setDocumentPositionQuantity(
-                    $item->quantity, 
+                    $item->quantity,
                     $item->type_id == 2 ? "HUR" : "H87"
                 )
                 ->setDocumentPositionNetPrice(
                     $this->document->uses_inclusive_taxes ? $item->net_cost : $item->cost
                 );
-                
+
             // 2. ALWAYS add tax information (even if zero)
-            if(strlen($item->tax_name1) > 1) {
+            if (strlen($item->tax_name1) > 1) {
                 $this->xdocument->addDocumentPositionTax(
-                    $this->getTaxType($item->tax_id ?? '2'), 
-                    'VAT', 
+                    $this->getTaxType($item->tax_id ?? '2'),
+                    'VAT',
                     $item->tax_rate1
                 );
             } else {
@@ -293,15 +421,15 @@ class ZugferdEDocument extends AbstractService
             $line_discount = 0;
 
             // 3. Add allowances/charges (discounts) if any
-            if($item->discount > 0) {
+            if ($item->discount > 0) {
                 $line_discount = $this->calculateTotalItemDiscountAmount($item);
                 $this->xdocument->addDocumentPositionGrossPriceAllowanceCharge(
-                    abs($line_discount), 
+                    abs($line_discount),
                     false
                 );
             }
             // 4. Finally add monetary summation
-            $this->xdocument->setDocumentPositionLineSummation($this->document->uses_inclusive_taxes ? ($item->line_total-$item->tax_amount) : $item->line_total);
+            $this->xdocument->setDocumentPositionLineSummation($this->document->uses_inclusive_taxes ? ($item->line_total - $item->tax_amount) : $item->line_total);
         }
 
         return $this;
@@ -319,10 +447,11 @@ class ZugferdEDocument extends AbstractService
 
     private function setCompanyTaxRegistration(): array
     {
-        if (str_contains($this->company->getSetting('vat_number'), "/")) 
+        if (str_contains($this->company->getSetting('vat_number'), "/")) {
             return ["FC", $this->company->getSetting('vat_number')];
-    
-        return ["VA", $this->company->getSetting('vat_number')];      
+        }
+
+        return ["VA", $this->company->getSetting('vat_number')];
     }
 
     private function setPaymentMeans(): self
@@ -380,6 +509,10 @@ class ZugferdEDocument extends AbstractService
             );
         }
 
+        if (isset($this->document->e_invoice->Invoice->Delivery[0]->ActualDeliveryDate)) {
+            $this->xdocument->setDocumentSupplyChainEvent(new \DateTime($this->document->e_invoice->Invoice->Delivery[0]->ActualDeliveryDate));
+        }
+
         return $this;
     }
 
@@ -398,7 +531,7 @@ class ZugferdEDocument extends AbstractService
     private function setBaseDocument(): self
     {
 
-        $user_or_company_phone = strlen($this->document->user->present()->phone()) > 3 ? $this->document->user->present()->phone() : $this->company->present()->phone();
+        $user_or_company_phone = strlen($this->company->present()->phone()) > 3 ? $this->company->present()->phone() : $this->document->user->present()->phone();
 
         $company_tax_registration = $this->setCompanyTaxRegistration();
 
@@ -415,6 +548,9 @@ class ZugferdEDocument extends AbstractService
             ->setDocumentBuyerCommunication("EM", $this->client->present()->email())
             ->addDocumentPaymentTerm(ctrans("texts.xinvoice_payable", ['payeddue' => date_create($this->document->date ?? now()->format('Y-m-d'))->diff(date_create($this->document->due_date ?? now()->format('Y-m-d')))->format("%d"), 'paydate' => $this->document->due_date]));
 
+        if (strlen($this->client->vat_number ?? '') > 1) {
+            $this->xdocument->addDocumentBuyerTaxRegistration($this->getDocumentLevelTaxRegistration(), $this->client->vat_number);
+        }
 
         return $this;
     }
@@ -434,6 +570,23 @@ class ZugferdEDocument extends AbstractService
     {
         if (isset($this->document->po_number) && strlen($this->document->po_number) > 1) {
             $this->xdocument->setDocumentBuyerOrderReferencedDocument($this->document->po_number);
+        }
+
+        return $this;
+    }
+
+    private function setIdNumber(): self
+    {
+        $id_number = $this->company->getSetting('id_number');
+        
+        if (!empty($id_number) && str_contains($id_number, "/")) {
+            $id_number = trim($id_number);
+            
+            // BT-29: Seller identifier
+            $this->xdocument->addDocumentSellerGlobalId($id_number, "0088");
+            
+            // BT-32: Tax registration identifier
+            $this->xdocument->addDocumentSellerTaxRegistration("FC", $id_number);
         }
 
         return $this;
@@ -463,6 +616,26 @@ class ZugferdEDocument extends AbstractService
     private function getDocumentCurrency(): string
     {
         return $this->client->getCurrencyCode();
+    }
+
+    private function getDocumentLevelTaxRegistration(): string
+    {
+        return strlen($this->client->vat_number ?? '') > 1 ? "VA" : "FC";
+    }
+
+
+    private function getIdNumber(): ?string
+    {
+        return !empty($this->company->getSetting('id_number')) 
+            ? trim($this->company->getSetting('id_number')) 
+            : null;
+    }
+
+    private function getIdNumberRegistrationType(): ?string
+    {
+        return !empty($this->getIdNumber()) && str_contains($this->getIdNumber(), "/") 
+            ? "FC" 
+            : null;
     }
 
     private function getTaxType(string $tax_id): string
@@ -502,13 +675,13 @@ class ZugferdEDocument extends AbstractService
             if ((in_array($this->company->country()->iso_3166_2, $eu_states) && in_array($this->client->country->iso_3166_2, $eu_states)) && $this->company->country()->iso_3166_2 != $this->client->country->iso_3166_2) {
                 $tax_type = ZugferdDutyTaxFeeCategories::VAT_EXEMPT_FOR_EEA_INTRACOMMUNITY_SUPPLY_OF_GOODS_AND_SERVICES;
             } elseif (!in_array($this->document->client->country->iso_3166_2, $eu_states)) {
-                $tax_type = ZugferdDutyTaxFeeCategories::SERVICE_OUTSIDE_SCOPE_OF_TAX;
+                $tax_type = ZugferdDutyTaxFeeCategories::FREE_EXPORT_ITEM_TAX_NOT_CHARGED;
             } elseif ($this->document->client->country->iso_3166_2 == "ES-CN") {
                 $tax_type = ZugferdDutyTaxFeeCategories::CANARY_ISLANDS_GENERAL_INDIRECT_TAX;
             } elseif (in_array($this->document->client->country->iso_3166_2, ["ES-CE", "ES-ML"])) {
                 $tax_type = ZugferdDutyTaxFeeCategories::TAX_FOR_PRODUCTION_SERVICES_AND_IMPORTATION_IN_CEUTA_AND_MELILLA;
             } else {
-                nlog("Unkown tax case for xinvoice");
+                // nlog("Unkown tax case for xinvoice");
                 $tax_type = ZugferdDutyTaxFeeCategories::STANDARD_RATE;
             }
         }

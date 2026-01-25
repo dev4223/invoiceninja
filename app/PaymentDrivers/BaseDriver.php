@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -55,6 +56,13 @@ class BaseDriver extends AbstractPaymentDriver
 
     /* The Invitation */
     public $invitation;
+
+    /**
+     * Indicates if returning responses should be headless or classic redirect.
+     *
+     * @var bool
+     */
+    public bool $headless = false;
 
     /**
      * The Client
@@ -173,6 +181,14 @@ class BaseDriver extends AbstractPaymentDriver
         return $fields;
     }
 
+
+    public function setHeadless(bool $headless): self
+    {
+        $this->headless = $headless;
+
+        return $this;
+    }
+
     /**
      * Authorize a payment method.
      *
@@ -288,6 +304,7 @@ class BaseDriver extends AbstractPaymentDriver
         $payment->service()->applyNumber()->save();
 
         $invoices->each(function ($invoice) use ($payment) {
+            /** @var \App\Models\Invoice $invoice */
             event(new InvoiceWasPaid($invoice, $payment, $payment->company, Ninja::eventVars()));
         });
 
@@ -403,23 +420,20 @@ class BaseDriver extends AbstractPaymentDriver
         }
 
         $invoice = $this->payment_hash->fee_invoice;
-        
-        if(!$invoice)
+
+        if (!$invoice) {
             return;
+        }
 
         if (collect($invoice->line_items)->contains('unit_code', $this->payment_hash->hash)) {
             $invoice->service()->toggleFeesPaid($this->payment_hash->hash)->save();
             return;
         }
 
-        // $confirmed_fee_count = collect($invoice->line_items)
-        //                 ->where('type_id', '4')
-        //                 ->count();
-
         $unconfirmed_fee_count = collect($invoice->line_items)
                         ->where('type_id', '3')
                         ->count();
-                
+
         if ($unconfirmed_fee_count == 0) {
 
             nlog("apparently no fee, so injecting here!");
@@ -503,7 +517,7 @@ class BaseDriver extends AbstractPaymentDriver
         if ($this->invitation) {
             return ClientContact::withTrashed()->find($this->invitation->client_contact_id);
         } elseif (auth()->guard('contact')->user()) {
-            return auth()->guard('contact')->user();
+            return $this->client->contacts()->where('email', auth()->guard('contact')->user()->email)->first() ?? $this->client->contacts()->first();
         } else {
             return false;
         }
@@ -531,7 +545,7 @@ class BaseDriver extends AbstractPaymentDriver
 
         $cgt->save();
 
-        if ($this->client->gateway_tokens->count() > 1) {
+        if ($this->client->gateway_tokens->count() >= 1) {
             $this->client->gateway_tokens()->update(['is_default' => 0]);
         }
 
@@ -877,6 +891,7 @@ class BaseDriver extends AbstractPaymentDriver
 
         return ctrans('texts.gateway_payment_text', [
             'invoices' => $invoices_string,
+            'invoice' => $invoices_string,
             'amount' => $amount,
             'client' => $this->client->present()->name(),
         ]);
@@ -897,11 +912,11 @@ class BaseDriver extends AbstractPaymentDriver
     /**
      * Stub for checking authentication.
      *
-     * @return bool
+     * @return string
      */
-    public function auth(): bool
+    public function auth(): string
     {
-        return true;
+        return 'ok';
     }
 
     public function importCustomers()

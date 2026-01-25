@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -138,6 +139,7 @@ class QuoteInvitation extends BaseModel
     public function markViewed()
     {
         $this->viewed_date = Carbon::now();
+        $this->quote->last_viewed = Carbon::now();
         $this->save();
     }
 

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -11,7 +12,7 @@
 
 namespace App\Models;
 
-use Laravel\Scout\Searchable;
+use Elastic\ScoutDriverPlus\Searchable;
 use App\DataMapper\ClientSync;
 use App\Utils\Traits\AppSetup;
 use App\Utils\Traits\MakesHash;
@@ -37,12 +38,14 @@ use Illuminate\Contracts\Translation\HasLocalePreference;
  * @property int $id
  * @property int $company_id
  * @property int $user_id
+ * @property int|null $location_id
  * @property int|null $assigned_user_id
  * @property string|null $name
  * @property string|null $website
  * @property string|null $private_notes
  * @property string|null $public_notes
  * @property string|null $client_hash
+ * @property string|null $classification
  * @property string|null $logo
  * @property string|null $phone
  * @property string|null $routing_id
@@ -80,12 +83,17 @@ use Illuminate\Contracts\Translation\HasLocalePreference;
  * @property int|null $updated_at
  * @property int|null $deleted_at
  * @property string|null $id_number
+ * @property string|null $classification
  * @property-read mixed $hashed_id
  * @property-read \App\Models\User|null $assigned_user
  * @property-read \App\Models\User $user
  * @property-read \App\Models\Company $company
  * @property-read \App\Models\Country|null $country
+ * @property-read \App\Models\Country|null $shipping_country
+ * @property-read \App\Models\Industry|null $industry
+ * @property-read \App\Models\Size|null $size
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Activity> $activities
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Location> $locations
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\CompanyLedger> $company_ledger
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ClientContact> $contacts
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Credit> $credits
@@ -103,6 +111,7 @@ use Illuminate\Contracts\Translation\HasLocalePreference;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\SystemLog> $system_logs
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Task> $tasks
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\RecurringInvoice> $recurring_invoices
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Location> $locations
  * @method static \Illuminate\Database\Eloquent\Builder|Client exclude($columns)
  * @method static \Database\Factories\ClientFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder|Client filter(\App\Filters\QueryFilters $filters)
@@ -126,6 +135,16 @@ class Client extends BaseModel implements HasLocalePreference
     use ClientGroupSettingsSaver;
     use Excludable;
     use Searchable;
+
+    /**
+     * Get the index name for the model.
+     *
+     * @return string
+     */
+    public function searchableAs(): string
+    {
+        return 'clients';
+    }
 
     protected $presenter = ClientPresenter::class;
 
@@ -249,11 +268,11 @@ class Client extends BaseModel implements HasLocalePreference
         }
 
         return [
-            'id' => $this->id,
+            'id' => $this->company->db.":".$this->id,
             'name' => $name,
-            'is_deleted' => $this->is_deleted,
+            'is_deleted' => (bool)$this->is_deleted,
             'hashed_id' => $this->hashed_id,
-            'number' => $this->number,
+            'number' => (string)$this->number,
             'id_number' => $this->id_number,
             'vat_number' => $this->vat_number,
             'balance' => $this->balance,
@@ -282,13 +301,8 @@ class Client extends BaseModel implements HasLocalePreference
 
     public function getScoutKey()
     {
-        return $this->hashed_id;
+        return $this->company ? $this->company->db.":".$this->id : config('database.default').":".$this->id; //28-04-2025 handle removing clients when purged
     }
-
-    // public function getScoutKeyName()
-    // {
-    //     return 'hashed_id';
-    // }
 
     public function getEntityType()
     {
@@ -322,7 +336,7 @@ class Client extends BaseModel implements HasLocalePreference
 
     public function locations(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasMany(Location::class)->withTrashed();
+        return $this->hasMany(Location::class);
     }
 
     /**
@@ -436,12 +450,16 @@ class Client extends BaseModel implements HasLocalePreference
 
     public function language()
     {
+        return once(function () {
+            /** @var \Illuminate\Support\Collection<\App\Models\Language> */
+            $languages = app('languages');
 
-        /** @var \Illuminate\Support\Collection<\App\Models\Language> */
-        $languages = app('languages');
+            $language_id = $this->getSetting('language_id');
 
-        return $languages->first(function ($item) {
-            return $item->id == $this->getSetting('language_id');
+            return $languages->first(function ($item) use ($language_id) {
+                return $item->id == $language_id;
+            });
+
         });
     }
 
@@ -466,23 +484,36 @@ class Client extends BaseModel implements HasLocalePreference
 
     public function date_format()
     {
-        /** @var \Illuminate\Support\Collection<DateFormat> */
-        $date_formats = app('date_formats');
+        return once(function () {
 
-        return $date_formats->first(function ($item) {
-            return $item->id == $this->getSetting('date_format_id');
-        })->format;
+            /** @var \Illuminate\Support\Collection<DateFormat> */
+            $date_formats = app('date_formats');
+
+            $date_format = $this->getSetting('date_format_id');
+
+            return $date_formats->first(function ($item) use ($date_format) {
+                return $item->id == $date_format;
+            })->format;
+
+        });
     }
 
     public function currency()
     {
 
-        /** @var \Illuminate\Support\Collection<Currency> */
-        $currencies = app('currencies');
+        return once(function () {
+            
+            /** @var \Illuminate\Support\Collection<Currency> */
+            $currencies = app('currencies');
 
-        return $currencies->first(function ($item) {
-            return $item->id == $this->getSetting('currency_id');
-        });
+            $currency_id = $this->getSetting('currency_id');
+
+            return $currencies->first(function ($item) use ($currency_id) {
+                return $item->id == $currency_id;
+            });
+
+        }) ?? \App\Models\Currency::find($this->getSetting('currency_id'));
+
     }
 
     public function service(): ClientService
@@ -669,7 +700,7 @@ class Client extends BaseModel implements HasLocalePreference
 
 
     //todo refactor this  - it is only searching for existing tokens
-    public function getBankTransferGateway(): ?CompanyGateway
+    public function getBankTransferGateway($is_add_payment_method = false): ?CompanyGateway
     {
         $pms = $this->service()->getPaymentMethods(-1);
 
@@ -716,13 +747,15 @@ class Client extends BaseModel implements HasLocalePreference
             }
         }
 
-        if (in_array($this->currency()->code, ['CAD','USD']) && in_array(GatewayType::ACSS, array_column($pms, 'gateway_type_id'))) {
+        // if (in_array($this->currency()->code, ['USD']) && in_array(GatewayType::ACSS, array_column($pms, 'gateway_type_id'))) {
+            if (in_array($this->currency()->code, ['CAD','USD']) && in_array(GatewayType::ACSS, array_column($pms, 'gateway_type_id'))) {
             // if ($this->currency()->code == 'CAD' && in_array(GatewayType::ACSS, array_column($pms, 'gateway_type_id'))) {
             foreach ($pms as $pm) {
                 if ($pm['gateway_type_id'] == GatewayType::ACSS) {
                     $cg = CompanyGateway::query()->find($pm['company_gateway_id']);
 
-                    if ($cg && $cg->fees_and_limits->{GatewayType::ACSS}->is_enabled) {
+                    //supports a weird edge case where we need to allow rotessa to be used when adding a payment method.
+                    if ($cg && ($is_add_payment_method || $cg->gateway_key != '91be24c7b792230bced33e930ac61676') && $cg->fees_and_limits->{GatewayType::ACSS}->is_enabled) {
                         return $cg;
                     }
                 }
@@ -748,7 +781,6 @@ class Client extends BaseModel implements HasLocalePreference
 
     public function getBankTransferMethodType()
     {
-
 
         $pms = $this->service()->getPaymentMethods(-1);
 
@@ -805,6 +837,7 @@ class Client extends BaseModel implements HasLocalePreference
             foreach ($pms as $pm) {
                 if ($pm['gateway_type_id'] == GatewayType::ACSS) {
                     $cg = CompanyGateway::query()->find($pm['company_gateway_id']);
+                    // $cg = CompanyGateway::query()->where('id', $pm['company_gateway_id'])->where('gateway_key', '!=', '91be24c7b792230bced33e930ac61676')->first();
 
                     if ($cg && $cg->fees_and_limits->{GatewayType::ACSS}->is_enabled) {
                         return GatewayType::ACSS;
@@ -829,29 +862,6 @@ class Client extends BaseModel implements HasLocalePreference
 
         return null;
 
-
-
-
-        // if ($this->currency()->code == 'USD') {
-        //     return GatewayType::BANK_TRANSFER;
-        // }
-
-        // if ($this->currency()->code == 'EUR') {
-        //     return GatewayType::SEPA;
-        // }
-
-        // //Special handler for GoCardless
-        // if($this->currency()->code == 'CAD' && ($this->getBankTransferGateway()->gateway_key == 'b9886f9257f0c6ee7c302f1c74475f6c') ?? false) {
-        //     return GatewayType::DIRECT_DEBIT;
-        // }
-
-        // if (in_array($this->currency()->code, ['EUR', 'GBP','DKK','SEK','AUD','NZD','USD'])) {
-        //     return GatewayType::DIRECT_DEBIT;
-        // }
-
-        // if(in_array($this->currency()->code, ['CAD'])) {
-        //     return GatewayType::ACSS;
-        // }
     }
 
     public function getCurrencyCode(): string
@@ -930,7 +940,12 @@ class Client extends BaseModel implements HasLocalePreference
     {
         return $this->company->company_key.'/';
     }
-
+    
+    /**
+     * document_filepath
+     * @deprecated. not used.
+     * @return string
+     */
     public function document_filepath(): string
     {
         return $this->company->company_key.'/documents/';
@@ -1006,19 +1021,7 @@ class Client extends BaseModel implements HasLocalePreference
 
         return $offset;
     }
-
-    public function transaction_event()
-    {
-        $client = $this->fresh();
-
-        return [
-            'client_id' => $client->id,
-            'client_balance' => $client->balance ?: 0,
-            'client_paid_to_date' => $client->paid_to_date ?: 0,
-            'client_credit_balance' => $client->credit_balance ?: 0,
-        ];
-    }
-
+    
     public function translate_entity(): string
     {
         return ctrans('texts.client');
@@ -1040,31 +1043,33 @@ class Client extends BaseModel implements HasLocalePreference
     {
         return $this->getSetting('e_invoice_type') == 'PEPPOL' && $this->company->peppolSendingEnabled() && is_null($this->checkDeliveryNetwork());
     }
-    
+
     /**
      * checkDeliveryNetwork
      *
      * Checks whether the client country is supported
      * for sending over the PEPPOL network.
-     * 
+     *
      * @return string|null
      */
     public function checkDeliveryNetwork(): ?string
     {
 
-        if(!isset($this->country->iso_3166_2))
+        if (!isset($this->country->iso_3166_2)) {
             return "Client has no country set!";
-        
+        }
+
         $br = new \App\DataMapper\Tax\BaseRule();
 
         $government_countries = array_merge($br->peppol_business_countries, $br->peppol_government_countries);
 
-        if(in_array($this->country->iso_3166_2, $government_countries) && $this->classification == 'government'){
+        if (in_array($this->country->iso_3166_2, $government_countries) && $this->classification == 'government') {
             return null;
         }
 
-        if(in_array($this->country->iso_3166_2, $br->peppol_business_countries))
+        if (in_array($this->country->iso_3166_2, $br->peppol_business_countries)) {
             return null;
+        }
 
         return "Country {$this->country->full_name} ( {$this->country->iso_3166_2} ) is not supported by the PEPPOL network for e-delivery.";
 

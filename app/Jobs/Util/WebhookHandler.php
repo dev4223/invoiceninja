@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -28,11 +29,12 @@ class WebhookHandler implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-
     public $tries = 1; //number of retries
 
+    public $timeout = 30;
+    
     public $deleteWhenMissingModels = true;
-
+    
     /**
      * Create a new job instance.
      *
@@ -63,6 +65,11 @@ class WebhookHandler implements ShouldQueue
                 ->each(function ($subscription) {
                     (new WebhookSingle($subscription->id, $this->entity, $this->company->db, $this->includes))->handle();
                 });
+    }
+
+    public function viaQueue()
+    {
+        return \App\Utils\Ninja::isHosted() ? 'webhooks' : 'default';
     }
 
     public function failed($exception = null)

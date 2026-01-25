@@ -49,7 +49,7 @@ class PdfSlot extends Component
     private $entity_type;
 
     private $preference_product_notes_for_html_view;
-    
+
     public $show_cost = true;
 
     public $show_quantity = true;
@@ -145,7 +145,7 @@ class PdfSlot extends Component
         $this->settings = $this->entity()->client ? $this->entity()->client->getMergedSettings() : $this->entity()->company->settings;
         $this->html_entity_option = $this->entity()->client ? $this->entity()->client->getSetting('show_pdfhtml_on_mobile') : $this->entity()->company->getSetting('show_pdfhtml_on_mobile');
         $this->preference_product_notes_for_html_view = $this->entity()->client ? $this->entity()->client->getSetting('preference_product_notes_for_html_view') : $this->entity()->company->getSetting('preference_product_notes_for_html_view');
-        
+
         $this->show_cost = in_array('$product.unit_cost', $this->settings->pdf_variables->product_columns);
         $this->show_line_total = in_array('$product.line_total', $this->settings->pdf_variables->product_columns);
         $this->show_quantity = in_array('$product.quantity', $this->settings->pdf_variables->product_columns);
@@ -172,7 +172,7 @@ class PdfSlot extends Component
             'products' => $this->getProducts(),
             'services' => $this->getServices(),
             'amount' => Number::formatMoney($this->entity()->amount, $this->entity()->client ?: $this->entity()->vendor),
-            'balance' => Number::formatMoney($this->entity()->balance, $this->entity()->client ?: $this->entity()->vendor),
+            'balance' => Number::formatMoney($this->entity()->partial > 0 ? $this->entity()->partial : $this->entity()->balance, $this->entity()->client ?: $this->entity()->vendor),
             'discount' => $this->entity_calc->getTotalDiscount() > 0 ? Number::formatMoney($this->entity_calc->getTotalDiscount(), $this->entity()->client ?: $this->entity()->vendor) : false,
             'taxes' => $this->entity_calc->getTotalTaxes() > 0 ? Number::formatMoney($this->entity_calc->getTotalTaxes(), $this->entity()->client ?: $this->entity()->vendor) : false,
             'company_details' => $this->getCompanyDetails(),
@@ -200,7 +200,7 @@ class PdfSlot extends Component
 
         $company_address = "";
 
-        foreach ($this->settings->pdf_variables->company_address as $variable) {
+        foreach ($this->settings->pdf_variables?->company_address as $variable) {
             $company_address .= "<p>{$variable}</p>";
         }
 

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -11,30 +12,33 @@
 
 namespace Tests\Feature;
 
-use App\Jobs\Util\UpdateExchangeRates;
-use App\Libraries\Currency\Conversion\CurrencyApi;
-use App\Models\Currency;
-use App\Utils\Traits\MakesHash;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Tests\MockAccountData;
 use Tests\TestCase;
+use App\Models\Currency;
+use Tests\MockAccountData;
+use App\Utils\Traits\MakesHash;
+use App\Jobs\Util\UpdateExchangeRates;
+use Illuminate\Support\Facades\Artisan;
+use App\Libraries\Currency\Conversion\CurrencyApi;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 
 /**
- * 
+ *
  *  App\Jobs\Util\UpdateExchangeRates
  */
 class UpdateExchangeRatesTest extends TestCase
 {
     use MakesHash;
-    use DatabaseTransactions;
-    use MockAccountData;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        if(empty(config('ninja.currency_converter_api_key'))) {
+        if (empty(config('ninja.currency_converter_api_key'))) {
             $this->markTestSkipped("no currency key set");
+        }
+
+        if (Currency::count() == 0) {
+            Artisan::call('db:seed', ['--force' => true]);
         }
 
     }
@@ -48,12 +52,11 @@ class UpdateExchangeRatesTest extends TestCase
 
         $currency_api = json_decode($response->getBody());
 
-        UpdateExchangeRates::dispatchSync();
+        (new UpdateExchangeRates())->handle();
 
-        $gbp_currency = app('currencies')->first(function ($item) {
-            return $item->id == 2;
-        });
+        $gbp_currency = \App\Models\Currency::find(2);
 
+        $this->assertNotNull($gbp_currency);
         $this->assertEquals($currency_api->rates->GBP, $gbp_currency->exchange_rate);
 
     }

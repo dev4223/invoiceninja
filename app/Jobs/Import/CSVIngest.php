@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -51,6 +52,8 @@ class CSVIngest implements ShouldQueue
     public array $request;
 
     public $tries = 1;
+
+    public $timeout = 10800;
 
     public function __construct(array $request, Company $company)
     {

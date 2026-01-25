@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -14,6 +15,7 @@ namespace App\Transformers;
 use stdClass;
 use App\Models\Task;
 use App\Models\User;
+use App\Utils\Ninja;
 use App\Models\Quote;
 use App\Models\Client;
 use App\Models\Credit;
@@ -156,7 +158,6 @@ class CompanyTransformer extends EntityTransformer
             'matomo_id' => (string) $company->matomo_id ?: '',
             'enabled_item_tax_rates' => (int) $company->enabled_item_tax_rates,
             'client_can_register' => (bool) $company->client_can_register,
-            // 'is_large' => (bool) $company->is_large,
             'is_large' => (bool) $this->isLarge($company),
             'is_disabled' => (bool) $company->is_disabled,
             'enable_shop_api' => (bool) $company->enable_shop_api,
@@ -305,7 +306,7 @@ class CompanyTransformer extends EntityTransformer
 
         return $this->includeCollection($company->locations, $transformer, Location::class);
     }
-    
+
 
     public function includeBankTransactionRules(Company $company)
     {

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -119,6 +120,7 @@ class InvoiceTransformer extends BaseTransformer
             ];
 
         }
+
         return $transformed;
     }
 

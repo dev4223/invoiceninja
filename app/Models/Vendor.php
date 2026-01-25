@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -11,7 +12,7 @@
 
 namespace App\Models;
 
-use Laravel\Scout\Searchable;
+use Elastic\ScoutDriverPlus\Searchable;
 use App\Utils\Traits\AppSetup;
 use App\DataMapper\CompanySettings;
 use Illuminate\Support\Facades\App;
@@ -54,12 +55,15 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string|null $custom_value4
  * @property string|null $vendor_hash
  * @property string|null $public_notes
+ * @property string|null $classification
  * @property string|null $id_number
  * @property int|null $language_id
  * @property int|null $last_login
  * @property bool $is_tax_exempt
+ * @property string|null $classification
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Activity> $activities
  * @property-read int|null $activities_count
+ * @property-read \App\Models\Language|null $language
  * @property-read \App\Models\User|null $assigned_user
  * @property-read \App\Models\Company $company
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\VendorContact> $contacts
@@ -71,6 +75,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\VendorContact> $primary_contact
  * @property-read int|null $primary_contact_count
  * @property-read \App\Models\User $user
+ * @property-read \App\Models\Language|null $language
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Location> $locations
+ * @property-read int|null $locations_count
  * @method static \Illuminate\Database\Eloquent\Builder|BaseModel exclude($columns)
  * @method static \Database\Factories\VendorFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder|Vendor filter(\App\Filters\QueryFilters $filters)
@@ -85,6 +92,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\VendorContact> $contacts
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Document> $documents
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\VendorContact> $primary_contact
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Location> $locations
  * @mixin \Eloquent
  */
 class Vendor extends BaseModel
@@ -95,7 +103,17 @@ class Vendor extends BaseModel
     use PresentableTrait;
     use AppSetup;
     use Searchable;
-    
+
+    /**
+     * Get the index name for the model.
+     *
+     * @return string
+     */
+    public function searchableAs(): string
+    {
+        return 'vendors';
+    }
+
     protected $fillable = [
         'name',
         'assigned_user_id',
@@ -154,11 +172,11 @@ class Vendor extends BaseModel
         }
 
         return [
-            'id' => $this->id,
+            'id' => $this->company->db.":".$this->id,
             'name' => $name,
-            'is_deleted' => $this->is_deleted,
+            'is_deleted' => (bool)$this->is_deleted,
             'hashed_id' => $this->hashed_id,
-            'number' => $this->number,
+            'number' => (string)$this->number,
             'id_number' => $this->id_number,
             'vat_number' => $this->vat_number,
             'phone' => $this->phone,
@@ -180,7 +198,7 @@ class Vendor extends BaseModel
 
     public function getScoutKey()
     {
-        return $this->hashed_id;
+        return $this->company->db.":".$this->id;
     }
 
     protected $presenter = VendorPresenter::class;
@@ -231,16 +249,17 @@ class Vendor extends BaseModel
 
     public function currency()
     {
+        return once(function () {
+            /** @var \Illuminate\Support\Collection<\App\Models\Currency> */
+            $currencies = app('currencies');
 
-        /** @var \Illuminate\Support\Collection<\App\Models\Currency> */
-        $currencies = app('currencies');
+            if (!$this->currency_id) {
+                return $this->company->currency();
+            }
 
-        if (!$this->currency_id) {
-            return $this->company->currency();
-        }
-
-        return $currencies->first(function ($item) {
-            return $item->id == $this->currency_id;
+            return $currencies->first(function ($item) {
+                    return $item->id == $this->currency_id;
+                });
         });
     }
 

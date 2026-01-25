@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -68,6 +69,10 @@ class ZugferdTest extends TestCase
 
     private string $zug_16931 = 'Services/EDocument/Standards/Validation/Zugferd/zugferd_16931.xslt';
 
+    private string $zf_extended_wl = 'Services/EDocument/Standards/Validation/Zugferd/FACTUR-X_EXTENDED.xslt';
+
+    private string $extended_profile = 'XInvoice-Extended';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -76,7 +81,7 @@ class ZugferdTest extends TestCase
         if (config('ninja.testvars.travis')) {
             $this->markTestSkipped("do not run in CI");
         }
-                
+
         $this->withoutMiddleware(
             ThrottleRequests::class
         );
@@ -87,16 +92,16 @@ class ZugferdTest extends TestCase
     }
 
 
-     private function setupTestData(array $params = []): array
+    private function setupTestData(array $params = []): array
     {
-        
+
         $settings = CompanySettings::defaults();
         $settings->vat_number = $params['company_vat'] ?? 'DE123456789';
         $settings->id_number = $params['company_id_number'] ?? '';
         $settings->classification = $params['company_classification'] ?? 'business';
         $settings->country_id = Country::where('iso_3166_2', 'DE')->first()->id;
         $settings->email = $this->faker->safeEmail();
-        $settings->e_invoice_type = 'XInvoice_3_0';
+        $settings->e_invoice_type = $params['e_invoice_type'] ?? 'XInvoice_3_0';
         $settings->currency_id = '3';
         $settings->name = 'Test Company';
         $settings->address1 = 'Line 1 of address of the seller';
@@ -159,7 +164,7 @@ class ZugferdTest extends TestCase
 
         $contact = ClientContact::factory()->create([
             'client_id' => $client->id,
-            'company_id' =>$client->company_id,
+            'company_id' => $client->company_id,
             'user_id' => $client->user_id,
             'first_name' => $this->faker->firstName(),
             'last_name' => $this->faker->lastName(),
@@ -182,13 +187,12 @@ class ZugferdTest extends TestCase
         ]);
 
         $items = $invoice->line_items;
-        foreach($items as &$item)
-        {
-          $item->tax_name2 = '';
-          $item->tax_rate2 = 0;
-          $item->tax_name3 = '';
-          $item->tax_rate3 = 0;
-          $item->uses_inclusive_taxes = false;
+        foreach ($items as &$item) {
+            $item->tax_name2 = '';
+            $item->tax_rate2 = 0;
+            $item->tax_name3 = '';
+            $item->tax_rate3 = 0;
+            $item->uses_inclusive_taxes = false;
         }
         unset($item);
 
@@ -198,9 +202,198 @@ class ZugferdTest extends TestCase
         return compact('company', 'client', 'invoice');
     }
 
+
+    public function testDeTodeTaxExempt()
+    {
+
+        $scenario = [
+            'company_vat' => 'DE923356489',
+            'company_country' => 'DE',
+            'client_country' => 'DE',
+            'client_vat' => 'DE923356488',
+            'classification' => 'business',
+            'has_valid_vat' => true,
+            'over_threshold' => true,
+            'legal_entity_id' => 290868,
+        ];
+
+        $data = $this->setupTestData($scenario);
+
+        $invoice = $data['invoice'];
+
+        $repo = new InvoiceRepository();
+
+        foreach ($this->inclusive_scenarios as $scenario) {
+
+            $invoice_data = json_decode($scenario, true);
+
+            $line_items = $invoice_data['line_items'];
+
+            foreach ($line_items as &$item) {
+                $item['tax_rate1'] = 0;
+                $item['tax_name1'] = 'VAT';
+                $item['tax_id'] = '5';
+            }
+            unset($item);
+
+            $invoice_data['line_items'] = array_values($line_items);
+
+            $invoice_data['uses_inclusive_taxes'] = false;
+
+            unset($invoice_data['hashed_id']);
+            unset($invoice_data['status']);
+            $invoice = $repo->save($invoice_data, $invoice);
+            $invoice = $invoice->calc()->getInvoice();
+
+            $xml = $invoice->service()->getEInvoice();
+
+            $validator = new \App\Services\EDocument\Standards\Validation\XsltDocumentValidator($xml);
+            $validator->setStyleSheets([$this->zug_16931]);
+            $validator->setXsd('/Services/EDocument/Standards/Validation/Zugferd/Schema/XSD/CrossIndustryInvoice_100pD22B.xsd');
+            $validator->validate();
+
+            if (count($validator->getErrors()) > 0) {
+
+                nlog($invoice->withoutRelations()->toArray());
+                nlog($xml);
+                nlog($validator->getErrors());
+            }
+
+            $this->assertCount(0, $validator->getErrors());
+
+        }
+    }
+
+
+    public function testDeTodeTaxExemptExtendedProfile()
+    {
+
+        $scenario = [
+            'company_vat' => 'DE923356489',
+            'company_country' => 'DE',
+            'client_country' => 'DE',
+            'client_vat' => 'DE923356488',
+            'classification' => 'business',
+            'has_valid_vat' => true,
+            'over_threshold' => true,
+            'legal_entity_id' => 290868,
+            'e_invoice_type' => $this->extended_profile,
+        ];
+
+        $data = $this->setupTestData($scenario);
+
+        $invoice = $data['invoice'];
+
+        $repo = new InvoiceRepository();
+
+        foreach ($this->inclusive_scenarios as $scenario) {
+
+            $invoice_data = json_decode($scenario, true);
+
+            $line_items = $invoice_data['line_items'];
+
+            foreach ($line_items as &$item) {
+                $item['tax_rate1'] = 0;
+                $item['tax_name1'] = 'VAT';
+                $item['tax_id'] = '5';
+            }
+            unset($item);
+
+            $invoice_data['line_items'] = array_values($line_items);
+
+            $invoice_data['uses_inclusive_taxes'] = false;
+
+            unset($invoice_data['hashed_id']);
+            unset($invoice_data['status']);
+            $invoice = $repo->save($invoice_data, $invoice);
+            $invoice = $invoice->calc()->getInvoice();
+
+            $xml = $invoice->service()->getEInvoice();
+
+            $validator = new \App\Services\EDocument\Standards\Validation\XsltDocumentValidator($xml);
+            $validator->setStyleSheets([$this->zf_extended_wl]);
+            $validator->setXsd('/Services/EDocument/Standards/Validation/Zugferd/Schema/XSD/CrossIndustryInvoice_100pD22B.xsd');
+            $validator->validate();
+
+            if (count($validator->getErrors()) > 0) {
+
+                nlog($invoice->withoutRelations()->toArray());
+                nlog($xml);
+                nlog($validator->getErrors());
+            }
+
+            $this->assertCount(0, $validator->getErrors());
+
+        }
+    }
+
+    public function testDeToNlReverseTax()
+    {
+
+        $scenario = [
+            'company_vat' => 'DE923356489',
+            'company_country' => 'DE',
+            'client_country' => 'NL',
+            'client_vat' => 'NL808436332B01',
+            'classification' => 'business',
+            'has_valid_vat' => true,
+            'over_threshold' => true,
+            'legal_entity_id' => 290868,
+        ];
+
+        $data = $this->setupTestData($scenario);
+
+        $invoice = $data['invoice'];
+
+        $repo = new InvoiceRepository();
+
+        foreach ($this->inclusive_scenarios as $scenario) {
+
+            $invoice_data = json_decode($scenario, true);
+
+            $line_items = $invoice_data['line_items'];
+
+            foreach ($line_items as &$item) {
+                $item['tax_rate1'] = 0;
+                $item['tax_name1'] = '';
+                $item['tax_id'] = '9';
+            }
+            unset($item);
+
+            $invoice_data['line_items'] = array_values($line_items);
+
+            $invoice_data['uses_inclusive_taxes'] = false;
+
+            unset($invoice_data['hashed_id']);
+            unset($invoice_data['status']);
+
+            $invoice = $repo->save($invoice_data, $invoice);
+            $invoice = $invoice->calc()->getInvoice();
+
+            $xml = $invoice->service()->getEInvoice();
+
+            $validator = new \App\Services\EDocument\Standards\Validation\XsltDocumentValidator($xml);
+            $validator->setStyleSheets([$this->zug_16931]);
+            $validator->setXsd('/Services/EDocument/Standards/Validation/Zugferd/Schema/XSD/CrossIndustryInvoice_100pD22B.xsd');
+            $validator->validate();
+
+            if (count($validator->getErrors()) > 0) {
+
+                nlog($invoice->withoutRelations()->toArray());
+                nlog($xml);
+                nlog($validator->getErrors());
+            }
+
+            $this->assertCount(0, $validator->getErrors());
+
+
+        }
+    }
+
+
     public function testInclusiveScenarios()
     {
-        
+
         $scenario = [
             'company_vat' => 'DE923356489',
             'company_country' => 'DE',
@@ -217,12 +410,14 @@ class ZugferdTest extends TestCase
         $invoice = $data['invoice'];
         $repo = new InvoiceRepository();
 
-        foreach($this->inclusive_scenarios as $scenario){
+        foreach ($this->inclusive_scenarios as $scenario) {
 
             $invoice_data = json_decode($scenario, true);
+            unset($invoice_data['hashed_id']);
+            unset($invoice_data['status']);
             $invoice = $repo->save($invoice_data, $invoice);
             $invoice = $invoice->calc()->getInvoice();
-            
+
             $xml = $invoice->service()->getEInvoice();
 
             $validator = new \App\Services\EDocument\Standards\Validation\XsltDocumentValidator($xml);
@@ -231,8 +426,8 @@ class ZugferdTest extends TestCase
             $validator->validate();
 
             if (count($validator->getErrors()) > 0) {
-            
-                nlog($invoice->toArray());
+
+                nlog($invoice->withoutRelations()->toArray());
                 nlog($xml);
                 nlog($validator->getErrors());
             }
@@ -246,7 +441,7 @@ class ZugferdTest extends TestCase
 
     public function testExclusiveScenarios()
     {
-        
+
         $scenario = [
             'company_vat' => 'DE923356489',
             'company_country' => 'DE',
@@ -263,15 +458,17 @@ class ZugferdTest extends TestCase
         $invoice = $data['invoice'];
         $repo = new InvoiceRepository();
 
-        foreach($this->inclusive_scenarios as $scenario){
+        foreach ($this->inclusive_scenarios as $scenario) {
 
             $invoice_data = json_decode($scenario, true);
 
             $invoice_data['uses_inclusive_taxes'] = false;
 
+            unset($invoice_data['hashed_id']);
+            unset($invoice_data['status']);
             $invoice = $repo->save($invoice_data, $invoice);
             $invoice = $invoice->calc()->getInvoice();
-            
+
             $xml = $invoice->service()->getEInvoice();
 
             $validator = new \App\Services\EDocument\Standards\Validation\XsltDocumentValidator($xml);
@@ -280,7 +477,7 @@ class ZugferdTest extends TestCase
             $validator->validate();
 
             if (count($validator->getErrors()) > 0) {
-            
+
                 // nlog($invoice->toArray());
                 // nlog($xml);
                 nlog($validator->getErrors());
@@ -296,7 +493,7 @@ class ZugferdTest extends TestCase
     public function testZugFerdValidation()
     {
 
-        
+
 
         // $zug_16931 = 'Services/EDocument/Standards/Validation/Zugferd/FACTUR-X_MINIMUM.xslt';
 
@@ -322,7 +519,7 @@ class ZugferdTest extends TestCase
         $validator->setStyleSheets([$this->zug_16931]);
         $validator->setXsd('/Services/EDocument/Standards/Validation/Zugferd/Schema/XSD/CrossIndustryInvoice_100pD22B.xsd');
         $validator->validate();
-        
+
         if (count($validator->getErrors()) > 0) {
             nlog($xml);
             nlog($validator->getErrors());
@@ -363,7 +560,7 @@ class ZugferdTest extends TestCase
         $validator->setStyleSheets([$this->zug_16931]);
         $validator->setXsd('/Services/EDocument/Standards/Validation/Zugferd/Schema/XSD/CrossIndustryInvoice_100pD22B.xsd');
         $validator->validate();
-        
+
         if (count($validator->getErrors()) > 0) {
             nlog($xml);
             nlog($validator->getErrors());
@@ -397,7 +594,7 @@ class ZugferdTest extends TestCase
         $invoice = $data['invoice'];
         $invoice->uses_inclusive_taxes = true;
         $invoice = $invoice->calc()->getInvoice();
-        $invoice->discount=20;
+        $invoice->discount = 20;
         $invoice->is_amount_discount = true;
 
         $xml = $invoice->service()->getEInvoice();
@@ -406,7 +603,7 @@ class ZugferdTest extends TestCase
         $validator->setStyleSheets([$this->zug_16931]);
         $validator->setXsd('/Services/EDocument/Standards/Validation/Zugferd/Schema/XSD/CrossIndustryInvoice_100pD22B.xsd');
         $validator->validate();
-        
+
         if (count($validator->getErrors()) > 0) {
             nlog($xml);
             nlog($validator->getErrors());
@@ -440,16 +637,16 @@ class ZugferdTest extends TestCase
         $invoice = $data['invoice'];
         $invoice->uses_inclusive_taxes = true;
         $invoice = $invoice->calc()->getInvoice();
-        $invoice->discount=20;
+        $invoice->discount = 20;
         $invoice->is_amount_discount = false;
-        
+
         $xml = $invoice->service()->getEInvoice();
 
         $validator = new \App\Services\EDocument\Standards\Validation\XsltDocumentValidator($xml);
         $validator->setStyleSheets([$this->zug_16931]);
         $validator->setXsd('/Services/EDocument/Standards/Validation/Zugferd/Schema/XSD/CrossIndustryInvoice_100pD22B.xsd');
         $validator->validate();
-        
+
         if (count($validator->getErrors()) > 0) {
             nlog($xml);
             nlog($validator->getErrors());
@@ -463,6 +660,7 @@ class ZugferdTest extends TestCase
     {
 
         $zug_16931 = 'Services/EDocument/Standards/Validation/Zugferd/zugferd_16931.xslt';
+        // $xr_cii = 'Services/EDocument/Standards/Validation/Zugferd/xrechnung_cii.xslt';
 
         // $zug_16931 = 'Services/EDocument/Standards/Validation/Zugferd/FACTUR-X_MINIMUM.xslt';
 
@@ -482,13 +680,13 @@ class ZugferdTest extends TestCase
         $invoice = $data['invoice'];
         $invoice->uses_inclusive_taxes = true;
         $invoice = $invoice->calc()->getInvoice();
-        $invoice->discount=20;
+        $invoice->discount = 20;
         $invoice->is_amount_discount = false;
-        
+
         $items = $invoice->line_items;
 
-        foreach($items as &$item){
-            $item->discount=10;
+        foreach ($items as &$item) {
+            $item->discount = 10;
             $item->is_amount_discount = false;
         }
         unset($item);
@@ -499,9 +697,11 @@ class ZugferdTest extends TestCase
 
         $validator = new \App\Services\EDocument\Standards\Validation\XsltDocumentValidator($xml);
         $validator->setStyleSheets([$this->zug_16931]);
+
+
         $validator->setXsd('/Services/EDocument/Standards/Validation/Zugferd/Schema/XSD/CrossIndustryInvoice_100pD22B.xsd');
         $validator->validate();
-        
+
         if (count($validator->getErrors()) > 0) {
             nlog($xml);
             nlog($validator->getErrors());
@@ -533,26 +733,26 @@ class ZugferdTest extends TestCase
         $invoice = $data['invoice'];
         $invoice->uses_inclusive_taxes = true;
         $invoice = $invoice->calc()->getInvoice();
-        $invoice->discount=20;
+        $invoice->discount = 20;
         $invoice->is_amount_discount = true;
-        
+
         $items = $invoice->line_items;
 
-        foreach($items as &$item){
-            $item->discount=5;
+        foreach ($items as &$item) {
+            $item->discount = 5;
             $item->is_amount_discount = true;
         }
         unset($item);
 
         $invoice->line_items = $items;
-        
+
         $xml = $invoice->service()->getEInvoice();
 
         $validator = new \App\Services\EDocument\Standards\Validation\XsltDocumentValidator($xml);
         $validator->setStyleSheets([$this->zug_16931]);
         $validator->setXsd('/Services/EDocument/Standards/Validation/Zugferd/Schema/XSD/CrossIndustryInvoice_100pD22B.xsd');
         $validator->validate();
-        
+
         if (count($validator->getErrors()) > 0) {
             nlog($xml);
             nlog($validator->getErrors());
@@ -562,5 +762,405 @@ class ZugferdTest extends TestCase
 
     }
 
-    
+    // ============================================================================
+    // EXTENDED PROFILE TEST METHODS - Duplicates using extended profile and XSLT
+    // ============================================================================
+
+    public function testDeToNlReverseTaxExtendedProfile()
+    {
+
+        $scenario = [
+            'company_vat' => 'DE923356489',
+            'company_country' => 'DE',
+            'client_country' => 'NL',
+            'client_vat' => 'NL808436332B01',
+            'classification' => 'business',
+            'has_valid_vat' => true,
+            'over_threshold' => true,
+            'legal_entity_id' => 290868,
+            'e_invoice_type' => $this->extended_profile,
+        ];
+
+        $data = $this->setupTestData($scenario);
+
+        $invoice = $data['invoice'];
+
+        $repo = new InvoiceRepository();
+
+        foreach ($this->inclusive_scenarios as $scenario) {
+
+            $invoice_data = json_decode($scenario, true);
+
+            $line_items = $invoice_data['line_items'];
+
+            foreach ($line_items as &$item) {
+                $item['tax_rate1'] = 0;
+                $item['tax_name1'] = '';
+                $item['tax_id'] = '9';
+            }
+            unset($item);
+
+            $invoice_data['line_items'] = array_values($line_items);
+
+            $invoice_data['uses_inclusive_taxes'] = false;
+
+            unset($invoice_data['hashed_id']);
+            unset($invoice_data['status']);
+            $invoice = $repo->save($invoice_data, $invoice);
+            $invoice = $invoice->calc()->getInvoice();
+
+            $xml = $invoice->service()->getEInvoice();
+
+            $validator = new \App\Services\EDocument\Standards\Validation\XsltDocumentValidator($xml);
+            $validator->setStyleSheets([$this->zf_extended_wl]);
+            $validator->setXsd('/Services/EDocument/Standards/Validation/Zugferd/Schema/XSD/CrossIndustryInvoice_100pD22B.xsd');
+            $validator->validate();
+
+            if (count($validator->getErrors()) > 0) {
+
+                nlog($invoice->withoutRelations()->toArray());
+                nlog($xml);
+                nlog($validator->getErrors());
+            }
+
+            $this->assertCount(0, $validator->getErrors());
+
+        }
+    }
+
+    public function testInclusiveScenariosExtendedProfile()
+    {
+        $scenario = [
+            'company_vat' => 'DE923356489',
+            'company_country' => 'DE',
+            'client_country' => 'DE',
+            'client_vat' => 'DE923356488',
+            'classification' => 'business',
+            'has_valid_vat' => true,
+            'over_threshold' => true,
+            'legal_entity_id' => 290868,
+            'e_invoice_type' => $this->extended_profile,
+        ];
+
+        $data = $this->setupTestData($scenario);
+
+        $invoice = $data['invoice'];
+
+        $repo = new InvoiceRepository();
+
+        foreach ($this->inclusive_scenarios as $scenario) {
+
+            $invoice_data = json_decode($scenario, true);
+
+            unset($invoice_data['hashed_id']);
+            unset($invoice_data['status']);
+            $invoice = $repo->save($invoice_data, $invoice);
+            $invoice = $invoice->calc()->getInvoice();
+
+            $xml = $invoice->service()->getEInvoice();
+
+            $validator = new \App\Services\EDocument\Standards\Validation\XsltDocumentValidator($xml);
+            $validator->setStyleSheets([$this->zf_extended_wl]);
+            $validator->setXsd('/Services/EDocument/Standards/Validation/Zugferd/Schema/XSD/CrossIndustryInvoice_100pD22B.xsd');
+            $validator->validate();
+
+            if (count($validator->getErrors()) > 0) {
+
+                nlog($invoice->withoutRelations()->toArray());
+                nlog($xml);
+                nlog($validator->getErrors());
+            }
+
+            $this->assertCount(0, $validator->getErrors());
+
+        }
+    }
+
+    public function testExclusiveScenariosExtendedProfile()
+    {
+        $scenario = [
+            'company_vat' => 'DE923356489',
+            'company_country' => 'DE',
+            'client_country' => 'DE',
+            'client_vat' => 'DE923356488',
+            'classification' => 'business',
+            'has_valid_vat' => true,
+            'over_threshold' => true,
+            'legal_entity_id' => 290868,
+            'e_invoice_type' => $this->extended_profile,
+        ];
+
+        $data = $this->setupTestData($scenario);
+
+        $invoice = $data['invoice'];
+
+        $repo = new InvoiceRepository();
+
+        foreach ($this->inclusive_scenarios as $scenario) {
+
+            $invoice_data = json_decode($scenario, true);
+
+            $invoice_data['uses_inclusive_taxes'] = false;
+
+            unset($invoice_data['hashed_id']);
+            unset($invoice_data['status']);
+            $invoice = $repo->save($invoice_data, $invoice);
+            $invoice = $invoice->calc()->getInvoice();
+
+            $xml = $invoice->service()->getEInvoice();
+
+            $validator = new \App\Services\EDocument\Standards\Validation\XsltDocumentValidator($xml);
+            $validator->setStyleSheets([$this->zf_extended_wl]);
+            $validator->setXsd('/Services/EDocument/Standards/Validation/Zugferd/Schema/XSD/CrossIndustryInvoice_100pD22B.xsd');
+            $validator->validate();
+
+            if (count($validator->getErrors()) > 0) {
+
+                nlog($invoice->withoutRelations()->toArray());
+                nlog($xml);
+                nlog($validator->getErrors());
+            }
+
+            $this->assertCount(0, $validator->getErrors());
+
+        }
+    }
+
+    public function testZugFerdValidationExtendedProfile()
+    {
+        $scenario = [
+            'company_vat' => 'DE923356489',
+            'company_country' => 'DE',
+            'client_country' => 'DE',
+            'client_vat' => 'DE923356488',
+            'classification' => 'business',
+            'has_valid_vat' => true,
+            'over_threshold' => true,
+            'legal_entity_id' => 290868,
+            'e_invoice_type' => $this->extended_profile,
+        ];
+
+        $data = $this->setupTestData($scenario);
+
+        $invoice = $data['invoice'];
+
+        $xml = $invoice->service()->getEInvoice();
+
+        $validator = new \App\Services\EDocument\Standards\Validation\XsltDocumentValidator($xml);
+        $validator->setStyleSheets([$this->zf_extended_wl]);
+        $validator->setXsd('/Services/EDocument/Standards/Validation/Zugferd/Schema/XSD/CrossIndustryInvoice_100pD22B.xsd');
+        $validator->validate();
+
+        if (count($validator->getErrors()) > 0) {
+            nlog($xml);
+            nlog($validator->getErrors());
+        }
+
+        $this->assertCount(0, $validator->getErrors());
+    }
+
+    public function testZugFerdValidationWithInclusiveTaxesExtendedProfile()
+    {
+        $scenario = [
+            'company_vat' => 'DE923356489',
+            'company_country' => 'DE',
+            'client_country' => 'DE',
+            'client_vat' => 'DE923356488',
+            'classification' => 'business',
+            'has_valid_vat' => true,
+            'over_threshold' => true,
+            'legal_entity_id' => 290868,
+            'e_invoice_type' => $this->extended_profile,
+        ];
+
+        $data = $this->setupTestData($scenario);
+
+        $invoice = $data['invoice'];
+        $invoice->uses_inclusive_taxes = true;
+        $invoice = $invoice->calc()->getInvoice();
+
+        $xml = $invoice->service()->getEInvoice();
+
+        $validator = new \App\Services\EDocument\Standards\Validation\XsltDocumentValidator($xml);
+        $validator->setStyleSheets([$this->zf_extended_wl]);
+        $validator->setXsd('/Services/EDocument/Standards/Validation/Zugferd/Schema/XSD/CrossIndustryInvoice_100pD22B.xsd');
+        $validator->validate();
+
+        if (count($validator->getErrors()) > 0) {
+            nlog($xml);
+            nlog($validator->getErrors());
+        }
+
+        $this->assertCount(0, $validator->getErrors());
+    }
+
+    public function testZugFerdValidationWithInclusiveTaxesAndTotalAmountDiscountExtendedProfile()
+    {
+        $scenario = [
+            'company_vat' => 'DE923356489',
+            'company_country' => 'DE',
+            'client_country' => 'DE',
+            'client_vat' => 'DE923356488',
+            'classification' => 'business',
+            'has_valid_vat' => true,
+            'over_threshold' => true,
+            'legal_entity_id' => 290868,
+            'e_invoice_type' => $this->extended_profile,
+        ];
+
+        $data = $this->setupTestData($scenario);
+
+        $invoice = $data['invoice'];
+        $invoice->uses_inclusive_taxes = true;
+        $invoice = $invoice->calc()->getInvoice();
+        $invoice->discount = 20;
+        $invoice->is_amount_discount = true;
+
+        $xml = $invoice->service()->getEInvoice();
+
+        $validator = new \App\Services\EDocument\Standards\Validation\XsltDocumentValidator($xml);
+        $validator->setStyleSheets([$this->zf_extended_wl]);
+        $validator->setXsd('/Services/EDocument/Standards/Validation/Zugferd/Schema/XSD/CrossIndustryInvoice_100pD22B.xsd');
+        $validator->validate();
+
+        if (count($validator->getErrors()) > 0) {
+            nlog($xml);
+            nlog($validator->getErrors());
+        }
+
+        $this->assertCount(0, $validator->getErrors());
+    }
+
+    public function testZugFerdValidationWithInclusiveTaxesAndTotalPercentDiscountExtendedProfile()
+    {
+        $scenario = [
+            'company_vat' => 'DE923356489',
+            'company_country' => 'DE',
+            'client_country' => 'DE',
+            'client_vat' => 'DE923356488',
+            'classification' => 'business',
+            'has_valid_vat' => true,
+            'over_threshold' => true,
+            'legal_entity_id' => 290868,
+            'e_invoice_type' => $this->extended_profile,
+        ];
+
+        $data = $this->setupTestData($scenario);
+
+        $invoice = $data['invoice'];
+        $invoice->uses_inclusive_taxes = true;
+        $invoice = $invoice->calc()->getInvoice();
+        $invoice->discount = 20;
+        $invoice->is_amount_discount = false;
+
+        $xml = $invoice->service()->getEInvoice();
+
+        $validator = new \App\Services\EDocument\Standards\Validation\XsltDocumentValidator($xml);
+        $validator->setStyleSheets([$this->zf_extended_wl]);
+        $validator->setXsd('/Services/EDocument/Standards/Validation/Zugferd/Schema/XSD/CrossIndustryInvoice_100pD22B.xsd');
+        $validator->validate();
+
+        if (count($validator->getErrors()) > 0) {
+            nlog($xml);
+            nlog($validator->getErrors());
+        }
+
+        $this->assertCount(0, $validator->getErrors());
+    }
+
+    public function testZugFerdValidationWithInclusiveTaxesAndTotalPercentDiscountOnLineItemsAlsoExtendedProfile()
+    {
+        $scenario = [
+            'company_vat' => 'DE923356489',
+            'company_country' => 'DE',
+            'client_country' => 'DE',
+            'client_vat' => 'DE923356488',
+            'classification' => 'business',
+            'has_valid_vat' => true,
+            'over_threshold' => true,
+            'legal_entity_id' => 290868,
+            'e_invoice_type' => $this->extended_profile,
+        ];
+
+        $data = $this->setupTestData($scenario);
+
+        $invoice = $data['invoice'];
+        $invoice->uses_inclusive_taxes = true;
+        $invoice = $invoice->calc()->getInvoice();
+        $invoice->discount = 20;
+        $invoice->is_amount_discount = false;
+
+        $items = $invoice->line_items;
+
+        foreach ($items as &$item) {
+            $item->discount = 10;
+            $item->is_amount_discount = false;
+        }
+        unset($item);
+
+        $invoice->line_items = $items;
+
+        $xml = $invoice->service()->getEInvoice();
+
+        $validator = new \App\Services\EDocument\Standards\Validation\XsltDocumentValidator($xml);
+        $validator->setStyleSheets([$this->zf_extended_wl]);
+        $validator->setXsd('/Services/EDocument/Standards/Validation/Zugferd/Schema/XSD/CrossIndustryInvoice_100pD22B.xsd');
+        $validator->validate();
+
+        if (count($validator->getErrors()) > 0) {
+            nlog($xml);
+            nlog($validator->getErrors());
+        }
+
+        $this->assertCount(0, $validator->getErrors());
+    }
+
+    public function testZugFerdValidationWithInclusiveTaxesAndTotalAmountDiscountOnLineItemsAlsoExtendedProfile()
+    {
+        $scenario = [
+            'company_vat' => 'DE923356489',
+            'company_country' => 'DE',
+            'client_country' => 'DE',
+            'client_vat' => 'DE923356488',
+            'classification' => 'business',
+            'has_valid_vat' => true,
+            'over_threshold' => true,
+            'legal_entity_id' => 290868,
+            'e_invoice_type' => $this->extended_profile,
+        ];
+
+        $data = $this->setupTestData($scenario);
+
+        $invoice = $data['invoice'];
+        $invoice->uses_inclusive_taxes = true;
+        $invoice = $invoice->calc()->getInvoice();
+        $invoice->discount = 20;
+        $invoice->is_amount_discount = true;
+
+        $items = $invoice->line_items;
+
+        foreach ($items as &$item) {
+            $item->discount = 5;
+            $item->is_amount_discount = true;
+        }
+        unset($item);
+
+        $invoice->line_items = $items;
+
+        $xml = $invoice->service()->getEInvoice();
+
+        $validator = new \App\Services\EDocument\Standards\Validation\XsltDocumentValidator($xml);
+        $validator->setStyleSheets([$this->zf_extended_wl]);
+        $validator->setXsd('/Services/EDocument/Standards/Validation/Zugferd/Schema/XSD/CrossIndustryInvoice_100pD22B.xsd');
+        $validator->validate();
+
+        if (count($validator->getErrors()) > 0) {
+            nlog($xml);
+            nlog($validator->getErrors());
+        }
+
+        $this->assertCount(0, $validator->getErrors());
+    }
+
+
 }

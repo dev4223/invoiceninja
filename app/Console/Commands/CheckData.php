@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -86,7 +87,7 @@ class CheckData extends Command
     /**
      * @var string
      */
-    protected $signature = 'ninja:check-data {--database=} {--fix=} {--portal_url=} {--client_id=} {--vendor_id=} {--paid_to_date=} {--client_balance=} {--ledger_balance=} {--balance_status=} {--bank_transaction=} {--line_items=} {--payment_balance=}';
+    protected $signature = 'ninja:check-data {--database=} {--fix=} {--portal_url=} {--client_id=} {--vendor_id=} {--paid_to_date=} {--client_balance=} {--ledger_balance=} {--balance_status=} {--bank_transaction=} {--line_items=} {--payment_balance=} {--tasks=}';
 
     /**
      * @var string
@@ -117,6 +118,7 @@ class CheckData extends Command
             config(['database.default' => $database]);
         }
 
+        $this->checkTaskTimeLogs();
         $this->checkInvoiceBalances();
         $this->checkClientBalanceEdgeCases();
         $this->checkPaidToDatesNew();
@@ -177,6 +179,37 @@ class CheckData extends Command
         $str = date('Y-m-d h:i:s').' '.$str;
         $this->info($str);
         $this->log .= $str."\n";
+    }
+
+    private function checkTaskTimeLogs()
+    {
+        \App\Models\Task::query()->cursor()->each(function ($task) {
+            $time_log = json_decode(($task->time_log ?? ''), true) ?? [];
+
+            foreach($time_log as &$log){
+                if(count($log) > 4){
+
+                    $this->logMessage("Task #{$task->id} has a time log with more than 4 elements");
+
+                    if($this->option('tasks') == 'true'){
+                        $log = [(int)$log[0], (int)$log[1], (string)$log[2], (bool)$log[3]];
+                    }
+                }
+                elseif(count($log) == 4){
+                 
+                    if($this->option('tasks') == 'true'){
+                        $log = [(int)$log[0], (int)$log[1], (string)$log[2], (bool)$log[3]];
+                    }
+                }
+            }
+            unset($log); // Unset the reference variable
+
+            if($this->option('tasks') == 'true'){   
+                $task->time_log = json_encode($time_log);
+                $task->saveQuietly();
+            }
+
+        });
     }
 
     private function checkCompanyTokens()
@@ -488,7 +521,8 @@ class CheckData extends Command
                             $this->logMessage("Add invitation for {$entity_key} - {$entity->id}");
                         }
                     } else {
-                        $this->logMessage("No contact present, so cannot add invitation for {$entity_key} - {$entity->id}");
+                        $this->logMessage("No contact present ( ? vendor not present ?? ), so cannot add invitation for {$entity_key} - {$entity->id}");
+
 
                         try {
                             $entity->service()->createInvitations()->save();
@@ -568,6 +602,7 @@ class CheckData extends Command
             });
     }
 
+    //@deprecated
     private function clientCreditPaymentables($client)
     {
         $results = \DB::select("
@@ -587,6 +622,28 @@ class CheckData extends Command
         return $results;
     }
 
+    private function clientCreditPaymentablesNew($client)
+    {
+
+        $results = \DB::select("
+                SELECT 
+                SUM(paymentables.amount - paymentables.refunded) as credit_payment
+                FROM payments
+                LEFT JOIN paymentables
+                ON
+                payments.id = paymentables.payment_id
+                WHERE paymentable_type = 'invoices'
+                AND paymentables.deleted_at is NULL
+                AND paymentables.amount > 0
+                AND payments.is_deleted = 0
+                AND payments.client_id = ?;
+                ", [$client->id]);
+
+        return $results;
+
+
+    }
+
     private function checkPaidToDatesNew()
     {
         $clients_to_check = $this->clientPaidToDateQuery();
@@ -599,8 +656,11 @@ class CheckData extends Command
             $credits_from_reversal = Credit::withTrashed()->where('client_id', $client->id)->where('is_deleted', 0)->whereNotNull('invoice_id')->sum('amount');
 
             $credits_used_for_payments = $this->clientCreditPaymentables($client);
-
             $total_paid_to_date = $_client->payments_applied + $credits_used_for_payments[0]->credit_payment - $credits_from_reversal;
+
+            //2025-03-06 - new method
+            // $credits_used_for_payments = $this->clientCreditPaymentablesNew($client);
+            // $total_paid_to_date = $credits_used_for_payments[0]->credit_payment;
 
             if (round($total_paid_to_date, 2) != round($_client->client_paid_to_date, 2)) {
                 $this->wrong_paid_to_dates++;
@@ -911,14 +971,14 @@ class CheckData extends Command
     public function checkClientSettings()
     {
         if ($this->option('fix') == 'true') {
-            Client::query()->whereNull('country_id')->orWhere('country_id', 0)->cursor()->each(function ($client) {
+            Client::query()->withTrashed()->whereNull('country_id')->orWhere('country_id', 0)->cursor()->each(function ($client) {
                 $client->country_id = $client->company->settings->country_id;
                 $client->saveQuietly();
 
                 $this->logMessage("Fixing country for # {$client->id}");
             });
 
-            Client::query()->whereNull("settings->currency_id")->orWhereJsonContains('settings', ['currency_id' => ''])->cursor()->each(function ($client) {
+            Client::query()->withTrashed()->whereNull("settings->currency_id")->orWhereJsonContains('settings', ['currency_id' => ''])->cursor()->each(function ($client) {
                 $settings = $client->settings;
                 $settings->currency_id = (string)$client->company->settings->currency_id;
                 $client->settings = $settings;
@@ -928,7 +988,7 @@ class CheckData extends Command
 
             });
 
-            Payment::withTrashed()->where('exchange_rate', 0)->cursor()->each(function ($payment) {
+            Payment::withTrashed()->withTrashed()->where('exchange_rate', 0)->cursor()->each(function ($payment) {
                 $payment->exchange_rate = 1;
                 $payment->saveQuietly();
 
@@ -941,11 +1001,11 @@ class CheckData extends Command
             })
             ->cursor()
             ->each(function ($p) {
-                $p->currency_id = $p->client->settings->currency_id;
+                $p->currency_id = $p->client->settings->currency_id ?? $p->company->settings->currency_id;
                 $p->saveQuietly();
 
 
-                $this->logMessage("Fixing currency for # {$p->id}");
+                $this->logMessage("Fixing currency for # {$p->id} with new currency {$p->currency_id}");
 
             });
 
@@ -956,7 +1016,7 @@ class CheckData extends Command
                 $c->subdomain = MultiDB::randomSubdomainGenerator();
                 $c->save();
 
-                $this->logMessage("Fixing subdomain for # {$c->id}");
+                $this->logMessage("Fixing subdomain for # {$c->id} with new subdomain {$c->subdomain}");
 
             });
 
@@ -1017,7 +1077,7 @@ class CheckData extends Command
     public function checkVendorSettings()
     {
         if ($this->option('fix') == 'true') {
-            Vendor::query()->whereNull('currency_id')->orWhere('currency_id', '')->cursor()->each(function ($vendor) {
+            Vendor::query()->withTrashed()->whereNull('currency_id')->orWhere('currency_id', '')->cursor()->each(function ($vendor) {
                 $vendor->currency_id = $vendor->company->settings->currency_id;
                 $vendor->saveQuietly();
 
@@ -1115,7 +1175,7 @@ class CheckData extends Command
                 $bt->invoice_ids = collect($bt->payment->invoices)->pluck('hashed_id')->implode(',');
                 $bt->save();
 
-                $this->logMessage("Fixing - {$bt->id}");
+                $this->logMessage("Fixing - {$bt->id} with new invoice IDs {$bt->invoice_ids}");
 
             }
 
@@ -1136,7 +1196,7 @@ class CheckData extends Command
                 $c->send_email = false;
                 $c->saveQuietly();
 
-                $this->logMessage("Fixing - {$c->id}");
+                $this->logMessage("Fixing - {$c->id} with new send email {$c->send_email}");
 
             });
         }
@@ -1175,11 +1235,11 @@ class CheckData extends Command
 
         if ($this->option('fix') == 'true') {
 
-            $p->cursor()->each(function ($c) {
-                $c->currency_id = $c->client->settings->currency_id ?? $c->company->settings->currency_id;
-                $c->saveQuietly();
+            $p->cursor()->each(function ($payment) {
+                $payment->currency_id = $payment->client->settings->currency_id ?? $payment->company->settings->currency_id;
+                $payment->saveQuietly();
 
-                $this->logMessage("Fixing - {$c->id}");
+                $this->logMessage("Fixing payment ID - {$payment->id} with new currency {$payment->currency_id}");
 
             });
         }

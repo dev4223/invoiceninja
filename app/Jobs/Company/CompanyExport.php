@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -234,7 +235,7 @@ class CompanyExport implements ShouldQueue
 
         $this->export_data['credits'] = $this->company->credits()->orderBy('number', 'DESC')->cursor()->map(function ($credit) {
             $credit = $this->transformBasicEntities($credit);
-            $credit = $this->transformArrayOfKeys($credit, ['recurring_id','client_id', 'vendor_id', 'project_id', 'design_id', 'subscription_id','invoice_id']);
+            $credit = $this->transformArrayOfKeys($credit, ['recurring_id','client_id', 'vendor_id', 'project_id', 'design_id', 'subscription_id','invoice_id', 'location_id']);
 
             return $credit->makeVisible(['id']);
         })->all();
@@ -313,7 +314,7 @@ class CompanyExport implements ShouldQueue
 
         $this->export_data['invoices'] = $this->company->invoices()->orderBy('number', 'DESC')->cursor()->map(function ($invoice) {
             $invoice = $this->transformBasicEntities($invoice);
-            $invoice = $this->transformArrayOfKeys($invoice, ['recurring_id','client_id', 'vendor_id', 'project_id', 'design_id', 'subscription_id']);
+            $invoice = $this->transformArrayOfKeys($invoice, ['recurring_id','client_id', 'vendor_id', 'project_id', 'design_id', 'subscription_id', 'location_id']);
             $invoice->tax_data = '';
 
             return $invoice->makeHidden(['gateway_fee'])->makeVisible(['id',
@@ -396,7 +397,7 @@ class CompanyExport implements ShouldQueue
 
         $this->export_data['quotes'] = $this->company->quotes()->orderBy('number', 'DESC')->cursor()->map(function ($quote) {
             $quote = $this->transformBasicEntities($quote);
-            $quote = $this->transformArrayOfKeys($quote, ['invoice_id','recurring_id','client_id', 'vendor_id', 'project_id', 'design_id', 'subscription_id']);
+            $quote = $this->transformArrayOfKeys($quote, ['invoice_id','recurring_id','client_id', 'vendor_id', 'project_id', 'design_id', 'subscription_id', 'location_id']);
 
             return $quote->makeVisible(['id']);
         })->all();
@@ -435,7 +436,7 @@ class CompanyExport implements ShouldQueue
 
         $this->export_data['recurring_invoices'] = $this->company->recurring_invoices()->orderBy('number', 'DESC')->cursor()->map(function ($ri) {
             $ri = $this->transformBasicEntities($ri);
-            $ri = $this->transformArrayOfKeys($ri, ['client_id', 'vendor_id', 'project_id', 'design_id', 'subscription_id']);
+            $ri = $this->transformArrayOfKeys($ri, ['client_id', 'vendor_id', 'project_id', 'design_id', 'subscription_id', 'location_id']);
 
             return $ri->makeVisible(['id']);
         })->all();
@@ -571,7 +572,7 @@ class CompanyExport implements ShouldQueue
 
         $this->export_data['purchase_orders'] = $this->company->purchase_orders()->orderBy('number', 'DESC')->cursor()->map(function ($purchase_order) {
             $purchase_order = $this->transformBasicEntities($purchase_order);
-            $purchase_order = $this->transformArrayOfKeys($purchase_order, ['expense_id','client_id', 'vendor_id', 'project_id', 'design_id', 'subscription_id','project_id']);
+            $purchase_order = $this->transformArrayOfKeys($purchase_order, ['expense_id','client_id', 'vendor_id', 'project_id', 'design_id', 'subscription_id','project_id', 'location_id']);
 
             return $purchase_order->makeVisible(['id',
                                         'private_notes',
@@ -631,10 +632,9 @@ class CompanyExport implements ShouldQueue
 
         //write to tmp and email to owner();
 
-        if(Ninja::isSelfHost()) {
+        if (Ninja::isSelfHost()) {
             $this->export_data['e_invoicing_tokens'] = EInvoicingToken::all()->makeHidden(['id'])->all();
-        }
-        else {
+        } else {
             $this->export_data['e_invoicing_tokens'] = [];
         }
 
@@ -642,10 +642,20 @@ class CompanyExport implements ShouldQueue
         $x->addItems($this->export_data['e_invoicing_tokens']);
         $this->export_data = null;
 
+        $this->export_data['locations'] = $this->company->locations()->withTrashed()->orderBy('id', 'ASC')->cursor()->map(function ($location) {
+            $location = $this->transformArrayOfKeys($location, ['company_id', 'user_id', 'client_id', 'vendor_id']);
+
+            return $location->makeVisible(['id','user_id','company_id']);
+        })->all();
+
+        $x = $this->writer->collection('locations');
+        $x->addItems($this->export_data['locations']);
+        $this->export_data = null;
+
         //////////////////////////////////// fine ////////////////////////////////////
 
         $this->writer->end();
-        
+
         $this->zipAndSend();
 
         return true;
@@ -687,7 +697,7 @@ class CompanyExport implements ShouldQueue
             foreach ($documents as $document) {
                 try {
                     $content = $document->getFile();
-                    
+
                     if ($content === false) {
                         continue;
                     }
@@ -697,7 +707,7 @@ class CompanyExport implements ShouldQueue
                     continue;
                 }
             }
-            
+
             // Free up memory after each batch
             gc_collect_cycles();
         });
@@ -713,8 +723,8 @@ class CompanyExport implements ShouldQueue
             foreach ($backups as $backup) {
                 try {
                     $content = $backup->getFile();
-                    
-                    if ($content === false) {
+
+                    if ($content === false || is_null($content)) {
                         continue;
                     }
 
@@ -723,7 +733,7 @@ class CompanyExport implements ShouldQueue
                     continue;
                 }
             }
-            
+
             // Free up memory after each batch
             gc_collect_cycles();
         });
@@ -736,7 +746,7 @@ class CompanyExport implements ShouldQueue
         $logo = $this->company->present()->logoFile($this->company->settings);
 
         $zip->addFromString("company_logo.png", $logo);
-        
+
         return $zip;
     }
 

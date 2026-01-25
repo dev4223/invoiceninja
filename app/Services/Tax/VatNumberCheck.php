@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -21,7 +22,12 @@ class VatNumberCheck
 
     public function run()
     {
-        return $this->checkvat_number();
+        if (strlen($this->vat_number ?? '') == 0) {
+            $this->response = ['valid' => false, 'error' => 'No VAT number provided'];
+            return $this;
+        } else {
+            return $this->checkvat_number();
+        }
     }
 
     private function checkvat_number(): self

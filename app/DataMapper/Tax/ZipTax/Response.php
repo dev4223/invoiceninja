@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Invoice Ninja (https://invoiceninja.com).
  *
@@ -98,6 +99,9 @@ class Response
     public float $district5UseTax = 0;
     /* US SPECIFIC TAX CODES */
 
+    public string $nexus = "";
+    public string $country_nexus = "";
+    
     public string $originDestination = "D"; // defines if the client origin is the locale where the tax is remitted to
 
     public function __construct($data = null)
